@@ -1,10 +1,11 @@
 import { Link, useLocation } from "wouter";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Sparkles } from "lucide-react";
+import { Activity, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Sparkles, LogIn, LogOut, User } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useUser, useClerk, Show } from "@clerk/react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: Home },
@@ -17,18 +18,19 @@ const NAV_ITEMS = [
   { href: "/ai", label: "AI Control", icon: Sparkles },
 ];
 
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { key, updateKey, connected, checking, battery } = useHandy();
   const [inputKey, setInputKey] = useState(key);
   const { toast } = useToast();
+  const { user } = useUser();
+  const { signOut, openSignIn } = useClerk();
 
   const handleSaveKey = () => {
     updateKey(inputKey);
-    toast({
-      title: "Key updated",
-      description: "Attempting to connect to Handy..."
-    });
+    toast({ title: "Key updated", description: "Attempting to connect to Handy..." });
   };
 
   return (
@@ -52,13 +54,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
               />
             </div>
           </div>
-          
+
           <div className="space-y-2">
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Connection Key</label>
             <div className="flex gap-2">
-              <Input 
-                type="password" 
-                value={inputKey} 
+              <Input
+                type="password"
+                value={inputKey}
                 onChange={e => setInputKey(e.target.value)}
                 placeholder="Key..."
                 className="h-8 text-xs font-mono"
@@ -78,10 +80,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
               const isActive = location === item.href;
               return (
                 <Link key={item.href} href={item.href}>
-                  <div 
+                  <div
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors ${
-                      isActive 
-                        ? "bg-primary/10 text-primary font-medium" 
+                      isActive
+                        ? "bg-primary/10 text-primary font-medium"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                     data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
@@ -93,6 +95,44 @@ export function Layout({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
+        </div>
+
+        {/* User account section at bottom of sidebar */}
+        <div className="p-3 border-t border-border">
+          <Show when="signed-in">
+            <div className="flex items-center gap-3 px-2 py-2 rounded-md">
+              {user?.imageUrl ? (
+                <img src={user.imageUrl} alt={user.fullName ?? "User"} className="h-8 w-8 rounded-full border border-border flex-shrink-0" />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
+                  <User className="h-4 w-4 text-primary" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? "Account"}</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.primaryEmailAddress?.emailAddress}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground flex-shrink-0"
+                onClick={() => signOut()}
+                title="Sign out"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </Show>
+          <Show when="signed-out">
+            <Button
+              variant="outline"
+              className="w-full h-9 text-sm gap-2 border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/50"
+              onClick={() => openSignIn()}
+            >
+              <LogIn className="h-4 w-4" />
+              Sign In / Create Account
+            </Button>
+          </Show>
         </div>
       </div>
 
