@@ -25,6 +25,21 @@ export default function Library() {
     loadEntries();
   };
 
+  const handleOpen = async (entry: LibraryEntry) => {
+    const url = URL.createObjectURL(entry.blob);
+    if (entry.type === "video") {
+      localStorage.setItem("handy_pending_video_url", url);
+      localStorage.setItem("handy_pending_video_name", entry.name);
+    } else {
+      try {
+        const text = await entry.blob.text();
+        localStorage.setItem("handy_pending_script", text);
+        localStorage.setItem("handy_pending_script_name", entry.name);
+      } catch { /* ignore */ }
+    }
+    setLocation("/player");
+  };
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -92,7 +107,7 @@ export default function Library() {
               <CardTitle className="text-base truncate" title={entry.name}>{entry.name}</CardTitle>
             </CardHeader>
             <CardFooter className="p-4 pt-0 gap-2">
-              <Button variant="secondary" size="sm" className="flex-1" onClick={() => setLocation("/player")} data-testid={`button-open-${entry.id}`}>
+              <Button variant="secondary" size="sm" className="flex-1" onClick={() => handleOpen(entry)} data-testid={`button-open-${entry.id}`}>
                 <Play className="h-4 w-4 mr-2" /> Open
               </Button>
               <Button variant="destructive" size="icon" className="h-9 w-9" onClick={() => handleDelete(entry.id)} data-testid={`button-delete-${entry.id}`}>

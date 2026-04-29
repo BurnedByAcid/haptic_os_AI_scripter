@@ -36,6 +36,9 @@ export default function Scripter() {
   const [vtOffPos, setVtOffPos] = useState(0);
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
   const [vtProgress, setVtProgress] = useState(0);
+  const [vtStartTime, setVtStartTime] = useState(0);
+  const [vtEndTime, setVtEndTime] = useState(0);
+  const [vtPreviewPoints, setVtPreviewPoints] = useState<Point[]>([]);
 
   // ─────────────── Timeline drawing ───────────────
 
@@ -194,6 +197,9 @@ export default function Scripter() {
     const video = vtVideoRef.current!;
     video.src = url;
     video.currentTime = 0;
+    video.onloadedmetadata = () => {
+      setVtEndTime(Math.round(video.duration));
+    };
     video.onloadeddata = () => {
       setVtVideoLoaded(true);
       drawVtFrame();
@@ -256,13 +262,17 @@ export default function Scripter() {
 
     setVtAnalyzing(true);
     setVtProgress(0);
-    const duration = video.duration;
-    const stepMs = 100;
+    setVtPreviewPoints([]);
+
+    const startMs = vtStartTime * 1000;
+    const endMs = vtEndTime > 0 ? vtEndTime * 1000 : video.duration * 1000;
+    const stepMs = 200;
     const generated: Point[] = [];
     let lastState = false;
-    let t = 0;
+    let t = startMs;
+    const rangeMs = endMs - startMs;
 
-    while (t <= duration * 1000) {
+    while (t <= endMs) {
       video.currentTime = t / 1000;
       await new Promise<void>(res => {
         const onSeeked = () => { video.removeEventListener("seeked", onSeeked); res(); };
@@ -283,11 +293,16 @@ export default function Scripter() {
       }
 
       t += stepMs;
-      setVtProgress(Math.round((t / (duration * 1000)) * 100));
+      setVtProgress(Math.round(((t - startMs) / rangeMs) * 100));
     }
 
-    setPoints(prev => [...prev, ...generated]);
+    setVtPreviewPoints(generated);
     setVtAnalyzing(false);
+  };
+
+  const commitPreviewPoints = () => {
+    setPoints(prev => [...prev, ...vtPreviewPoints]);
+    setVtPreviewPoints([]);
   };
 
   return (
@@ -470,6 +485,32 @@ export default function Scripter() {
                     </div>
                   </div>
 
+                  <div>
+                    <p className="text-xs font-medium mb-2 text-muted-foreground uppercase tracking-wider">Time Range (seconds)</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground">Start (s)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={vtStartTime}
+                          onChange={e => setVtStartTime(Number(e.target.value))}
+                          className="w-full bg-input rounded px-2 py-1 text-sm mt-1 border border-border"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">End (s, 0=full)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={vtEndTime}
+                          onChange={e => setVtEndTime(Number(e.target.value))}
+                          className="w-full bg-input rounded px-2 py-1 text-sm mt-1 border border-border"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   <Button
                     className="w-full"
                     disabled={!vtZone || !vtSampledColor || vtAnalyzing}
@@ -479,8 +520,22 @@ export default function Scripter() {
                     {vtAnalyzing ? `Analyzing... ${vtProgress}%` : "Analyze Video"}
                   </Button>
 
+                  {vtPreviewPoints.length > 0 && (
+                    <div className="space-y-2 p-3 bg-primary/10 border border-primary/30 rounded-lg">
+                      <p className="text-xs font-medium text-primary">{vtPreviewPoints.length} points ready — preview in Timeline Editor</p>
+                      <div className="flex gap-2">
+                        <Button size="sm" className="flex-1" onClick={commitPreviewPoints} data-testid="button-vt-commit">
+                          Add to Script
+                        </Button>
+                        <Button size="sm" variant="destructive" className="flex-1" onClick={() => setVtPreviewPoints([])}>
+                          Discard
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {points.length > 0 && (
-                    <p className="text-xs text-primary text-center">{points.length} control points generated</p>
+                    <p className="text-xs text-primary text-center">{points.length} total points in script</p>
                   )}
                 </CardContent>
               </Card>

@@ -20,6 +20,27 @@ export default function Player() {
     syncEngine.setKey(key);
   }, [key]);
 
+  // Load item passed from Library
+  useEffect(() => {
+    const pendingVideoUrl = localStorage.getItem("handy_pending_video_url");
+    const pendingScript = localStorage.getItem("handy_pending_script");
+    if (pendingVideoUrl) {
+      setVideoUrl(pendingVideoUrl);
+      localStorage.removeItem("handy_pending_video_url");
+      localStorage.removeItem("handy_pending_video_name");
+    }
+    if (pendingScript) {
+      try {
+        const json = JSON.parse(pendingScript);
+        const newScripts = [json, null, null, null] as (Funscript | null)[];
+        setScripts(newScripts);
+        setActiveScriptIdx(0);
+      } catch { /* ignore bad JSON */ }
+      localStorage.removeItem("handy_pending_script");
+      localStorage.removeItem("handy_pending_script_name");
+    }
+  }, []);
+
   useEffect(() => {
     syncEngine.setScript(scripts[activeScriptIdx]);
   }, [scripts, activeScriptIdx]);

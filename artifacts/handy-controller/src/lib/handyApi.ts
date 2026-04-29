@@ -1,21 +1,38 @@
 export const BASE = "https://www.handyfeeling.com/api/handy/v2";
+export const SYNC_BASE = "https://www.handyfeeling.com/api/server/v3";
 
-const headers = (key: string) => ({ 
-  "X-Connection-Key": key, 
+const headers = (key: string) => ({
+  "X-Connection-Key": key,
   "Content-Type": "application/json",
   "Accept": "application/json"
 });
 
-export async function getStatus(key: string): Promise<{ connected: boolean; info?: any }> {
+export interface HandyStatusResult {
+  connected: boolean;
+  battery?: number;
+  mode?: number;
+}
+
+export async function getStatus(key: string): Promise<HandyStatusResult> {
   try {
-    const res = await fetch(`${BASE}/connected`, {
-      method: "GET",
-      headers: headers(key)
-    });
-    if (!res.ok) return { connected: false };
-    const data = await res.json();
-    return { connected: data.connected, info: data };
-  } catch (e) {
+    const [connRes, infoRes] = await Promise.allSettled([
+      fetch(`${BASE}/connected`, { headers: headers(key) }),
+      fetch(`${BASE}/info`, { headers: headers(key) })
+    ]);
+    let connected = false;
+    let battery: number | undefined;
+    let mode: number | undefined;
+    if (connRes.status === "fulfilled" && connRes.value.ok) {
+      const d = await connRes.value.json();
+      connected = !!d.connected;
+    }
+    if (infoRes.status === "fulfilled" && infoRes.value.ok) {
+      const d = await infoRes.value.json();
+      battery = d.hardware?.batteryLevel;
+      mode = d.mode;
+    }
+    return { connected, battery, mode };
+  } catch {
     return { connected: false };
   }
 }
@@ -32,24 +49,24 @@ export async function setMode(key: string, mode: number): Promise<void> {
   }
 }
 
-export async function setHAMP(key: string, opts: { velocity?: number; slideMin?: number; slideMax?: number }): Promise<void> {
+export async function setHAMP(
+  key: string,
+  opts: { velocity?: number; slideMin?: number; slideMax?: number }
+): Promise<void> {
   try {
-    // First ensure we are in HAMP mode (mode=0)
     await setMode(key, 0);
-
     if (opts.velocity !== undefined) {
       await fetch(`${BASE}/hamp/velocity`, {
         method: "PUT",
         headers: headers(key),
-        body: JSON.stringify({ velocity: Math.min(opts.velocity, 87) })
+        body: JSON.stringify({ velocity: Math.min(Math.round(opts.velocity), 100) })
       });
     }
-    
     if (opts.slideMin !== undefined && opts.slideMax !== undefined) {
       await fetch(`${BASE}/hamp/slide`, {
         method: "PUT",
         headers: headers(key),
-        body: JSON.stringify({ min: opts.slideMin, max: opts.slideMax })
+        body: JSON.stringify({ min: opts.slideMin / 100, max: opts.slideMax / 100 })
       });
     }
   } catch (e) {
@@ -62,9 +79,9 @@ export async function setHDSP(key: string, position: number, velocity: number): 
     await fetch(`${BASE}/hdsp/xava`, {
       method: "PUT",
       headers: headers(key),
-      body: JSON.stringify({ 
-        position: Math.max(0, Math.min(100, position)), 
-        velocity: Math.min(velocity, 87) 
+      body: JSON.stringify({
+        position: Math.max(0, Math.min(100, Math.round(position))) / 100,
+        velocity: Math.min(Math.round(velocity), 100) / 100
       })
     });
   } catch (e) {
@@ -74,11 +91,63 @@ export async function setHDSP(key: string, position: number, velocity: number): 
 
 export async function stopDevice(key: string): Promise<void> {
   try {
-    await fetch(`${BASE}/hamp/stop`, {
-      method: "PUT",
-      headers: headers(key)
-    });
+    await fetch(`${BASE}/hamp/stop`, { method: "PUT", headers: headers(key) });
   } catch (e) {
     console.error("stopDevice error", e);
+  }
+}
+
+// ─── HSSP — Handy Sync Script Play ───────────────────────────────────────────
+
+export async function getServerTime(): Promise<number> {
+  const t0 = Date.now();
+  const res = await fetch(`${SYNC_BASE}/servertime`);
+  const t1 = Date.now();
+  const { serverTime } = await res.json();
+  const offset = serverTime - Math.round((t0 + t1) / 2);
+  return offset;
+}
+
+export async function uploadScript(scriptJson: object): Promise<string> {
+  const blob = new Blob([JSON.stringify(scriptJson)], { type: "application/json" });
+  const formData = new FormData();
+  formData.append("file", blob, "script.funscript");
+  const res = await fetch(`${SYNC_BASE}/uploadFile`, { method: "POST", body: formData });
+  if (!res.ok) throw new Error("Script upload failed");
+  const data = await res.json();
+  return data.sha as string;
+}
+
+export async function setHSSP(
+  key: string,
+  sha: string,
+  serverTimeOffsetMs: number,
+  startTimeMs = 0
+): Promise<void> {
+  try {
+    await fetch(`${BASE}/hssp/setup`, {
+      method: "PUT",
+      headers: headers(key),
+      body: JSON.stringify({ sha })
+    });
+    const estimatedServerTime = Date.now() + serverTimeOffsetMs;
+    await fetch(`${BASE}/hssp/play`, {
+      method: "PUT",
+      headers: headers(key),
+      body: JSON.stringify({
+        estimatedServerTime,
+        startTime: startTimeMs
+      })
+    });
+  } catch (e) {
+    console.error("setHSSP error", e);
+  }
+}
+
+export async function stopHSSP(key: string): Promise<void> {
+  try {
+    await fetch(`${BASE}/hssp/stop`, { method: "PUT", headers: headers(key) });
+  } catch (e) {
+    console.error("stopHSSP error", e);
   }
 }

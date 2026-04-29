@@ -20,7 +20,7 @@ const NAV_ITEMS = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { key, updateKey, connected, checking } = useHandy();
+  const { key, updateKey, connected, checking, battery } = useHandy();
   const [inputKey, setInputKey] = useState(key);
   const { toast } = useToast();
 
@@ -39,14 +39,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-bold tracking-tight text-primary">HANDY<span className="text-foreground">CTRL</span></h1>
-            <div 
-              className={`h-3 w-3 rounded-full ${
-                checking ? "bg-yellow-500 animate-pulse" :
-                connected ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : 
-                "bg-red-500"
-              }`} 
-              title={checking ? "Checking..." : connected ? "Connected" : "Disconnected"}
-            />
+            <div className="flex items-center gap-2">
+              {battery !== undefined && connected && (
+                <span className="text-xs font-mono text-muted-foreground">{battery}%</span>
+              )}
+              <div
+                className={`h-3 w-3 rounded-full ${
+                  checking ? "bg-yellow-500 animate-pulse" :
+                  connected ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" :
+                  "bg-red-500"
+                }`}
+                title={checking ? "Checking..." : connected ? `Connected${battery !== undefined ? ` · ${battery}% battery` : ""}` : "Disconnected"}
+              />
+            </div>
           </div>
           
           <div className="space-y-2">
