@@ -4,7 +4,8 @@ import { syncEngine, Funscript } from "@/lib/scriptSync";
 import { setHDSP, stopDevice } from "@/lib/handyApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Play, Pause, Upload, Zap, Square } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Play, Pause, Upload, Zap, Square, Link2, Video, Circle, StopCircle, Download } from "lucide-react";
 
 function parseFunscript(json: unknown): Funscript {
   if (typeof json !== "object" || json === null) throw new Error("Not an object");
@@ -18,9 +19,56 @@ function parseFunscript(json: unknown): Funscript {
   return obj as unknown as Funscript;
 }
 
+type VideoMode = "file" | "url" | "embed";
+
+function detectEmbedUrl(raw: string): { embedUrl: string; mode: VideoMode } | null {
+  try {
+    const url = new URL(raw);
+    const h = url.hostname.replace("www.", "");
+
+    if (h === "youtube.com" || h === "youtu.be") {
+      const vid = h === "youtu.be" ? url.pathname.slice(1) : url.searchParams.get("v");
+      if (vid) return { embedUrl: `https://www.youtube.com/embed/${vid}?autoplay=0&rel=0`, mode: "embed" };
+    }
+    if (h === "pornhub.com") {
+      const key = url.searchParams.get("viewkey");
+      if (key) return { embedUrl: `https://www.pornhub.com/embed/${key}`, mode: "embed" };
+      const m = url.pathname.match(/\/embed\/(\w+)/);
+      if (m) return { embedUrl: raw, mode: "embed" };
+    }
+    if (h === "xvideos.com") {
+      const m = url.pathname.match(/\/video(\d+)\//);
+      if (m) return { embedUrl: `https://www.xvideos.com/embedframe/${m[1]}`, mode: "embed" };
+    }
+    if (h === "xhamster.com" || h === "xhamster.desi") {
+      const m = url.pathname.match(/\/(videos|xhamster)\/.*-(\d+)/);
+      if (m) return { embedUrl: `https://xhamster.com/xembed.php?video=${m[2]}`, mode: "embed" };
+    }
+    if (h === "redtube.com") {
+      const m = url.pathname.match(/\/(\d+)/);
+      if (m) return { embedUrl: `https://embed.redtube.com/?id=${m[1]}&bgcolor=000000`, mode: "embed" };
+    }
+    if (h === "vimeo.com") {
+      const m = url.pathname.match(/\/(\d+)/);
+      if (m) return { embedUrl: `https://player.vimeo.com/video/${m[1]}`, mode: "embed" };
+    }
+    if (/\.(mp4|webm|ogg|mov)(\?.*)?$/.test(url.pathname)) {
+      return { embedUrl: raw, mode: "url" };
+    }
+    return { embedUrl: raw, mode: "embed" };
+  } catch {
+    return null;
+  }
+}
+
+interface RecordedAction { at: number; pos: number }
+
 export default function Player() {
   const { key, connected } = useHandy();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoMode, setVideoMode] = useState<VideoMode>("file");
+  const [urlInput, setUrlInput] = useState("");
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [scripts, setScripts] = useState<(Funscript | null)[]>([null, null, null, null]);
   const [activeScriptIdx, setActiveScriptIdx] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -28,11 +76,14 @@ export default function Player() {
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    syncEngine.setKey(key);
-  }, [key]);
+  // Script recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordPos, setRecordPos] = useState(50);
+  const [recordedActions, setRecordedActions] = useState<RecordedAction[]>([]);
+  const recordRef = useRef({ isRecording: false, actions: [] as RecordedAction[] });
 
-  // Load item passed from Library
+  useEffect(() => { syncEngine.setKey(key); }, [key]);
+
   useEffect(() => {
     const pendingVideoUrl = localStorage.getItem("handy_pending_video_url");
     const pendingScript = localStorage.getItem("handy_pending_script");
@@ -52,30 +103,30 @@ export default function Player() {
     }
   }, []);
 
+  useEffect(() => { syncEngine.setScript(scripts[activeScriptIdx]); }, [scripts, activeScriptIdx]);
+  useEffect(() => { if (videoRef.current) syncEngine.setVideo(videoRef.current); }, [videoUrl]);
   useEffect(() => {
-    syncEngine.setScript(scripts[activeScriptIdx]);
-  }, [scripts, activeScriptIdx]);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      syncEngine.setVideo(videoRef.current);
-    }
-  }, [videoUrl]);
-
-  useEffect(() => {
-    if (isPlaying) {
-      syncEngine.start();
-    } else {
-      syncEngine.stop();
-    }
+    if (isPlaying) syncEngine.start();
+    else syncEngine.stop();
     return () => syncEngine.stop();
   }, [isPlaying]);
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setVideoUrl(url);
+    if (file) { setVideoUrl(URL.createObjectURL(file)); setVideoMode("file"); setEmbedUrl(null); }
+  };
+
+  const handleUrlLoad = () => {
+    const detected = detectEmbedUrl(urlInput.trim());
+    if (!detected) return;
+    if (detected.mode === "url") {
+      setVideoUrl(detected.embedUrl);
+      setEmbedUrl(null);
+      setVideoMode("url");
+    } else {
+      setEmbedUrl(detected.embedUrl);
+      setVideoUrl(null);
+      setVideoMode("embed");
     }
   };
 
@@ -88,21 +139,14 @@ export default function Player() {
         const newScripts = [...scripts];
         newScripts[idx] = script;
         setScripts(newScripts);
-      } catch (err) {
-        console.error("Failed to parse script", err);
-      }
+      } catch (err) { console.error("Failed to parse script", err); }
     }
   };
 
   const handlePlayPause = () => {
     if (videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play();
-        setIsPlaying(true);
-      } else {
-        videoRef.current.pause();
-        setIsPlaying(false);
-      }
+      if (videoRef.current.paused) { videoRef.current.play(); setIsPlaying(true); }
+      else { videoRef.current.pause(); setIsPlaying(false); }
     }
   };
 
@@ -111,11 +155,7 @@ export default function Player() {
     setFinishMode(true);
     let count = 0;
     const burst = () => {
-      if (count >= 10) {
-        stopDevice(key);
-        setFinishMode(false);
-        return;
-      }
+      if (count >= 10) { stopDevice(key); setFinishMode(false); return; }
       setHDSP(key, count % 2 === 0 ? 100 : 0, 87);
       count++;
       finishTimerRef.current = setTimeout(burst, 80);
@@ -123,18 +163,53 @@ export default function Player() {
     burst();
   }, [connected, key]);
 
-  useEffect(() => {
-    return () => {
-      if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
-    };
-  }, []);
+  useEffect(() => () => { if (finishTimerRef.current) clearTimeout(finishTimerRef.current); }, []);
+
+  // Recording
+  const startRecording = () => {
+    recordRef.current = { isRecording: true, actions: [] };
+    setRecordedActions([]);
+    setIsRecording(true);
+  };
+
+  const recordPoint = () => {
+    if (!videoRef.current || !recordRef.current.isRecording) return;
+    const at = Math.round(videoRef.current.currentTime * 1000);
+    const action = { at, pos: recordRef.current.actions.length % 2 === 0 ? 100 : 0 };
+    recordRef.current.actions = [...recordRef.current.actions, action];
+    setRecordedActions([...recordRef.current.actions]);
+  };
+
+  const stopRecording = () => {
+    setIsRecording(false);
+    recordRef.current.isRecording = false;
+    const actions = recordRef.current.actions;
+    if (actions.length < 2) return;
+    const script: Funscript = { actions };
+    const newScripts = [...scripts];
+    newScripts[activeScriptIdx] = script;
+    setScripts(newScripts);
+  };
+
+  const downloadRecordedScript = () => {
+    const actions = recordedActions;
+    if (!actions.length) return;
+    const script: Funscript = { actions };
+    const blob = new Blob([JSON.stringify(script, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "recorded.funscript";
+    a.click();
+  };
+
+  const hasVideo = videoUrl || embedUrl;
 
   return (
     <div className="p-6 h-full flex flex-col max-w-[1600px] mx-auto gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Player</h1>
-          <p className="text-muted-foreground">Sync local video with Funscripts.</p>
+          <p className="text-muted-foreground">Sync video with Funscripts — local files or external sites.</p>
         </div>
         {!connected && (
           <div className="bg-destructive/10 text-destructive px-4 py-2 rounded-md font-medium text-sm">
@@ -143,9 +218,51 @@ export default function Player() {
         )}
       </div>
 
+      {/* URL input bar */}
+      <Card className="border-border/50 bg-card/50">
+        <CardContent className="pt-4 pb-3">
+          <div className="flex gap-2">
+            <div className="flex rounded-md border border-border/50 overflow-hidden text-xs">
+              <button
+                className={`px-3 py-1.5 flex items-center gap-1.5 transition-colors ${videoMode === "file" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setVideoMode("file")}
+              >
+                <Video className="h-3.5 w-3.5" /> Local File
+              </button>
+              <button
+                className={`px-3 py-1.5 flex items-center gap-1.5 border-l border-border/50 transition-colors ${videoMode !== "file" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setVideoMode("url")}
+              >
+                <Link2 className="h-3.5 w-3.5" /> Video URL
+              </button>
+            </div>
+            {videoMode !== "file" ? (
+              <>
+                <Input
+                  className="flex-1 h-9 text-sm bg-background/50 border-border/50"
+                  placeholder="Paste YouTube, Pornhub, xVideos, xHamster, Vimeo, or direct video URL…"
+                  value={urlInput}
+                  onChange={e => setUrlInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleUrlLoad()}
+                />
+                <Button size="sm" className="h-9 px-4" onClick={handleUrlLoad}>Load</Button>
+              </>
+            ) : (
+              <Button variant="outline" className="h-9 relative px-4 text-sm">
+                <span>Browse Files</span>
+                <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
+              </Button>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1.5 ml-1">
+            Supports YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo, or any direct .mp4/.webm URL
+          </p>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
         <div className="lg:col-span-2 flex flex-col gap-4">
-          <Card className="flex-1 bg-black overflow-hidden relative border-border/50">
+          <Card className="flex-1 bg-black overflow-hidden relative border-border/50 min-h-[300px]">
             {videoUrl ? (
               <div className="w-full h-full relative group">
                 <video
@@ -153,18 +270,14 @@ export default function Player() {
                   src={videoUrl}
                   className="w-full h-full object-contain"
                   onPlay={() => { setIsPlaying(true); syncEngine.start(); }}
-                  onPause={() => {
-                    setIsPlaying(false);
-                    syncEngine.stop();
-                    if (connected && key) stopDevice(key);
-                  }}
-                  onSeeking={() => { syncEngine.stop(); }}
+                  onPause={() => { setIsPlaying(false); syncEngine.stop(); if (connected && key) stopDevice(key); }}
+                  onSeeking={() => syncEngine.stop()}
                   onSeeked={() => { if (isPlaying) syncEngine.start(); }}
                   controls={false}
                 />
 
-                {/* Tap-anywhere Finish Mode zone — shown when playing */}
-                {isPlaying && connected && !finishMode && (
+                {/* Tap-anywhere Finish Mode zone */}
+                {isPlaying && connected && !finishMode && !isRecording && (
                   <div
                     className="absolute inset-0 flex items-end justify-center pb-20 cursor-pointer select-none"
                     onClick={e => { e.stopPropagation(); triggerFinishMode(); }}
@@ -176,7 +289,18 @@ export default function Player() {
                   </div>
                 )}
 
-                {/* Finish Mode active indicator */}
+                {/* Recording overlay */}
+                {isRecording && (
+                  <div className="absolute inset-0 border-4 border-red-500 pointer-events-none">
+                    <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-sm font-bold px-3 py-1.5 rounded-full">
+                      <Circle className="h-3 w-3 fill-white animate-pulse" /> RECORDING
+                    </div>
+                    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-white text-xs bg-black/60 backdrop-blur px-3 py-1.5 rounded-full">
+                      {recordedActions.length} strokes recorded
+                    </div>
+                  </div>
+                )}
+
                 {finishMode && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="bg-primary/20 border border-primary rounded-full px-8 py-4 text-primary font-bold text-xl animate-pulse">
@@ -185,7 +309,6 @@ export default function Player() {
                   </div>
                 )}
 
-                {/* Custom Controls Overlay */}
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-4">
                   <Button variant="ghost" size="icon" onClick={handlePlayPause} className="text-white hover:bg-white/20">
                     {isPlaying ? <Pause /> : <Play />}
@@ -193,27 +316,78 @@ export default function Player() {
                   <div className="flex-1 h-2 bg-white/20 rounded-full cursor-pointer relative overflow-hidden" onClick={(e) => {
                     if (videoRef.current) {
                       const rect = e.currentTarget.getBoundingClientRect();
-                      const pos = (e.clientX - rect.left) / rect.width;
-                      videoRef.current.currentTime = pos * videoRef.current.duration;
+                      videoRef.current.currentTime = ((e.clientX - rect.left) / rect.width) * videoRef.current.duration;
                     }
                   }}>
-                    <div className="h-full bg-primary" style={{
-                      width: videoRef.current ? `${(videoRef.current.currentTime / videoRef.current.duration) * 100}%` : "0%"
-                    }} />
+                    <div className="h-full bg-primary" style={{ width: videoRef.current ? `${(videoRef.current.currentTime / videoRef.current.duration) * 100}%` : "0%" }} />
                   </div>
+                  {isRecording && (
+                    <Button size="sm" variant="destructive" onClick={recordPoint} className="text-xs h-8 gap-1.5 font-bold">
+                      ● STROKE
+                    </Button>
+                  )}
                 </div>
               </div>
+            ) : embedUrl ? (
+              <div className="w-full h-full relative">
+                <iframe
+                  src={embedUrl}
+                  className="w-full h-full border-0"
+                  allowFullScreen
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  title="Embedded video"
+                />
+                {recordedActions.length > 0 && (
+                  <div className="absolute top-3 right-3 bg-black/80 text-white text-xs px-3 py-1.5 rounded-full">
+                    {recordedActions.length} strokes recorded
+                  </div>
+                )}
+              </div>
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center border-2 border-dashed border-border/50 rounded-xl m-4 w-[calc(100%-2rem)] h-[calc(100%-2rem)]">
+              <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
                 <Upload className="h-12 w-12 mb-4 opacity-50" />
-                <h3 className="text-xl font-medium text-foreground mb-2">Load Video</h3>
-                <p className="mb-6 max-w-sm">Select a local video file to begin playback.</p>
-                <Button variant="secondary" className="relative cursor-pointer">
-                  <span>Browse Files</span>
-                  <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
-                </Button>
+                <h3 className="text-xl font-medium text-foreground mb-2">No Video Loaded</h3>
+                <p className="mb-4 max-w-sm text-sm">Load a local file or paste a URL from YouTube, Pornhub, xVideos, and more.</p>
               </div>
             )}
+          </Card>
+
+          {/* Script recorder */}
+          <Card className="border-border/50 bg-card/50">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-foreground">Script Recorder</span>
+                <span className="text-xs text-muted-foreground">
+                  {isRecording ? `${recordedActions.length} strokes` : recordedActions.length > 0 ? `${recordedActions.length} strokes saved to Slot 0${activeScriptIdx + 1}` : "Click record, then tap STROKE while watching"}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                {!isRecording ? (
+                  <Button size="sm" variant="outline" className="gap-1.5 text-xs border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300" onClick={startRecording} disabled={!hasVideo}>
+                    <Circle className="h-3 w-3 fill-red-400" /> Start Recording
+                  </Button>
+                ) : (
+                  <>
+                    <Button size="sm" variant="destructive" onClick={recordPoint} className="text-xs gap-1.5 font-bold">
+                      ● STROKE
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={stopRecording} className="text-xs gap-1.5">
+                      <StopCircle className="h-3.5 w-3.5" /> Stop & Save
+                    </Button>
+                  </>
+                )}
+                {!isRecording && recordedActions.length > 0 && (
+                  <Button size="sm" variant="ghost" className="text-xs gap-1.5 text-muted-foreground hover:text-foreground ml-auto" onClick={downloadRecordedScript}>
+                    <Download className="h-3.5 w-3.5" /> Download .funscript
+                  </Button>
+                )}
+              </div>
+              {embedUrl && (
+                <p className="text-[11px] text-amber-400/80 mt-2">
+                  Note: Embedded players don't expose playback time. Use the STROKE button to manually mark stroke moments.
+                </p>
+              )}
+            </CardContent>
           </Card>
         </div>
 
@@ -223,8 +397,8 @@ export default function Player() {
               <CardTitle>Finish Mode</CardTitle>
             </CardHeader>
             <CardContent>
-              <Button 
-                variant={finishMode ? "destructive" : "default"} 
+              <Button
+                variant={finishMode ? "destructive" : "default"}
                 className="w-full h-14 text-base font-bold"
                 onClick={triggerFinishMode}
                 disabled={!connected || finishMode}
@@ -242,13 +416,9 @@ export default function Player() {
             </CardHeader>
             <CardContent className="space-y-4">
               {[0, 1, 2, 3].map(idx => (
-                <div 
-                  key={idx} 
-                  className={`p-4 rounded-lg border-2 transition-all cursor-pointer flex flex-col gap-2 ${
-                    activeScriptIdx === idx 
-                      ? "border-primary bg-primary/10" 
-                      : "border-border hover:border-primary/50"
-                  }`}
+                <div
+                  key={idx}
+                  className={`p-4 rounded-lg border-2 transition-all cursor-pointer flex flex-col gap-2 ${activeScriptIdx === idx ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}
                   onClick={() => setActiveScriptIdx(idx)}
                 >
                   <div className="flex justify-between items-center">
@@ -257,20 +427,18 @@ export default function Player() {
                       {["Low", "Med", "High", "Max"][idx]} Intensity
                     </span>
                   </div>
-                  
                   {scripts[idx] ? (
-                    <div className="text-sm text-primary">
-                      Loaded ({scripts[idx]?.actions.length} points)
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-primary">Loaded ({scripts[idx]?.actions.length} points)</span>
+                      <button
+                        className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                        onClick={e => { e.stopPropagation(); const n = [...scripts]; n[idx] = null; setScripts(n); }}
+                      >Clear</button>
                     </div>
                   ) : (
                     <Button variant="outline" size="sm" className="w-full relative text-xs h-8">
                       <span>Load Script</span>
-                      <input 
-                        type="file" 
-                        accept=".funscript,.json" 
-                        className="absolute inset-0 opacity-0 cursor-pointer" 
-                        onChange={(e) => handleScriptUpload(idx, e)} 
-                      />
+                      <input type="file" accept=".funscript,.json" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleScriptUpload(idx, e)} />
                     </Button>
                   )}
                 </div>

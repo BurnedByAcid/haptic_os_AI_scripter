@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Sparkles, LogIn, LogOut, User } from "lucide-react";
+import { Activity, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Sparkles, LogIn, LogOut, User, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { href: "/beat", label: "Beat 2 Beat", icon: Activity },
   { href: "/scripter", label: "Scripter", icon: Mic },
   { href: "/ai", label: "AI Control", icon: Sparkles },
+  { href: "/community", label: "Community", icon: Users },
 ];
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");

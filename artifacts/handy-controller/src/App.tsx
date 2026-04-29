@@ -20,6 +20,7 @@ import Scripter from "@/pages/scripter";
 import AI from "@/pages/ai";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
+import Community from "@/pages/community";
 
 const queryClient = new QueryClient();
 
@@ -100,6 +101,7 @@ function Router() {
       <Route path="/beat" component={Beat} />
       <Route path="/scripter" component={Scripter} />
       <Route path="/ai" component={AI} />
+      <Route path="/community" component={Community} />
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
       <Route component={NotFound} />
