@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Play, Pause, Upload, Zap, Square, Link2, Video, Circle, StopCircle, Download, Loader2, CheckCircle2, WifiOff } from "lucide-react";
+import { FunscriptWaveform } from "@/components/funscript-waveform";
 
 function parseFunscript(json: unknown): Funscript {
   if (typeof json !== "object" || json === null) throw new Error("Not an object");
@@ -462,6 +463,22 @@ export default function Player() {
                 <p className="mb-4 max-w-sm text-sm">Load a local file or paste a URL from YouTube, Pornhub, xVideos, and more.</p>
               </div>
             )}
+          </Card>
+
+          {/* Funscript waveform */}
+          <Card className="border-border/50 bg-card/50 overflow-hidden">
+            <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Waveform</span>
+              {activeScript && (
+                <span className="text-[10px] text-muted-foreground">{activeScript.actions.length} points · click to seek</span>
+              )}
+            </div>
+            <FunscriptWaveform
+              script={activeScript ?? null}
+              videoRef={videoRef}
+              className="w-full"
+              style={{ height: "80px" }}
+            />
           </Card>
 
           {/* Script recorder */}
