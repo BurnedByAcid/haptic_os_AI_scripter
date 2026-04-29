@@ -1,12 +1,11 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useHandy } from "@/hooks/use-handy";
 import { setHDSP } from "@/lib/handyApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { Trash2 } from "lucide-react";
+import { Trash2, Download } from "lucide-react";
 
 interface Point {
   id: string;
@@ -23,37 +22,47 @@ export default function Scripter() {
   const [realtimeTest, setRealtimeTest] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  
-  // Dragging state
   const isDragging = useRef(false);
-  
-  const drawTimeline = () => {
+
+  // ─── Visual Trigger state ───
+  const vtCanvasRef = useRef<HTMLCanvasElement>(null);
+  const vtVideoRef = useRef<HTMLVideoElement>(null);
+  const vtVideoUrl = useRef<string | null>(null);
+  const [vtVideoLoaded, setVtVideoLoaded] = useState(false);
+  const [vtZone, setVtZone] = useState<{ x: number; y: number } | null>(null);
+  const [vtSampledColor, setVtSampledColor] = useState<[number, number, number, number] | null>(null);
+  const [vtTolerance, setVtTolerance] = useState(40);
+  const [vtOnPos, setVtOnPos] = useState(100);
+  const [vtOffPos, setVtOffPos] = useState(0);
+  const [vtAnalyzing, setVtAnalyzing] = useState(false);
+  const [vtProgress, setVtProgress] = useState(0);
+
+  // ─────────────── Timeline drawing ───────────────
+
+  const drawTimeline = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Grid
     ctx.strokeStyle = "rgba(255,255,255,0.05)";
     ctx.lineWidth = 1;
-    for(let i=0; i<=10; i++) {
+    for (let i = 0; i <= 10; i++) {
       ctx.beginPath();
-      ctx.moveTo(0, (canvas.height/10)*i);
-      ctx.lineTo(canvas.width, (canvas.height/10)*i);
+      ctx.moveTo(0, (canvas.height / 10) * i);
+      ctx.lineTo(canvas.width, (canvas.height / 10) * i);
       ctx.stroke();
     }
 
     const duration = videoRef.current?.duration ? videoRef.current.duration * 1000 : 10000;
-    const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p=>p.time)) + 1000 : 10000);
-    
+    const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p => p.time)) + 1000 : 10000);
+
     if (points.length > 0) {
-      const sorted = [...points].sort((a,b) => a.time - b.time);
+      const sorted = [...points].sort((a, b) => a.time - b.time);
       ctx.strokeStyle = "hsl(186, 100%, 50%)";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      
       sorted.forEach((p, i) => {
         const x = (p.time / maxTime) * canvas.width;
         const y = canvas.height - (p.pos / 100) * canvas.height;
@@ -61,13 +70,12 @@ export default function Scripter() {
         else ctx.lineTo(x, y);
       });
       ctx.stroke();
-      
       sorted.forEach(p => {
         const x = (p.time / maxTime) * canvas.width;
         const y = canvas.height - (p.pos / 100) * canvas.height;
         ctx.fillStyle = p.id === selectedPointId ? "hsl(186, 100%, 50%)" : "white";
         ctx.beginPath();
-        ctx.arc(x, y, p.id === selectedPointId ? 6 : 4, 0, Math.PI*2);
+        ctx.arc(x, y, p.id === selectedPointId ? 6 : 4, 0, Math.PI * 2);
         ctx.fill();
         if (p.id === selectedPointId) {
           ctx.strokeStyle = "white";
@@ -76,32 +84,29 @@ export default function Scripter() {
       });
     }
 
-    // Playhead
     if (videoRef.current) {
       const x = (currentTime / maxTime) * canvas.width;
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, canvas.height);
       ctx.stroke();
     }
-  };
+  }, [points, selectedPointId, currentTime]);
 
   useEffect(() => {
     drawTimeline();
-  }, [points, selectedPointId, currentTime]);
+  }, [drawTimeline]);
 
   const getPointAtCursor = (x: number, y: number, canvas: HTMLCanvasElement) => {
     const duration = videoRef.current?.duration ? videoRef.current.duration * 1000 : 10000;
-    const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p=>p.time)) + 1000 : 10000);
-    
+    const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p => p.time)) + 1000 : 10000);
     for (let i = points.length - 1; i >= 0; i--) {
       const p = points[i];
       const px = (p.time / maxTime) * canvas.width;
       const py = canvas.height - (p.pos / 100) * canvas.height;
-      const dist = Math.hypot(x - px, y - py);
-      if (dist < 10) return p;
+      if (Math.hypot(x - px, y - py) < 10) return p;
     }
     return null;
   };
@@ -112,7 +117,6 @@ export default function Scripter() {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
     const clickedPoint = getPointAtCursor(x, y, canvas);
     if (clickedPoint) {
       setSelectedPointId(clickedPoint.id);
@@ -120,12 +124,11 @@ export default function Scripter() {
     } else {
       setSelectedPointId(null);
       const duration = videoRef.current?.duration ? videoRef.current.duration * 1000 : 10000;
-      const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p=>p.time)) + 1000 : 10000);
+      const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p => p.time)) + 1000 : 10000);
       const time = (x / canvas.width) * maxTime;
       const pos = Math.round(100 - (y / canvas.height) * 100);
-      
       const newPoint = { id: crypto.randomUUID(), time, pos };
-      setPoints([...points, newPoint]);
+      setPoints(prev => [...prev, newPoint]);
       setSelectedPointId(newPoint.id);
     }
   };
@@ -137,26 +140,20 @@ export default function Scripter() {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
     const duration = videoRef.current?.duration ? videoRef.current.duration * 1000 : 10000;
-    const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p=>p.time)) + 1000 : 10000);
-    
+    const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p => p.time)) + 1000 : 10000);
     const newTime = Math.max(0, (x / canvas.width) * maxTime);
     const newPos = Math.max(0, Math.min(100, Math.round(100 - (y / canvas.height) * 100)));
-    
     setPoints(pts => pts.map(p => p.id === selectedPointId ? { ...p, time: newTime, pos: newPos } : p));
-
     if (realtimeTest && connected && key) {
       setHDSP(key, newPos, 87);
     }
   };
 
-  const handleCanvasMouseUp = () => {
-    isDragging.current = false;
-  };
+  const handleCanvasMouseUp = () => { isDragging.current = false; };
 
   const exportScript = () => {
-    const sorted = [...points].sort((a,b) => a.time - b.time);
+    const sorted = [...points].sort((a, b) => a.time - b.time);
     const script = { actions: sorted.map(p => ({ at: Math.round(p.time), pos: p.pos })) };
     const blob = new Blob([JSON.stringify(script, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -164,30 +161,134 @@ export default function Scripter() {
     a.href = url;
     a.download = "script.funscript";
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   const deleteSelected = () => {
     if (selectedPointId) {
-      setPoints(points.filter(p => p.id !== selectedPointId));
+      setPoints(pts => pts.filter(p => p.id !== selectedPointId));
       setSelectedPointId(null);
     }
   };
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setVideoUrl(URL.createObjectURL(file));
-    }
+    if (file) setVideoUrl(URL.createObjectURL(file));
   };
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    
     const updateTime = () => setCurrentTime(video.currentTime * 1000);
     video.addEventListener("timeupdate", updateTime);
     return () => video.removeEventListener("timeupdate", updateTime);
   }, [videoUrl]);
+
+  // ─────────────── Visual Trigger ───────────────
+
+  const handleVtVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    vtVideoUrl.current = url;
+    const video = vtVideoRef.current!;
+    video.src = url;
+    video.currentTime = 0;
+    video.onloadeddata = () => {
+      setVtVideoLoaded(true);
+      drawVtFrame();
+    };
+  };
+
+  const drawVtFrame = useCallback(() => {
+    const canvas = vtCanvasRef.current;
+    const video = vtVideoRef.current;
+    if (!canvas || !video) return;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 360;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(video, 0, 0);
+    if (vtZone) {
+      ctx.strokeStyle = "hsl(186, 100%, 50%)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(vtZone.x - 2, vtZone.y - 2, 9, 9);
+      ctx.fillStyle = "rgba(0,229,255,0.25)";
+      ctx.fillRect(vtZone.x - 2, vtZone.y - 2, 9, 9);
+    }
+  }, [vtZone]);
+
+  useEffect(() => {
+    if (vtVideoLoaded) drawVtFrame();
+  }, [vtZone, vtVideoLoaded, drawVtFrame]);
+
+  const handleVtCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = vtCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = Math.round((e.clientX - rect.left) * scaleX);
+    const y = Math.round((e.clientY - rect.top) * scaleY);
+    setVtZone({ x, y });
+    setVtSampledColor(null);
+  };
+
+  const sampleColor = () => {
+    const canvas = vtCanvasRef.current;
+    if (!canvas || !vtZone) return;
+    const ctx = canvas.getContext("2d")!;
+    const data = ctx.getImageData(vtZone.x, vtZone.y, 5, 5).data;
+    let r = 0, g = 0, b = 0, a = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      r += data[i]; g += data[i + 1]; b += data[i + 2]; a += data[i + 3];
+    }
+    const n = 25;
+    setVtSampledColor([Math.round(r / n), Math.round(g / n), Math.round(b / n), Math.round(a / n)]);
+  };
+
+  const colorDistance = (a: number[], b: number[]) =>
+    Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2 + (a[3] - b[3]) ** 2);
+
+  const runAnalysis = async () => {
+    const video = vtVideoRef.current;
+    const canvas = vtCanvasRef.current;
+    if (!video || !canvas || !vtZone || !vtSampledColor) return;
+
+    setVtAnalyzing(true);
+    setVtProgress(0);
+    const duration = video.duration;
+    const stepMs = 100;
+    const generated: Point[] = [];
+    let lastState = false;
+    let t = 0;
+
+    while (t <= duration * 1000) {
+      video.currentTime = t / 1000;
+      await new Promise<void>(res => {
+        const onSeeked = () => { video.removeEventListener("seeked", onSeeked); res(); };
+        video.addEventListener("seeked", onSeeked);
+      });
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const px = ctx.getImageData(vtZone.x, vtZone.y, 5, 5).data;
+      let r = 0, g = 0, b = 0, a = 0;
+      for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; a += px[i + 3]; }
+      const avg = [r / 25, g / 25, b / 25, a / 25];
+      const dist = colorDistance(avg, vtSampledColor);
+      const matched = dist < vtTolerance;
+
+      if (matched !== lastState) {
+        generated.push({ id: crypto.randomUUID(), time: t, pos: matched ? vtOnPos : vtOffPos });
+        lastState = matched;
+      }
+
+      t += stepMs;
+      setVtProgress(Math.round((t / (duration * 1000)) * 100));
+    }
+
+    setPoints(prev => [...prev, ...generated]);
+    setVtAnalyzing(false);
+  };
 
   return (
     <div className="p-6 h-full flex flex-col max-w-[1600px] mx-auto gap-6">
@@ -196,27 +297,29 @@ export default function Scripter() {
           <h1 className="text-3xl font-bold tracking-tight">Scripter</h1>
           <p className="text-muted-foreground">Create and edit Funscripts.</p>
         </div>
-        <Button onClick={exportScript} disabled={points.length === 0} data-testid="button-export-script">Export .funscript</Button>
+        <Button onClick={exportScript} disabled={points.length === 0} data-testid="button-export-script">
+          <Download className="mr-2 h-4 w-4" /> Export .funscript
+        </Button>
       </div>
 
       <Tabs defaultValue="timeline" className="flex-1 flex flex-col min-h-0">
         <TabsList className="bg-card/50 w-fit">
           <TabsTrigger value="timeline">Timeline Editor</TabsTrigger>
-          <TabsTrigger value="visual">Visual Trigger (Beta)</TabsTrigger>
+          <TabsTrigger value="visual">Visual Trigger</TabsTrigger>
         </TabsList>
-        
+
+        {/* Timeline Tab */}
         <TabsContent value="timeline" className="flex-1 flex flex-col gap-4 mt-4 min-h-0">
           <div className="flex gap-4 items-center bg-card/50 p-4 rounded-lg border border-border">
             <Button variant="secondary" className="relative cursor-pointer" size="sm">
               <span>Load Reference Video</span>
               <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
             </Button>
-            
             <label className="flex items-center gap-2 text-sm cursor-pointer ml-auto">
-              <input 
-                type="checkbox" 
-                checked={realtimeTest} 
-                onChange={(e) => setRealtimeTest(e.target.checked)} 
+              <input
+                type="checkbox"
+                checked={realtimeTest}
+                onChange={e => setRealtimeTest(e.target.checked)}
                 className="rounded border-border bg-black"
               />
               Real-time Test (Handy)
@@ -224,10 +327,10 @@ export default function Scripter() {
           </div>
 
           <Card className="bg-black border-border/50 relative overflow-hidden flex-shrink-0 group">
-            <canvas 
-              ref={canvasRef} 
-              width={1600} 
-              height={300} 
+            <canvas
+              ref={canvasRef}
+              width={1600}
+              height={300}
               className="w-full h-[300px] cursor-crosshair"
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
@@ -239,7 +342,6 @@ export default function Scripter() {
                 Click anywhere to add control points
               </div>
             )}
-            
             {selectedPointId && (
               <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button variant="destructive" size="icon" onClick={deleteSelected} title="Delete selected point">
@@ -248,7 +350,7 @@ export default function Scripter() {
               </div>
             )}
           </Card>
-          
+
           <div className="flex justify-between text-sm text-muted-foreground px-2">
             <span>Points: {points.length}</span>
             <Button variant="ghost" size="sm" onClick={() => setPoints([])} className="text-destructive hover:text-destructive h-8">Clear All</Button>
@@ -256,29 +358,132 @@ export default function Scripter() {
 
           {videoUrl && (
             <div className="flex-1 min-h-0 bg-black rounded-lg border border-border/50 overflow-hidden mt-4">
-               <video 
-                  ref={videoRef}
-                  src={videoUrl} 
-                  className="w-full h-full object-contain"
-                  controls
-                />
+              <video ref={videoRef} src={videoUrl} className="w-full h-full object-contain" controls />
             </div>
           )}
         </TabsContent>
-        
-        <TabsContent value="visual" className="flex-1 bg-card/30 rounded-lg border border-border p-8 flex flex-col items-center justify-center text-center">
-          <div className="max-w-md space-y-4">
-            <h3 className="text-xl font-bold">Visual Trigger Generator</h3>
-            <p className="text-muted-foreground">
-              Automatically generate scripts by analyzing video frame colors. This feature is currently in beta.
-            </p>
-            <div className="p-4 bg-muted/20 rounded border border-border mt-8 text-left text-sm space-y-2">
-              <p><strong>Coming soon:</strong></p>
-              <ul className="list-disc pl-5 text-muted-foreground">
-                <li>Pin sampling zone on video</li>
-                <li>Set target color tolerance</li>
-                <li>Auto-generate stroke events</li>
-              </ul>
+
+        {/* Visual Trigger Tab */}
+        <TabsContent value="visual" className="flex-1 flex flex-col gap-4 mt-4 min-h-0 overflow-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Video preview */}
+            <div className="lg:col-span-2 space-y-3">
+              <div className="flex gap-3 items-center">
+                <Button variant="secondary" size="sm" className="relative cursor-pointer">
+                  <span>Load Video</span>
+                  <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVtVideoUpload} />
+                </Button>
+                {vtVideoLoaded && (
+                  <span className="text-xs text-muted-foreground">Click on the video to pin the 5×5 sampling zone</span>
+                )}
+              </div>
+              <div className="relative bg-black rounded-lg border border-border/50 overflow-hidden min-h-[200px] flex items-center justify-center">
+                {!vtVideoLoaded && (
+                  <span className="text-muted-foreground text-sm">No video loaded</span>
+                )}
+                <canvas
+                  ref={vtCanvasRef}
+                  className={`w-full ${vtVideoLoaded ? "block cursor-crosshair" : "hidden"}`}
+                  onClick={handleVtCanvasClick}
+                />
+                <video ref={vtVideoRef} className="hidden" />
+              </div>
+              {vtVideoLoaded && (
+                <input
+                  type="range"
+                  min={0}
+                  max={vtVideoRef.current?.duration || 100}
+                  step={0.033}
+                  defaultValue={0}
+                  className="w-full accent-cyan-400"
+                  onChange={e => {
+                    if (vtVideoRef.current) {
+                      vtVideoRef.current.currentTime = Number(e.target.value);
+                      drawVtFrame();
+                    }
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Controls */}
+            <div className="space-y-4">
+              <Card className="bg-card/50 border-primary/20">
+                <CardContent className="p-4 space-y-4">
+                  <div>
+                    <p className="text-sm font-medium mb-1">Sampled Color</p>
+                    {vtSampledColor ? (
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded border border-border"
+                          style={{ backgroundColor: `rgb(${vtSampledColor[0]},${vtSampledColor[1]},${vtSampledColor[2]})` }}
+                        />
+                        <span className="text-xs font-mono text-muted-foreground">
+                          rgb({vtSampledColor[0]},{vtSampledColor[1]},{vtSampledColor[2]})
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Pin a zone first, then sample</p>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 w-full"
+                      disabled={!vtZone}
+                      onClick={sampleColor}
+                      data-testid="button-vt-sample"
+                    >
+                      Sample Color at Zone
+                    </Button>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm font-medium">Color Tolerance</span>
+                      <span className="text-sm font-mono text-primary">{vtTolerance}</span>
+                    </div>
+                    <Slider min={5} max={150} step={1} value={[vtTolerance]} onValueChange={v => setVtTolerance(v[0])} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground">On Pos (matched)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={vtOnPos}
+                        onChange={e => setVtOnPos(Number(e.target.value))}
+                        className="w-full bg-input rounded px-2 py-1 text-sm mt-1 border border-border"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Off Pos (no match)</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={vtOffPos}
+                        onChange={e => setVtOffPos(Number(e.target.value))}
+                        className="w-full bg-input rounded px-2 py-1 text-sm mt-1 border border-border"
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    disabled={!vtZone || !vtSampledColor || vtAnalyzing}
+                    onClick={runAnalysis}
+                    data-testid="button-vt-analyze"
+                  >
+                    {vtAnalyzing ? `Analyzing... ${vtProgress}%` : "Analyze Video"}
+                  </Button>
+
+                  {points.length > 0 && (
+                    <p className="text-xs text-primary text-center">{points.length} control points generated</p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
         </TabsContent>

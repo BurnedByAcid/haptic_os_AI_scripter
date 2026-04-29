@@ -19,6 +19,7 @@ export default function Beat() {
   const rafRef = useRef<number | null>(null);
   const lastBeatTimeRef = useRef(0);
   const energyHistoryRef = useRef<number[]>([]);
+  const beatIntervalHistoryRef = useRef<number[]>([]);
 
   const startMic = async () => {
     try {
@@ -110,16 +111,21 @@ export default function Beat() {
     const now = performance.now();
     
     if (energy > avgEnergy * sensitivity && now - lastBeatTimeRef.current > 250) {
-      // Beat detected
+      const interval = now - lastBeatTimeRef.current;
+      if (interval > 0 && interval < 3000) {
+        beatIntervalHistoryRef.current.push(interval);
+        if (beatIntervalHistoryRef.current.length > 8) beatIntervalHistoryRef.current.shift();
+        const avgInterval = beatIntervalHistoryRef.current.reduce((a, b) => a + b, 0) / beatIntervalHistoryRef.current.length;
+        setBpm(Math.round(60000 / avgInterval));
+      }
       lastBeatTimeRef.current = now;
       if (connected && key) {
         setHDSP(key, 100, 87);
         setTimeout(() => setHDSP(key, 0, 87), 120);
       }
-      
-      // visual flash
-      ctx.fillStyle = "rgba(186, 100%, 50%, 0.8)";
-      ctx.fillRect(0,0, canvas.width, canvas.height);
+
+      ctx.fillStyle = "rgba(0, 229, 255, 0.25)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
     } else {
       ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
       ctx.fillRect(0,0, canvas.width, canvas.height);
@@ -187,6 +193,18 @@ export default function Beat() {
             </CardContent>
           </Card>
 
+          <Card className="bg-card/50 border-primary/30">
+            <CardHeader>
+              <CardTitle>BPM</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center">
+              <span className="text-5xl font-bold font-mono text-primary" data-testid="bpm-display">
+                {bpm > 0 ? bpm : "—"}
+              </span>
+              <span className="text-xs text-muted-foreground mt-1">beats per minute</span>
+            </CardContent>
+          </Card>
+
           <Card className="bg-card/50 border-border/50">
             <CardHeader>
               <CardTitle>Sensitivity</CardTitle>
@@ -196,10 +214,10 @@ export default function Beat() {
                 <span className="text-sm text-muted-foreground">Threshold Mult</span>
                 <span className="font-mono text-primary">{sensitivity.toFixed(1)}x</span>
               </div>
-              <Slider 
-                min={1.0} max={3.0} step={0.1} 
-                value={[sensitivity]} 
-                onValueChange={(v) => setSensitivity(v[0])} 
+              <Slider
+                min={1.0} max={3.0} step={0.1}
+                value={[sensitivity]}
+                onValueChange={v => setSensitivity(v[0])}
               />
             </CardContent>
           </Card>

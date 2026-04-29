@@ -103,7 +103,7 @@ export default function Library() {
         ))}
         {filtered.length === 0 && (
           <div className="col-span-full py-12 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-border/50 rounded-xl">
-            <Library className="h-12 w-12 mb-4 opacity-20" />
+            <LibraryIcon className="h-12 w-12 mb-4 opacity-20" />
             <p>No entries found in library.</p>
           </div>
         )}
@@ -114,7 +114,7 @@ export default function Library() {
 
 function LibraryIcon({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round" className={className}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
     </svg>
   );

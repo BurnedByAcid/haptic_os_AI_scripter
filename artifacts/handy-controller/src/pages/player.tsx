@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useHandy } from "@/hooks/use-handy";
 import { syncEngine, Funscript } from "@/lib/scriptSync";
+import { setHDSP, stopDevice } from "@/lib/handyApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Play, Pause, Upload, Maximize } from "lucide-react";
+import { Play, Pause, Upload, Zap, Square } from "lucide-react";
 
 export default function Player() {
   const { key, connected } = useHandy();
@@ -11,6 +12,8 @@ export default function Player() {
   const [scripts, setScripts] = useState<(Funscript | null)[]>([null, null, null, null]);
   const [activeScriptIdx, setActiveScriptIdx] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [finishMode, setFinishMode] = useState(false);
+  const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -70,6 +73,29 @@ export default function Player() {
       }
     }
   };
+
+  const triggerFinishMode = useCallback(() => {
+    if (!connected || !key) return;
+    setFinishMode(true);
+    let count = 0;
+    const burst = () => {
+      if (count >= 10) {
+        stopDevice(key);
+        setFinishMode(false);
+        return;
+      }
+      setHDSP(key, count % 2 === 0 ? 100 : 0, 87);
+      count++;
+      finishTimerRef.current = setTimeout(burst, 80);
+    };
+    burst();
+  }, [connected, key]);
+
+  useEffect(() => {
+    return () => {
+      if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
+    };
+  }, []);
 
   return (
     <div className="p-6 h-full flex flex-col max-w-[1600px] mx-auto gap-6">
@@ -132,6 +158,24 @@ export default function Player() {
         </div>
 
         <div className="flex flex-col gap-4">
+          <Card className="border-primary/20 bg-card/50">
+            <CardHeader>
+              <CardTitle>Finish Mode</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                variant={finishMode ? "destructive" : "default"} 
+                className="w-full h-14 text-base font-bold"
+                onClick={triggerFinishMode}
+                disabled={!connected || finishMode}
+                data-testid="button-finish-mode"
+              >
+                <Zap className="mr-2 h-5 w-5" />
+                {finishMode ? "Burst Active..." : "Trigger Finish"}
+              </Button>
+              {!connected && <p className="text-xs text-muted-foreground mt-2">Connect device to use Finish Mode</p>}
+            </CardContent>
+          </Card>
           <Card className="flex-1 border-primary/20 bg-card/50">
             <CardHeader>
               <CardTitle>Scripts</CardTitle>
