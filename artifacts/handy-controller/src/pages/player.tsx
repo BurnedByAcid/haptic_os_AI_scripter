@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useHandy } from "@/hooks/use-handy";
-import { syncEngine, Funscript } from "@/lib/scriptSync";
+import { syncEngine, hsspEngine, Funscript, HSSPStatus } from "@/lib/scriptSync";
 import { setHDSP, stopDevice } from "@/lib/handyApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Play, Pause, Upload, Zap, Square, Link2, Video, Circle, StopCircle, Download } from "lucide-react";
+import { Play, Pause, Upload, Zap, Square, Link2, Video, Circle, StopCircle, Download, Loader2, CheckCircle2, WifiOff } from "lucide-react";
 
 function parseFunscript(json: unknown): Funscript {
   if (typeof json !== "object" || json === null) throw new Error("Not an object");
@@ -63,6 +63,34 @@ function detectEmbedUrl(raw: string): { embedUrl: string; mode: VideoMode } | nu
 
 interface RecordedAction { at: number; pos: number }
 
+function SyncBadge({ status }: { status: HSSPStatus }) {
+  if (status === "uploading") {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-full">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        Syncing script…
+      </div>
+    );
+  }
+  if (status === "ready") {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-green-600 bg-green-500/10 px-3 py-1.5 rounded-full">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        HSSP Synced
+      </div>
+    );
+  }
+  if (status === "error") {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-full">
+        <WifiOff className="h-3.5 w-3.5" />
+        HDSP Fallback
+      </div>
+    );
+  }
+  return null;
+}
+
 export default function Player() {
   const { key, connected } = useHandy();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -73,17 +101,27 @@ export default function Player() {
   const [activeScriptIdx, setActiveScriptIdx] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [finishMode, setFinishMode] = useState(false);
+  const [hsspStatus, setHsspStatus] = useState<HSSPStatus>("idle");
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Script recording state
   const [isRecording, setIsRecording] = useState(false);
-  const [recordPos, setRecordPos] = useState(50);
   const [recordedActions, setRecordedActions] = useState<RecordedAction[]>([]);
   const recordRef = useRef({ isRecording: false, actions: [] as RecordedAction[] });
 
-  useEffect(() => { syncEngine.setKey(key); }, [key]);
+  // Keep engine keys in sync
+  useEffect(() => {
+    syncEngine.setKey(key);
+    hsspEngine.setKey(key);
+  }, [key]);
 
+  // Subscribe to HSSP status changes
+  useEffect(() => {
+    hsspEngine.onStatus(setHsspStatus);
+  }, []);
+
+  // Load item passed from Library
   useEffect(() => {
     const pendingVideoUrl = localStorage.getItem("handy_pending_video_url");
     const pendingScript = localStorage.getItem("handy_pending_script");
@@ -103,13 +141,48 @@ export default function Player() {
     }
   }, []);
 
-  useEffect(() => { syncEngine.setScript(scripts[activeScriptIdx]); }, [scripts, activeScriptIdx]);
-  useEffect(() => { if (videoRef.current) syncEngine.setVideo(videoRef.current); }, [videoUrl]);
+  const activeScript = scripts[activeScriptIdx];
+
+  // Sync HDSP engine with active script
   useEffect(() => {
-    if (isPlaying) syncEngine.start();
-    else syncEngine.stop();
+    syncEngine.setScript(activeScript);
+  }, [activeScript]);
+
+  // When active script changes, upload to HSSP
+  useEffect(() => {
+    hsspEngine.reset();
+    setHsspStatus("idle");
+    if (activeScript && key) {
+      hsspEngine.prepare(activeScript);
+    }
+  }, [activeScript, key]);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      syncEngine.setVideo(videoRef.current);
+    }
+  }, [videoUrl]);
+
+  // HDSP fallback loop — only active when HSSP is not ready
+  useEffect(() => {
+    if (isPlaying && hsspStatus !== "ready") {
+      syncEngine.start();
+    } else {
+      syncEngine.stop();
+    }
     return () => syncEngine.stop();
-  }, [isPlaying]);
+  }, [isPlaying, hsspStatus]);
+
+  // When HSSP becomes ready mid-playback, migrate from HDSP fallback to HSSP immediately.
+  // This effect only fires on hsspStatus changes to avoid running on every isPlaying toggle.
+  useEffect(() => {
+    if (hsspStatus === "ready" && isPlaying && videoRef.current) {
+      const posMs = videoRef.current.currentTime * 1000;
+      hsspEngine.play(posMs);
+    }
+    // isPlaying intentionally omitted: we only want to fire on status transition
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hsspStatus]);
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -145,10 +218,46 @@ export default function Player() {
 
   const handlePlayPause = () => {
     if (videoRef.current) {
-      if (videoRef.current.paused) { videoRef.current.play(); setIsPlaying(true); }
-      else { videoRef.current.pause(); setIsPlaying(false); }
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+      } else {
+        videoRef.current.pause();
+      }
     }
   };
+
+  const handlePlay = useCallback(async () => {
+    setIsPlaying(true);
+    if (hsspStatus === "ready" && videoRef.current) {
+      const posMs = videoRef.current.currentTime * 1000;
+      await hsspEngine.play(posMs);
+    }
+    // HDSP fallback loop is started by the effect above
+  }, [hsspStatus]);
+
+  const handlePause = useCallback(async () => {
+    setIsPlaying(false);
+    syncEngine.stop();
+    if (hsspStatus === "ready") {
+      await hsspEngine.pause();
+    } else if (connected && key) {
+      stopDevice(key);
+    }
+  }, [hsspStatus, connected, key]);
+
+  const handleSeeking = useCallback(() => {
+    syncEngine.stop();
+  }, []);
+
+  const handleSeeked = useCallback(async () => {
+    if (!isPlaying) return;
+    if (hsspStatus === "ready" && videoRef.current) {
+      const posMs = videoRef.current.currentTime * 1000;
+      await hsspEngine.seek(posMs);
+    } else {
+      syncEngine.start();
+    }
+  }, [isPlaying, hsspStatus]);
 
   const triggerFinishMode = useCallback(() => {
     if (!connected || !key) return;
@@ -211,11 +320,14 @@ export default function Player() {
           <h1 className="text-3xl font-bold tracking-tight">Player</h1>
           <p className="text-muted-foreground">Sync video with Funscripts — local files or external sites.</p>
         </div>
-        {!connected && (
-          <div className="bg-destructive/10 text-destructive px-4 py-2 rounded-md font-medium text-sm">
-            Device Not Connected
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <SyncBadge status={hsspStatus} />
+          {!connected && (
+            <div className="bg-destructive/10 text-destructive px-4 py-2 rounded-md font-medium text-sm">
+              Device Not Connected
+            </div>
+          )}
+        </div>
       </div>
 
       {/* URL input bar */}
@@ -269,10 +381,10 @@ export default function Player() {
                   ref={videoRef}
                   src={videoUrl}
                   className="w-full h-full object-contain"
-                  onPlay={() => { setIsPlaying(true); syncEngine.start(); }}
-                  onPause={() => { setIsPlaying(false); syncEngine.stop(); if (connected && key) stopDevice(key); }}
-                  onSeeking={() => syncEngine.stop()}
-                  onSeeked={() => { if (isPlaying) syncEngine.start(); }}
+                  onPlay={handlePlay}
+                  onPause={handlePause}
+                  onSeeking={handleSeeking}
+                  onSeeked={handleSeeked}
                   controls={false}
                 />
 
@@ -418,7 +530,11 @@ export default function Player() {
               {[0, 1, 2, 3].map(idx => (
                 <div
                   key={idx}
-                  className={`p-4 rounded-lg border-2 transition-all cursor-pointer flex flex-col gap-2 ${activeScriptIdx === idx ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}
+                  className={`p-4 rounded-lg border-2 transition-all cursor-pointer flex flex-col gap-2 ${
+                    activeScriptIdx === idx
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:border-primary/50"
+                  }`}
                   onClick={() => setActiveScriptIdx(idx)}
                 >
                   <div className="flex justify-between items-center">
@@ -427,18 +543,25 @@ export default function Player() {
                       {["Low", "Med", "High", "Max"][idx]} Intensity
                     </span>
                   </div>
+
                   {scripts[idx] ? (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-primary">Loaded ({scripts[idx]?.actions.length} points)</span>
-                      <button
-                        className="text-xs text-muted-foreground hover:text-destructive transition-colors"
-                        onClick={e => { e.stopPropagation(); const n = [...scripts]; n[idx] = null; setScripts(n); }}
-                      >Clear</button>
+                      <span className="text-sm text-primary">
+                        Loaded ({scripts[idx]?.actions.length} points)
+                      </span>
+                      {idx === activeScriptIdx && hsspStatus !== "idle" && (
+                        <SyncBadge status={hsspStatus} />
+                      )}
                     </div>
                   ) : (
                     <Button variant="outline" size="sm" className="w-full relative text-xs h-8">
                       <span>Load Script</span>
-                      <input type="file" accept=".funscript,.json" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleScriptUpload(idx, e)} />
+                      <input
+                        type="file"
+                        accept=".funscript,.json"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={(e) => handleScriptUpload(idx, e)}
+                      />
                     </Button>
                   )}
                 </div>

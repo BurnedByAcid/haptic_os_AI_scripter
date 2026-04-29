@@ -1,4 +1,4 @@
-import { setHDSP } from "./handyApi";
+import { setHDSP, uploadScript, hsspSetup, hsspPlay, hsspStop, getServerTimeOffset } from "./handyApi";
 
 export interface FunscriptAction {
   at: number;
@@ -8,6 +8,8 @@ export interface FunscriptAction {
 export interface Funscript {
   actions: FunscriptAction[];
 }
+
+// ─── HDSP Engine (real-time rAF polling) ─────────────────────────────────────
 
 export class ScriptSyncEngine {
   private key: string = "";
@@ -113,5 +115,114 @@ export class ScriptSyncEngine {
   }
 }
 
-// Global instance for the app
+// ─── HSSP Engine (server-side sync) ──────────────────────────────────────────
+
+export type HSSPStatus = "idle" | "uploading" | "ready" | "error";
+
+export class HSSPSyncEngine {
+  private key: string = "";
+  private sha: string | null = null;
+  private serverOffset: number = 0;
+  private status: HSSPStatus = "idle";
+  private onStatusChange: ((s: HSSPStatus) => void) | null = null;
+  private onReady: (() => void) | null = null;
+  /** Monotonically-increasing token; stale async operations are discarded. */
+  private token: number = 0;
+
+  setKey(key: string) {
+    this.key = key;
+  }
+
+  getStatus(): HSSPStatus {
+    return this.status;
+  }
+
+  onStatus(cb: (s: HSSPStatus) => void) {
+    this.onStatusChange = cb;
+  }
+
+  /** Register a callback invoked once when status transitions to "ready". */
+  onReadyOnce(cb: () => void) {
+    this.onReady = cb;
+  }
+
+  private setStatus(s: HSSPStatus) {
+    this.status = s;
+    this.onStatusChange?.(s);
+    if (s === "ready") {
+      const cb = this.onReady;
+      this.onReady = null;
+      cb?.();
+    }
+  }
+
+  /** Upload script to Handy's server, calibrate server time, and run hssp/setup. */
+  async prepare(script: Funscript): Promise<boolean> {
+    if (!this.key) return false;
+    // Increment token to invalidate any in-flight prepare from a previous script
+    const myToken = ++this.token;
+    this.setStatus("uploading");
+    try {
+      // Upload and calibrate in parallel
+      const [sha, offset] = await Promise.all([
+        uploadScript(script),
+        getServerTimeOffset(5)
+      ]);
+      // Discard if a newer prepare() was started while we were awaiting
+      if (myToken !== this.token) return false;
+      if (typeof sha !== "string" || sha.length === 0) {
+        throw new Error("uploadScript returned an invalid SHA");
+      }
+      this.sha = sha;
+      this.serverOffset = offset;
+      // Run setup so device knows which script to play
+      await hsspSetup(this.key, sha);
+      if (myToken !== this.token) return false;
+      this.setStatus("ready");
+      return true;
+    } catch (e) {
+      if (myToken !== this.token) return false;
+      console.error("HSSP prepare failed:", e);
+      this.setStatus("error");
+      return false;
+    }
+  }
+
+  /** Call on video play or seek-then-play. */
+  async play(currentTimeMs: number): Promise<void> {
+    if (this.status !== "ready" || !this.sha || !this.key) return;
+    try {
+      await hsspPlay(this.key, this.serverOffset, currentTimeMs);
+    } catch (e) {
+      console.error("HSSP play failed:", e);
+      this.setStatus("error");
+    }
+  }
+
+  /** Call on seek while playing. Re-issues play with updated position. */
+  async seek(currentTimeMs: number): Promise<void> {
+    await this.play(currentTimeMs);
+  }
+
+  /** Call on pause. */
+  async pause(): Promise<void> {
+    if (!this.key) return;
+    try {
+      await hsspStop(this.key);
+    } catch (e) {
+      console.error("HSSP stop failed:", e);
+    }
+  }
+
+  /** Reset state (e.g. when a new script is loaded). */
+  reset() {
+    this.sha = null;
+    this.serverOffset = 0;
+    this.setStatus("idle");
+  }
+}
+
+// ─── Global instances ─────────────────────────────────────────────────────────
+
 export const syncEngine = new ScriptSyncEngine();
+export const hsspEngine = new HSSPSyncEngine();

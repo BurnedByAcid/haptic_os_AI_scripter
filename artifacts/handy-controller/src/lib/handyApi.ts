@@ -109,25 +109,89 @@ export async function stopDevice(key: string): Promise<void> {
 
 // ─── HSSP — Handy Sync Script Play ───────────────────────────────────────────
 
-export async function getServerTime(): Promise<number> {
-  const t0 = Date.now();
-  const res = await fetch(`${SYNC_BASE}/servertime`);
-  const t1 = Date.now();
-  const { serverTime } = await res.json();
-  const offset = serverTime - Math.round((t0 + t1) / 2);
-  return offset;
+/**
+ * Fetch server time and return the offset (serverTime - localTime) in ms.
+ * Average of multiple samples for accuracy.
+ */
+export async function getServerTimeOffset(samples = 5): Promise<number> {
+  const offsets: number[] = [];
+  for (let i = 0; i < samples; i++) {
+    const t0 = Date.now();
+    const res = await fetch(`${SYNC_BASE}/servertime`);
+    const t1 = Date.now();
+    const { serverTime } = await res.json();
+    offsets.push(serverTime - Math.round((t0 + t1) / 2));
+  }
+  // Return median offset
+  offsets.sort((a, b) => a - b);
+  return offsets[Math.floor(offsets.length / 2)];
 }
 
+/**
+ * Upload funscript JSON to Handy's sync server and return the SHA.
+ */
 export async function uploadScript(scriptJson: object): Promise<string> {
   const blob = new Blob([JSON.stringify(scriptJson)], { type: "application/json" });
   const formData = new FormData();
   formData.append("file", blob, "script.funscript");
-  const res = await fetch(`${SYNC_BASE}/uploadFile`, { method: "POST", body: formData });
-  if (!res.ok) throw new Error("Script upload failed");
+  const res = await fetch(`${SYNC_BASE}/syncFile`, { method: "POST", body: formData });
+  if (!res.ok) throw new Error(`Script upload failed: ${res.status}`);
   const data = await res.json();
-  return data.sha as string;
+  // API returns { url, sha } or similar
+  return (data.sha ?? data.url) as string;
 }
 
+/**
+ * Tell the Handy which script to use (by SHA).
+ * Call once after upload, before play.
+ */
+export async function hsspSetup(key: string, sha: string): Promise<void> {
+  const res = await fetch(`${BASE}/hssp/setup`, {
+    method: "PUT",
+    headers: headers(key),
+    body: JSON.stringify({ sha })
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`hssp/setup failed (${res.status}): ${body}`);
+  }
+}
+
+/**
+ * Start or seek HSSP playback.
+ * @param key            Connection key
+ * @param serverOffset   ms offset = serverTime - localTime (from getServerTimeOffset)
+ * @param startTimeMs    Current video position in ms
+ */
+export async function hsspPlay(
+  key: string,
+  serverOffset: number,
+  startTimeMs: number
+): Promise<void> {
+  const estimatedServerTime = Date.now() + serverOffset;
+  const res = await fetch(`${BASE}/hssp/play`, {
+    method: "PUT",
+    headers: headers(key),
+    body: JSON.stringify({ estimatedServerTime, startTime: startTimeMs })
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`hssp/play failed (${res.status}): ${body}`);
+  }
+}
+
+/**
+ * Stop HSSP playback.
+ */
+export async function hsspStop(key: string): Promise<void> {
+  try {
+    await fetch(`${BASE}/hamp/stop`, { method: "PUT", headers: headers(key) });
+  } catch (e) {
+    console.error("hsspStop error", e);
+  }
+}
+
+// Legacy combined helper kept for backwards compat
 export async function setHSSP(
   key: string,
   sha: string,
@@ -135,29 +199,13 @@ export async function setHSSP(
   startTimeMs = 0
 ): Promise<void> {
   try {
-    await fetch(`${BASE}/hssp/setup`, {
-      method: "PUT",
-      headers: headers(key),
-      body: JSON.stringify({ sha })
-    });
-    const estimatedServerTime = Date.now() + serverTimeOffsetMs;
-    await fetch(`${BASE}/hssp/play`, {
-      method: "PUT",
-      headers: headers(key),
-      body: JSON.stringify({
-        estimatedServerTime,
-        startTime: startTimeMs
-      })
-    });
+    await hsspSetup(key, sha);
+    await hsspPlay(key, serverTimeOffsetMs, startTimeMs);
   } catch (e) {
     console.error("setHSSP error", e);
   }
 }
 
 export async function stopHSSP(key: string): Promise<void> {
-  try {
-    await fetch(`${BASE}/hssp/stop`, { method: "PUT", headers: headers(key) });
-  } catch (e) {
-    console.error("stopHSSP error", e);
-  }
+  await hsspStop(key);
 }
