@@ -6,6 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Play, Pause, Upload, Zap, Square } from "lucide-react";
 
+function parseFunscript(json: unknown): Funscript {
+  if (typeof json !== "object" || json === null) throw new Error("Not an object");
+  const obj = json as Record<string, unknown>;
+  if (!Array.isArray(obj.actions)) throw new Error("Missing actions array");
+  for (let i = 0; i < Math.min(obj.actions.length, 10); i++) {
+    const a = obj.actions[i] as Record<string, unknown>;
+    if (typeof a.at !== "number" || typeof a.pos !== "number")
+      throw new Error(`actions[${i}] must have numeric at and pos`);
+  }
+  return obj as unknown as Funscript;
+}
+
 export default function Player() {
   const { key, connected } = useHandy();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -31,11 +43,10 @@ export default function Player() {
     }
     if (pendingScript) {
       try {
-        const json = JSON.parse(pendingScript);
-        const newScripts = [json, null, null, null] as (Funscript | null)[];
-        setScripts(newScripts);
+        const script = parseFunscript(JSON.parse(pendingScript));
+        setScripts([script, null, null, null]);
         setActiveScriptIdx(0);
-      } catch { /* ignore bad JSON */ }
+      } catch (e) { console.error("Invalid funscript from library:", e); }
       localStorage.removeItem("handy_pending_script");
       localStorage.removeItem("handy_pending_script_name");
     }
@@ -73,9 +84,9 @@ export default function Player() {
     if (file) {
       try {
         const text = await file.text();
-        const json = JSON.parse(text);
+        const script = parseFunscript(JSON.parse(text));
         const newScripts = [...scripts];
-        newScripts[idx] = json;
+        newScripts[idx] = script;
         setScripts(newScripts);
       } catch (err) {
         console.error("Failed to parse script", err);

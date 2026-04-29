@@ -4,7 +4,6 @@ import { Activity, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Sparkles
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 
 const NAV_ITEMS = [
@@ -103,7 +102,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
-      <Toaster />
     </div>
   );
 }

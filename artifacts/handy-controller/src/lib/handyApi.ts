@@ -1,6 +1,14 @@
 export const BASE = "https://www.handyfeeling.com/api/handy/v2";
 export const SYNC_BASE = "https://www.handyfeeling.com/api/server/v3";
 
+// Handy v2 motion limits
+// Max physical speed: 350 units/s (full stroke = 100 units)
+// HAMP velocity API takes 0-100 (% of max speed), so 100% = 350 units/s
+// HDSP velocity takes 0-1 (normalised), so 1.0 = max speed ≈ 350 units/s
+export const HANDY_MAX_SPEED_UNITS_PER_SEC = 350;
+export const pctToHampVelocity = (pct: number) => Math.max(0, Math.min(100, Math.round(pct)));
+export const pctToHdspVelocity = (pct: number) => Math.max(0, Math.min(1, pct / 100));
+
 const headers = (key: string) => ({
   "X-Connection-Key": key,
   "Content-Type": "application/json",
