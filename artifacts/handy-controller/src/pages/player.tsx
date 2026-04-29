@@ -477,7 +477,7 @@ export default function Player() {
               script={activeScript ?? null}
               videoRef={videoRef}
               className="w-full"
-              style={{ height: "80px" }}
+              style={{ height: "96px" }}
             />
           </Card>
 

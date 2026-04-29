@@ -13,6 +13,25 @@ const NEON_CYAN_RGBA = "rgba(0, 229, 255, ";
 const BG = "#080c10";
 const GRID = "rgba(255,255,255,0.04)";
 const CURSOR_COLOR = "#ffffff";
+const LABEL_COLOR = "rgba(255,255,255,0.28)";
+const TICK_COLOR = "rgba(255,255,255,0.14)";
+const LABEL_FONT = "10px monospace";
+const BOTTOM_STRIP = 16; // px reserved for time labels
+
+function formatMs(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function niceInterval(totalMs: number, canvasW: number): number {
+  const candidates = [5000, 10000, 15000, 30000, 60000, 120000, 300000, 600000, 1200000];
+  const targetTicks = Math.max(3, Math.min(12, Math.floor(canvasW / 70)));
+  for (const iv of candidates) {
+    if (Math.floor(totalMs / iv) <= targetTicks) return iv;
+  }
+  return candidates[candidates.length - 1];
+}
 
 export function FunscriptWaveform({ script, videoRef, className, style }: FunscriptWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,18 +56,22 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
     const totalMs = actions[actions.length - 1].at;
     if (totalMs <= 0) return;
 
-    const xOf = (ms: number) => (ms / totalMs) * w;
-    const yOf = (pos: number) => h - (pos / 100) * h;
+    // Plot area sits above the bottom label strip
+    const ph = h - BOTTOM_STRIP;
 
+    const xOf = (ms: number) => (ms / totalMs) * w;
+    const yOf = (pos: number) => ph - (pos / 100) * ph;
+
+    // Subtle grid lines (confined to plot area)
     for (let gx = 0; gx <= w; gx += w / 10) {
       ctx.beginPath();
       ctx.strokeStyle = GRID;
       ctx.lineWidth = 1;
       ctx.moveTo(gx, 0);
-      ctx.lineTo(gx, h);
+      ctx.lineTo(gx, ph);
       ctx.stroke();
     }
-    for (let gy = 0; gy <= h; gy += h / 4) {
+    for (let gy = 0; gy <= ph; gy += ph / 4) {
       ctx.beginPath();
       ctx.strokeStyle = GRID;
       ctx.lineWidth = 1;
@@ -57,7 +80,8 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
       ctx.stroke();
     }
 
-    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    // Gradient fill under waveform
+    const grad = ctx.createLinearGradient(0, 0, 0, ph);
     grad.addColorStop(0, NEON_CYAN_RGBA + "0.25)");
     grad.addColorStop(1, NEON_CYAN_RGBA + "0.0)");
 
@@ -66,12 +90,13 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
     for (let i = 1; i < actions.length; i++) {
       ctx.lineTo(xOf(actions[i].at), yOf(actions[i].pos));
     }
-    ctx.lineTo(xOf(actions[actions.length - 1].at), h);
-    ctx.lineTo(xOf(actions[0].at), h);
+    ctx.lineTo(xOf(actions[actions.length - 1].at), ph);
+    ctx.lineTo(xOf(actions[0].at), ph);
     ctx.closePath();
     ctx.fillStyle = grad;
     ctx.fill();
 
+    // Waveform line
     ctx.beginPath();
     ctx.moveTo(xOf(actions[0].at), yOf(actions[0].pos));
     for (let i = 1; i < actions.length; i++) {
@@ -83,6 +108,40 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
     ctx.shadowBlur = 6;
     ctx.stroke();
     ctx.shadowBlur = 0;
+
+    // ── X-axis: time tick marks + labels ──
+    const interval = niceInterval(totalMs, w);
+    ctx.font = LABEL_FONT;
+    ctx.textBaseline = "bottom";
+
+    for (let t = interval; t < totalMs; t += interval) {
+      const x = xOf(t);
+      // Tick mark
+      ctx.beginPath();
+      ctx.strokeStyle = TICK_COLOR;
+      ctx.lineWidth = 1;
+      ctx.moveTo(x, ph);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+      // Label — keep within canvas edges
+      const label = formatMs(t);
+      ctx.fillStyle = LABEL_COLOR;
+      ctx.textAlign = x < 24 ? "left" : x > w - 24 ? "right" : "center";
+      ctx.fillText(label, x, h - 1);
+    }
+
+    // ── Y-axis: position labels (left edge, inside plot area) ──
+    ctx.textAlign = "left";
+    ctx.fillStyle = LABEL_COLOR;
+    // 100% at top
+    ctx.textBaseline = "top";
+    ctx.fillText("100", 3, 2);
+    // 50% at mid
+    ctx.textBaseline = "middle";
+    ctx.fillText("50", 3, ph / 2);
+    // 0% at bottom of plot area (above the time strip)
+    ctx.textBaseline = "bottom";
+    ctx.fillText("0", 3, ph - 1);
   }, [script]);
 
   useEffect(() => {
@@ -110,6 +169,7 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
 
     const w = canvas.width;
     const h = canvas.height;
+    const ph = h - BOTTOM_STRIP;
     const totalMs = script.actions[script.actions.length - 1].at;
     if (totalMs <= 0) return;
 
@@ -126,13 +186,13 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
     ctx.shadowColor = CURSOR_COLOR;
     ctx.shadowBlur = 8;
     ctx.moveTo(cursorX, 0);
-    ctx.lineTo(cursorX, h);
+    ctx.lineTo(cursorX, ph);
     ctx.stroke();
     ctx.shadowBlur = 0;
 
     const dotX = Math.max(2, Math.min(cursorX, w - 2));
     const posAtCursor = getPositionAtTime(script, video.currentTime * 1000);
-    const dotY = h - (posAtCursor / 100) * h;
+    const dotY = ph - (posAtCursor / 100) * ph;
     ctx.beginPath();
     ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
     ctx.fillStyle = CURSOR_COLOR;
