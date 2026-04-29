@@ -135,13 +135,13 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
     ctx.fillStyle = LABEL_COLOR;
     // 100% at top
     ctx.textBaseline = "top";
-    ctx.fillText("100", 3, 2);
+    ctx.fillText("100%", 3, 2);
     // 50% at mid
     ctx.textBaseline = "middle";
-    ctx.fillText("50", 3, ph / 2);
+    ctx.fillText("50%", 3, ph / 2);
     // 0% at bottom of plot area (above the time strip)
     ctx.textBaseline = "bottom";
-    ctx.fillText("0", 3, ph - 1);
+    ctx.fillText("0%", 3, ph - 1);
   }, [script]);
 
   useEffect(() => {
