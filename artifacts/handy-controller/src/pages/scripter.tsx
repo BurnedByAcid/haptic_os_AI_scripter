@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
-import { Trash2, Download } from "lucide-react";
+import { Trash2, Download, FilePlus } from "lucide-react";
+
+const STORAGE_KEY = "scripter_session_v1";
 
 interface Point {
   id: string;
@@ -15,7 +17,29 @@ interface Point {
 
 export default function Scripter() {
   const { key, connected } = useHandy();
-  const [points, setPoints] = useState<Point[]>([]);
+  const [points, setPoints] = useState<Point[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      if (
+        Array.isArray(parsed) &&
+        parsed.every(
+          (p) =>
+            p !== null &&
+            typeof p === "object" &&
+            typeof p.id === "string" &&
+            typeof p.time === "number" &&
+            typeof p.pos === "number"
+        )
+      ) {
+        return parsed as Point[];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -128,6 +152,14 @@ export default function Scripter() {
   useEffect(() => {
     drawTimeline();
   }, [drawTimeline]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(points));
+    } catch {
+      // quota exceeded or private browsing — silently ignore
+    }
+  }, [points]);
 
   const getPointAtCursor = (x: number, y: number, canvas: HTMLCanvasElement) => {
     const duration = videoRef.current?.duration ? videoRef.current.duration * 1000 : 10000;
@@ -340,9 +372,24 @@ export default function Scripter() {
           <h1 className="text-3xl font-bold tracking-tight">Scripter</h1>
           <p className="text-muted-foreground">Create and edit Funscripts.</p>
         </div>
-        <Button onClick={exportScript} disabled={points.length === 0} data-testid="button-export-script">
-          <Download className="mr-2 h-4 w-4" /> Export .funscript
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (points.length === 0 || window.confirm("Start a new script? All unsaved points will be cleared.")) {
+                setPoints([]);
+                setSelectedPointId(null);
+                try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+              }
+            }}
+            data-testid="button-new-script"
+          >
+            <FilePlus className="mr-2 h-4 w-4" /> New Script
+          </Button>
+          <Button onClick={exportScript} disabled={points.length === 0} data-testid="button-export-script">
+            <Download className="mr-2 h-4 w-4" /> Export .funscript
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="timeline" className="flex-1 flex flex-col min-h-0">
