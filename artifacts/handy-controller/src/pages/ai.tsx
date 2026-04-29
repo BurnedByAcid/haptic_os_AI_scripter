@@ -143,9 +143,17 @@ export default function AI() {
       toast({ title: "No Credits", description: "Your trial credits are exhausted.", variant: "destructive" });
       return;
     }
+    // Charge first minute immediately on session start
+    const firstCredit = credits - 1;
+    if (firstCredit < 0) {
+      toast({ title: "No Credits", description: "Your trial credits are exhausted.", variant: "destructive" });
+      return;
+    }
+    setCredits(firstCredit);
+    localStorage.setItem("handy_ai_credits", firstCredit.toString());
     setSessionActive(true);
-    setMinutesUsed(0);
-    let elapsed = 0;
+    setMinutesUsed(1);
+    let elapsed = 1;
     creditDeductRef.current = setInterval(() => {
       elapsed += 1;
       setMinutesUsed(elapsed);

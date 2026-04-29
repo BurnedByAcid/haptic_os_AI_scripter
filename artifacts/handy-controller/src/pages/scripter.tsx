@@ -58,9 +58,11 @@ export default function Scripter() {
       ctx.stroke();
     }
 
+    const allTimes = [...points, ...vtPreviewPoints].map(p => p.time);
     const duration = videoRef.current?.duration ? videoRef.current.duration * 1000 : 10000;
-    const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p => p.time)) + 1000 : 10000);
+    const maxTime = Math.max(duration, allTimes.length ? Math.max(...allTimes) + 1000 : 10000);
 
+    // Draw committed points in cyan
     if (points.length > 0) {
       const sorted = [...points].sort((a, b) => a.time - b.time);
       ctx.strokeStyle = "hsl(186, 100%, 50%)";
@@ -87,6 +89,31 @@ export default function Scripter() {
       });
     }
 
+    // Draw preview points (vtPreviewPoints) as amber overlay before commit
+    if (vtPreviewPoints.length > 0) {
+      const sorted = [...vtPreviewPoints].sort((a, b) => a.time - b.time);
+      ctx.strokeStyle = "rgba(251,191,36,0.8)";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 3]);
+      ctx.beginPath();
+      sorted.forEach((p, i) => {
+        const x = (p.time / maxTime) * canvas.width;
+        const y = canvas.height - (p.pos / 100) * canvas.height;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+      sorted.forEach(p => {
+        const x = (p.time / maxTime) * canvas.width;
+        const y = canvas.height - (p.pos / 100) * canvas.height;
+        ctx.fillStyle = "rgba(251,191,36,0.9)";
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
     if (videoRef.current) {
       const x = (currentTime / maxTime) * canvas.width;
       ctx.strokeStyle = "rgba(255,255,255,0.5)";
@@ -96,7 +123,7 @@ export default function Scripter() {
       ctx.lineTo(x, canvas.height);
       ctx.stroke();
     }
-  }, [points, selectedPointId, currentTime]);
+  }, [points, vtPreviewPoints, selectedPointId, currentTime]);
 
   useEffect(() => {
     drawTimeline();
@@ -266,7 +293,8 @@ export default function Scripter() {
 
     const startMs = vtStartTime * 1000;
     const endMs = vtEndTime > 0 ? vtEndTime * 1000 : video.duration * 1000;
-    const stepMs = 200;
+    // Step at video frame cadence (~30fps = 33ms per frame)
+    const stepMs = Math.round(1000 / 30);
     const generated: Point[] = [];
     let lastState = false;
     let t = startMs;
