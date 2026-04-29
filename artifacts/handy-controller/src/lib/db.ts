@@ -4,7 +4,8 @@ export interface LibraryEntry {
   id: string;
   name: string;
   type: "video" | "funscript";
-  blob: Blob;
+  blob?: Blob;
+  fileHandle?: FileSystemFileHandle;
   addedAt: number;
   thumbnail?: string;
   linkedTo?: string;

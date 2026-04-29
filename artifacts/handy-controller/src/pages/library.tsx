@@ -1,10 +1,24 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { getAllEntries, addEntry, deleteEntry, LibraryEntry } from "@/lib/db";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Film, FileJson, Trash2, Play, Upload } from "lucide-react";
+import { Film, FileJson, Trash2, Play, Upload, FolderOpen } from "lucide-react";
 import { useLocation } from "wouter";
+
+// File System Access API types (Chrome/Edge, not yet in standard TS lib)
+interface FSAFileHandle extends FileSystemFileHandle {
+  queryPermission(desc: { mode: "read" | "readwrite" }): Promise<PermissionState>;
+  requestPermission(desc: { mode: "read" | "readwrite" }): Promise<PermissionState>;
+}
+interface FSAWindow {
+  showOpenFilePicker(opts: {
+    multiple?: boolean;
+    types?: { description: string; accept: Record<string, string[]> }[];
+  }): Promise<FSAFileHandle[]>;
+}
+
+const hasFSA = typeof window !== "undefined" && "showOpenFilePicker" in window;
 
 export default function Library() {
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
@@ -26,15 +40,41 @@ export default function Library() {
   };
 
   const handleOpen = async (entry: LibraryEntry) => {
-    const url = URL.createObjectURL(entry.blob);
+    let url: string | null = null;
+
+    if (entry.fileHandle) {
+      try {
+        const fsaHandle = entry.fileHandle as unknown as FSAFileHandle;
+        let perm = await fsaHandle.queryPermission({ mode: "read" });
+        if (perm !== "granted") {
+          perm = await fsaHandle.requestPermission({ mode: "read" });
+        }
+        if (perm === "granted") {
+          const file = await fsaHandle.getFile();
+          url = URL.createObjectURL(file);
+        }
+      } catch {
+        // fall through to blob if handle failed
+      }
+    }
+
+    if (!url && entry.blob) {
+      url = URL.createObjectURL(entry.blob);
+    }
+
+    if (!url) return;
+
     if (entry.type === "video") {
       localStorage.setItem("handy_pending_video_url", url);
       localStorage.setItem("handy_pending_video_name", entry.name);
     } else {
       try {
-        const text = await entry.blob.text();
-        localStorage.setItem("handy_pending_script", text);
-        localStorage.setItem("handy_pending_script_name", entry.name);
+        const file = entry.blob ?? (entry.fileHandle ? await (await entry.fileHandle.getFile()) : null);
+        if (file) {
+          const text = await (file as Blob).text();
+          localStorage.setItem("handy_pending_script", text);
+          localStorage.setItem("handy_pending_script_name", entry.name);
+        }
       } catch { /* ignore */ }
     }
     setLocation("/player");
@@ -63,13 +103,43 @@ export default function Library() {
       video.onerror = () => { URL.revokeObjectURL(url); resolve(""); };
     });
 
+  // File System Access API picker — preferred when available (stores handle, no large blob)
+  const handleBrowseFSA = async () => {
+    try {
+      const handles = await (window as unknown as FSAWindow).showOpenFilePicker({
+        multiple: true,
+        types: [
+          { description: "Videos", accept: { "video/*": [".mp4", ".mkv", ".webm", ".mov", ".avi"] } },
+          { description: "Funscripts", accept: { "application/json": [".funscript", ".json"] } }
+        ]
+      });
+      for (const handle of handles) {
+        const file = await handle.getFile();
+        const isVideo = file.type.startsWith("video/");
+        const thumbnail = isVideo ? await generateThumbnail(file) : undefined;
+        const entry: LibraryEntry = {
+          id: crypto.randomUUID(),
+          name: file.name,
+          type: isVideo ? "video" : "funscript",
+          fileHandle: handle,
+          addedAt: Date.now(),
+          thumbnail
+        };
+        await addEntry(entry);
+      }
+      loadEntries();
+    } catch {
+      // user cancelled or permission denied — no-op
+    }
+  };
+
+  // Fallback: classic <input type="file"> that stores blob
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const isVideo = file.type.startsWith('video/');
+      const isVideo = file.type.startsWith("video/");
       const thumbnail = isVideo ? await generateThumbnail(file) : undefined;
       const entry: LibraryEntry = {
         id: crypto.randomUUID(),
@@ -95,23 +165,29 @@ export default function Library() {
         </div>
         <div className="flex items-center gap-4">
           <div className="w-64">
-            <Input 
-              placeholder="Search library..." 
+            <Input
+              placeholder="Search library..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="bg-card"
             />
           </div>
-          <Button variant="default" className="relative cursor-pointer" data-testid="button-upload-library">
-            <Upload className="h-4 w-4 mr-2" /> Upload
-            <input 
-              type="file" 
-              accept="video/*,.funscript,.json" 
-              multiple 
-              className="absolute inset-0 opacity-0 cursor-pointer" 
-              onChange={handleUpload} 
-            />
-          </Button>
+          {hasFSA ? (
+            <Button variant="default" onClick={handleBrowseFSA} data-testid="button-upload-library">
+              <FolderOpen className="h-4 w-4 mr-2" /> Browse Files
+            </Button>
+          ) : (
+            <Button variant="default" className="relative cursor-pointer" data-testid="button-upload-library">
+              <Upload className="h-4 w-4 mr-2" /> Upload
+              <input
+                type="file"
+                accept="video/*,.funscript,.json"
+                multiple
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                onChange={handleUpload}
+              />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -121,7 +197,7 @@ export default function Library() {
             <div className="aspect-video bg-black flex items-center justify-center relative border-b border-border/50 overflow-hidden">
               {entry.thumbnail ? (
                 <img src={entry.thumbnail} alt={entry.name} className="w-full h-full object-cover" />
-              ) : entry.type === 'video' ? (
+              ) : entry.type === "video" ? (
                 <Film className="h-12 w-12 text-primary/50 group-hover:text-primary transition-colors" />
               ) : (
                 <FileJson className="h-12 w-12 text-primary/50 group-hover:text-primary transition-colors" />
@@ -129,6 +205,11 @@ export default function Library() {
               <div className="absolute top-2 right-2 bg-background/80 backdrop-blur px-2 py-1 rounded text-xs font-mono">
                 {entry.type.toUpperCase()}
               </div>
+              {entry.fileHandle && (
+                <div className="absolute top-2 left-2 bg-primary/80 backdrop-blur px-2 py-1 rounded text-xs font-mono text-black font-semibold">
+                  LINKED
+                </div>
+              )}
             </div>
             <CardHeader className="p-4 pb-2">
               <CardTitle className="text-base truncate" title={entry.name}>{entry.name}</CardTitle>

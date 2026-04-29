@@ -97,7 +97,11 @@ export default function AI() {
   const creditDeductRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { toast } = useToast();
 
-  const API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+  const [apiKey, setApiKey] = useState(() =>
+    localStorage.getItem("handy_openai_key") || import.meta.env.VITE_OPENAI_API_KEY || ""
+  );
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [keyDraft, setKeyDraft] = useState("");
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -142,6 +146,16 @@ export default function AI() {
     setMessages(prev => [...prev, { role, content }]);
   };
 
+  const saveApiKey = (k: string) => {
+    const trimmed = k.trim();
+    setApiKey(trimmed);
+    if (trimmed) localStorage.setItem("handy_openai_key", trimmed);
+    else localStorage.removeItem("handy_openai_key");
+    setShowKeyInput(false);
+    setKeyDraft("");
+    toast({ title: trimmed ? "API Key Saved" : "API Key Cleared", description: trimmed ? "Using real OpenAI." : "Switched to simulation mode." });
+  };
+
   const sendToOpenAI = async (userText: string) => {
     const systemMsg: Message = { role: "system", content: activePersona.prompt };
     const history = messages.filter(m => m.role !== "system");
@@ -151,7 +165,7 @@ export default function AI() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${API_KEY}`
+        "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
         model: "gpt-4o-mini",
@@ -222,7 +236,7 @@ export default function AI() {
     setInputText("");
     setIsLoading(true);
     try {
-      const rawReply = API_KEY ? await sendToOpenAI(text) : await simulateResponse(text);
+      const rawReply = apiKey ? await sendToOpenAI(text) : await simulateResponse(text);
       const cleanReply = processHandyCommands(rawReply);
       addMessage("assistant", cleanReply);
       speak(cleanReply);
@@ -289,11 +303,37 @@ export default function AI() {
         </div>
       </div>
 
-      {!API_KEY && (
-        <div className="bg-yellow-500/10 border border-yellow-500/50 text-yellow-500 p-3 rounded-md text-sm">
-          <strong>No API key:</strong> Add VITE_OPENAI_API_KEY to enable real AI. Currently using demo responses.
-        </div>
-      )}
+      {/* API Key management bar */}
+      <div className="flex items-center gap-3 bg-card/50 border border-border/50 rounded-lg px-4 py-2">
+        <span className={`text-xs font-bold px-2 py-1 rounded ${apiKey ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"}`}>
+          {apiKey ? "Real AI (gpt-4o-mini)" : "Simulation Mode"}
+        </span>
+        {showKeyInput ? (
+          <>
+            <Input
+              type="password"
+              placeholder="sk-..."
+              value={keyDraft}
+              onChange={e => setKeyDraft(e.target.value)}
+              className="h-7 flex-1 text-xs bg-background"
+              onKeyDown={e => { if (e.key === "Enter") saveApiKey(keyDraft); if (e.key === "Escape") setShowKeyInput(false); }}
+              autoFocus
+            />
+            <Button size="sm" className="h-7 text-xs px-3" onClick={() => saveApiKey(keyDraft)}>Save</Button>
+            {apiKey && <Button size="sm" variant="destructive" className="h-7 text-xs px-3" onClick={() => saveApiKey("")}>Clear</Button>}
+            <Button size="sm" variant="ghost" className="h-7 text-xs px-3" onClick={() => setShowKeyInput(false)}>Cancel</Button>
+          </>
+        ) : (
+          <>
+            <span className="text-xs text-muted-foreground flex-1">
+              {apiKey ? "OpenAI key set — real chat completions enabled." : "Enter your OpenAI key to enable real AI responses."}
+            </span>
+            <Button size="sm" variant="outline" className="h-7 text-xs px-3" onClick={() => { setShowKeyInput(true); setKeyDraft(""); }}>
+              {apiKey ? "Change Key" : "Set API Key"}
+            </Button>
+          </>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 flex-1 min-h-0">
         {/* Persona selector */}

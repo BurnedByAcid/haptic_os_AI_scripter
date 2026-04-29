@@ -56,19 +56,21 @@ export async function setHAMP(
   try {
     await setMode(key, 0);
     if (opts.velocity !== undefined) {
+      // velocity: 0-100 (0-100% of max speed)
       await fetch(`${BASE}/hamp/velocity`, {
         method: "PUT",
         headers: headers(key),
-        body: JSON.stringify({ velocity: Math.min(Math.round(opts.velocity), 100) })
+        body: JSON.stringify({ velocity: Math.max(0, Math.min(100, Math.round(opts.velocity))) })
       });
     }
-    if (opts.slideMin !== undefined && opts.slideMax !== undefined) {
-      await fetch(`${BASE}/hamp/slide`, {
-        method: "PUT",
-        headers: headers(key),
-        body: JSON.stringify({ min: opts.slideMin / 100, max: opts.slideMax / 100 })
-      });
-    }
+    // Default stroke range: 60%-100% when not specified
+    const slideMin = opts.slideMin ?? 60;
+    const slideMax = opts.slideMax ?? 100;
+    await fetch(`${BASE}/hamp/slide`, {
+      method: "PUT",
+      headers: headers(key),
+      body: JSON.stringify({ min: slideMin / 100, max: slideMax / 100 })
+    });
   } catch (e) {
     console.error("setHAMP error", e);
   }
