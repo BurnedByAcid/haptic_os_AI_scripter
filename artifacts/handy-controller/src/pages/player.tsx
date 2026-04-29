@@ -137,15 +137,43 @@ export default function Player() {
           <Card className="flex-1 bg-black overflow-hidden relative border-border/50">
             {videoUrl ? (
               <div className="w-full h-full relative group">
-                <video 
+                <video
                   ref={videoRef}
-                  src={videoUrl} 
+                  src={videoUrl}
                   className="w-full h-full object-contain"
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
+                  onPlay={() => { setIsPlaying(true); syncEngine.start(); }}
+                  onPause={() => {
+                    setIsPlaying(false);
+                    syncEngine.stop();
+                    if (connected && key) stopDevice(key);
+                  }}
+                  onSeeking={() => { syncEngine.stop(); }}
+                  onSeeked={() => { if (isPlaying) syncEngine.start(); }}
                   controls={false}
                 />
-                
+
+                {/* Tap-anywhere Finish Mode zone — shown when playing */}
+                {isPlaying && connected && !finishMode && (
+                  <div
+                    className="absolute inset-0 flex items-end justify-center pb-20 cursor-pointer select-none"
+                    onClick={e => { e.stopPropagation(); triggerFinishMode(); }}
+                    title="Tap anywhere to trigger Finish Mode"
+                  >
+                    <div className="opacity-0 hover:opacity-100 transition-opacity duration-200 bg-black/60 backdrop-blur text-white text-sm font-bold px-6 py-3 rounded-full border border-white/30 flex items-center gap-2 pointer-events-none">
+                      <Zap className="h-4 w-4 text-primary" /> Tap anywhere → Finish Mode
+                    </div>
+                  </div>
+                )}
+
+                {/* Finish Mode active indicator */}
+                {finishMode && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-primary/20 border border-primary rounded-full px-8 py-4 text-primary font-bold text-xl animate-pulse">
+                      <Zap className="inline mr-2 h-6 w-6" /> FINISHING...
+                    </div>
+                  </div>
+                )}
+
                 {/* Custom Controls Overlay */}
                 <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-4">
                   <Button variant="ghost" size="icon" onClick={handlePlayPause} className="text-white hover:bg-white/20">
@@ -158,8 +186,8 @@ export default function Player() {
                       videoRef.current.currentTime = pos * videoRef.current.duration;
                     }
                   }}>
-                    <div className="h-full bg-primary" style={{ 
-                      width: videoRef.current ? `${(videoRef.current.currentTime / videoRef.current.duration) * 100}%` : '0%' 
+                    <div className="h-full bg-primary" style={{
+                      width: videoRef.current ? `${(videoRef.current.currentTime / videoRef.current.duration) * 100}%` : "0%"
                     }} />
                   </div>
                 </div>

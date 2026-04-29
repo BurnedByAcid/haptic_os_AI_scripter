@@ -40,6 +40,29 @@ export default function Library() {
     setLocation("/player");
   };
 
+  const generateThumbnail = (file: File): Promise<string> =>
+    new Promise(resolve => {
+      const url = URL.createObjectURL(file);
+      const video = document.createElement("video");
+      video.preload = "metadata";
+      video.muted = true;
+      video.src = url;
+      video.onloadeddata = () => {
+        video.currentTime = Math.min(5, video.duration * 0.1);
+      };
+      video.onseeked = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 320;
+        canvas.height = 180;
+        const ctx = canvas.getContext("2d");
+        if (ctx) ctx.drawImage(video, 0, 0, 320, 180);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        URL.revokeObjectURL(url);
+        resolve(dataUrl);
+      };
+      video.onerror = () => { URL.revokeObjectURL(url); resolve(""); };
+    });
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -47,12 +70,14 @@ export default function Library() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const isVideo = file.type.startsWith('video/');
+      const thumbnail = isVideo ? await generateThumbnail(file) : undefined;
       const entry: LibraryEntry = {
         id: crypto.randomUUID(),
         name: file.name,
         type: isVideo ? "video" : "funscript",
         blob: file,
-        addedAt: Date.now()
+        addedAt: Date.now(),
+        thumbnail
       };
       await addEntry(entry);
     }
@@ -93,8 +118,10 @@ export default function Library() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 content-start">
         {filtered.map(entry => (
           <Card key={entry.id} className="bg-card/50 backdrop-blur overflow-hidden group">
-            <div className="aspect-video bg-black flex items-center justify-center relative border-b border-border/50">
-              {entry.type === 'video' ? (
+            <div className="aspect-video bg-black flex items-center justify-center relative border-b border-border/50 overflow-hidden">
+              {entry.thumbnail ? (
+                <img src={entry.thumbnail} alt={entry.name} className="w-full h-full object-cover" />
+              ) : entry.type === 'video' ? (
                 <Film className="h-12 w-12 text-primary/50 group-hover:text-primary transition-colors" />
               ) : (
                 <FileJson className="h-12 w-12 text-primary/50 group-hover:text-primary transition-colors" />

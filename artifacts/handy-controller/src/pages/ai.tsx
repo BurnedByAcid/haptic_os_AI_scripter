@@ -8,6 +8,44 @@ import { Mic, MicOff, Send, MessageSquare, Plus, Activity, Clock } from "lucide-
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+interface SpeechRecognitionResultItem {
+  transcript: string;
+  confidence: number;
+}
+interface SpeechRecognitionResult {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResultItem;
+  [index: number]: SpeechRecognitionResultItem;
+}
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+interface SpeechRecognitionResultEvent extends Event {
+  readonly results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionLike extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionResultEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
+
+const getSpeechRecognition = (): SpeechRecognitionConstructor | undefined => {
+  const w = window as Window &
+    Partial<{
+      SpeechRecognition: SpeechRecognitionConstructor;
+      webkitSpeechRecognition: SpeechRecognitionConstructor;
+    }>;
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
+};
+
 interface Message {
   role: "user" | "assistant" | "system";
   content: string;
@@ -54,7 +92,7 @@ export default function AI() {
   const [minutesUsed, setMinutesUsed] = useState(0);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const sessionTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const creditDeductRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { toast } = useToast();
@@ -198,8 +236,8 @@ export default function AI() {
   };
 
   const toggleVoice = () => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
+    const SpeechRecognitionImpl = getSpeechRecognition();
+    if (!SpeechRecognitionImpl) {
       toast({ title: "Not Supported", description: "Voice input not available in this browser.", variant: "destructive" });
       return;
     }
@@ -208,11 +246,11 @@ export default function AI() {
       setIsListening(false);
       return;
     }
-    const recognition = new SpeechRecognition();
+    const recognition = new SpeechRecognitionImpl();
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = "en-US";
-    recognition.onresult = (e: any) => {
+    recognition.onresult = (e: SpeechRecognitionResultEvent) => {
       const transcript = e.results[0][0].transcript;
       handleSend(transcript);
     };

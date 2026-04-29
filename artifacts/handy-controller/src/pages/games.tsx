@@ -32,8 +32,16 @@ export default function Games() {
     }
     gameState.current.birdVelocity = -8;
     if (connected && key) {
-      setHDSP(key, 100, 87);
-      setTimeout(() => setHDSP(key, 0, 87), 150);
+      // Modulate stroke intensity by gap size: smaller gap (harder) = higher velocity
+      const GAP_MAX = 150;
+      const GAP_MIN = 80;
+      const VEL_MIN = 30;
+      const VEL_MAX = 100;
+      const gap = gameState.current.gap;
+      const gapRatio = Math.max(0, Math.min(1, (GAP_MAX - gap) / (GAP_MAX - GAP_MIN)));
+      const strokeVel = Math.round(VEL_MIN + gapRatio * (VEL_MAX - VEL_MIN));
+      setHDSP(key, 100, strokeVel);
+      setTimeout(() => setHDSP(key, 0, strokeVel), 150);
     }
   };
 
