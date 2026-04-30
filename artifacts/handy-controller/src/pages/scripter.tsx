@@ -687,7 +687,8 @@ export default function Scripter() {
     off.height = video.videoHeight || 360;
     const ctx = off.getContext("2d")!;
 
-    // Pass 1: collect rising-edge timestamps
+    // Pass 1 — detect rising edges, record each hit at pos=50 (neutral placeholder).
+    //          Using a flat number array keeps memory minimal during the scan.
     while (t <= endMs) {
       video.currentTime = t / 1000;
       await new Promise<void>(res => {
@@ -703,7 +704,14 @@ export default function Scripter() {
       setVtProgress(Math.round(((t - startMs) / rangeMs) * 100));
     }
 
-    // Pass 2: find the busiest 1-second window (max triggers in any 1 s)
+    // Commit all detections at the neutral midpoint — cheap, one pos value for every hit.
+    setVtPreviewPoints(triggerTimes.map(time => ({
+      id: crypto.randomUUID(),
+      time,
+      pos: 50,
+    })));
+
+    // Pass 2 — find the densest 1-second window.
     let maxInWindow = 0;
     for (let i = 0; i < triggerTimes.length; i++) {
       let count = 1;
@@ -711,12 +719,11 @@ export default function Scripter() {
       maxInWindow = Math.max(maxInWindow, count);
     }
 
-    // Pass 3: pick the widest range level where maxInWindow × strokeSize ≤ vtMovementLimit
-    //         Hard floor at [20, 80] (stroke = 60) — never collapse past that.
+    // Pass 3 — choose the widest range level where maxInWindow × strokeSize ≤ vtMovementLimit.
+    //          Hard floor: never collapse past 20↔80 (stroke = 60).
     let lo = 0, hi = 100;
     if (maxInWindow > 0) {
       const maxStroke = Math.floor(vtMovementLimit / maxInWindow);
-      // Only consider levels with stroke ≥ 60 (i.e. 20↔80 or wider)
       const chosen = VT_RANGE_LEVELS.filter(([l, h]) => h - l >= 60)
                                      .find(([l, h]) => h - l <= maxStroke);
       if (chosen) { [lo, hi] = chosen; }
@@ -724,14 +731,11 @@ export default function Scripter() {
     }
     setVtChosenRange([lo, hi]);
 
-    // Pass 4: assign alternating hi/lo positions
-    const generated: Point[] = triggerTimes.map((time, i) => ({
-      id: crypto.randomUUID(),
-      time,
-      pos: i % 2 === 0 ? hi : lo,
-    }));
+    // Pass 4 — redistribute: replace every pos=50 placeholder with alternating hi/lo.
+    setVtPreviewPoints(prev =>
+      prev.map((pt, i) => ({ ...pt, pos: i % 2 === 0 ? hi : lo }))
+    );
 
-    setVtPreviewPoints(generated);
     setVtAnalyzing(false);
   };
 
