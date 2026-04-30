@@ -6,6 +6,7 @@ import {
   ChevronFirst, ChevronLast,
   SkipBack, SkipForward,
   StepBack, StepForward,
+  Maximize2, Minimize2,
 } from "lucide-react";
 
 const FRAME_S = 1 / 30;
@@ -19,6 +20,8 @@ function formatTime(s: number): string {
 
 interface VideoControlBarProps {
   videoRef: RefObject<HTMLVideoElement | null>;
+  /** Element to fullscreen — defaults to the video element if omitted */
+  containerRef?: RefObject<HTMLElement | null>;
   isEditor?: boolean;
   markers?: number[];
   extraControls?: React.ReactNode;
@@ -27,6 +30,7 @@ interface VideoControlBarProps {
 
 export function VideoControlBar({
   videoRef,
+  containerRef,
   isEditor = false,
   markers = [],
   extraControls,
@@ -37,6 +41,7 @@ export function VideoControlBar({
   const [duration, setDuration] = useState(0);
   const [skipMs, setSkipMs] = useState(500);
   const [skipInput, setSkipInput] = useState("500");
+  const [fullscreen, setFullscreen] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [hovering, setHovering] = useState(false);
 
@@ -59,6 +64,22 @@ export function VideoControlBar({
       rafRef.current = null;
     }
   }, []);
+
+  // Fullscreen sync
+  useEffect(() => {
+    const onChange = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      const target = containerRef?.current ?? videoRef.current;
+      target?.requestFullscreen();
+    }
+  }, [containerRef, videoRef]);
 
   // Sync events + start/stop rAF
   useEffect(() => {
@@ -284,6 +305,17 @@ export function VideoControlBar({
             {extraControls}
           </div>
         )}
+
+        {/* Fullscreen */}
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-7 w-7 text-muted-foreground hover:text-foreground ml-auto"
+          onClick={toggleFullscreen}
+          title={fullscreen ? "Exit fullscreen" : "Fullscreen"}
+        >
+          {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+        </Button>
       </div>
     </div>
   );

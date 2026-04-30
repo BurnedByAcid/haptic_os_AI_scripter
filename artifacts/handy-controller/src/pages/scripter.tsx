@@ -51,6 +51,7 @@ export default function Scripter() {
   const [activeTab, setActiveTab] = useState<"beat" | "timeline" | "visual">("beat");
 
   // ─── Video rect (for VT overlay alignment) ───
+  const videoBlockRef = useRef<HTMLDivElement>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const [videoRect, setVideoRect] = useState({ left: 0, top: 0, width: 0, height: 0 });
 
@@ -689,7 +690,7 @@ export default function Scripter() {
       </div>
 
       {/* ── Shared video player — takes 2/3 of available height ── */}
-      <div className="flex flex-col rounded-lg border border-border/50 overflow-hidden min-h-0" style={{ flex: 2 }}>
+      <div ref={videoBlockRef} className="flex flex-col rounded-lg border border-border/50 overflow-hidden min-h-0" style={{ flex: 2 }}>
         {/* Toolbar */}
         <div className="bg-card/50 border-b border-border px-3 py-2 flex gap-2 items-center flex-shrink-0 flex-wrap">
           <Button variant="secondary" size="sm" className="relative cursor-pointer">
@@ -754,6 +755,7 @@ export default function Scripter() {
         <div className="bg-card/60 border-t border-border/50 px-3 py-2 flex-shrink-0">
           <VideoControlBar
             videoRef={videoRef}
+            containerRef={videoBlockRef}
             isEditor
             markers={[...points].sort((a, b) => a.time - b.time).map(p => p.time)}
           />
