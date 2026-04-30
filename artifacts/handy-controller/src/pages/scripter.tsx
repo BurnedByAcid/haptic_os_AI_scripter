@@ -69,7 +69,6 @@ export default function Scripter() {
   const vtPatchPreviewRef = useRef<HTMLCanvasElement>(null);
   const [vtTolerance, setVtTolerance] = useState(20); // RMS threshold 0-255
   const [vtOnPos, setVtOnPos] = useState(100);
-  const [vtOffPos, setVtOffPos] = useState(0);
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
   const [vtProgress, setVtProgress] = useState(0);
   const [vtStartTime, setVtStartTime] = useState(0);
@@ -668,10 +667,10 @@ export default function Scripter() {
       const rms = patchRms(frameGray, vtSampledPatch);
       const matched = rms < vtTolerance;
 
-      if (matched !== lastState) {
-        generated.push({ id: crypto.randomUUID(), time: t, pos: matched ? vtOnPos : vtOffPos });
-        lastState = matched;
+      if (matched && !lastState) {
+        generated.push({ id: crypto.randomUUID(), time: t, pos: vtOnPos });
       }
+      lastState = matched;
 
       t += stepMs;
       setVtProgress(Math.round(((t - startMs) / rangeMs) * 100));
@@ -987,26 +986,15 @@ export default function Scripter() {
                     <p className="text-[10px] text-muted-foreground mt-1">Lower = stricter match (2=exact, 80=loose)</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div>
                     <div>
-                      <label className="text-xs text-muted-foreground">On Pos (matched)</label>
+                      <label className="text-xs text-muted-foreground">Position when triggered (0–100)</label>
                       <input
                         type="number"
                         min={0}
                         max={100}
                         value={vtOnPos}
                         onChange={e => setVtOnPos(Number(e.target.value))}
-                        className="w-full bg-input rounded px-2 py-1 text-sm mt-1 border border-border"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Off Pos (no match)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={vtOffPos}
-                        onChange={e => setVtOffPos(Number(e.target.value))}
                         className="w-full bg-input rounded px-2 py-1 text-sm mt-1 border border-border"
                       />
                     </div>
