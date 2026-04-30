@@ -445,8 +445,9 @@ export default function Scripter() {
         </TabsList>
 
         {/* Timeline Tab */}
-        <TabsContent value="timeline" className="flex-1 flex flex-col gap-4 mt-4 min-h-0">
-          <div className="flex gap-4 items-center bg-card/50 p-4 rounded-lg border border-border">
+        <TabsContent value="timeline" className="flex-1 flex flex-col gap-3 mt-4 min-h-0 overflow-auto">
+          {/* Toolbar */}
+          <div className="flex gap-4 items-center bg-card/50 p-3 rounded-lg border border-border flex-shrink-0">
             <Button variant="secondary" className="relative cursor-pointer" size="sm">
               <span>Load Reference Video</span>
               <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
@@ -472,6 +473,34 @@ export default function Scripter() {
             </label>
           </div>
 
+          {/* Reference video + controls (top, always visible) */}
+          {videoUrl ? (
+            <div className="flex flex-col gap-0 rounded-lg border border-border/50 overflow-hidden flex-shrink-0">
+              <div className="bg-black" style={{ maxHeight: "200px" }}>
+                <video
+                  ref={videoRef}
+                  src={videoUrl}
+                  className="w-full object-contain"
+                  style={{ maxHeight: "200px" }}
+                  preload="auto"
+                  onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
+                />
+              </div>
+              <div className="bg-card/60 border-t border-border/50 px-3 py-2">
+                <VideoControlBar
+                  videoRef={videoRef}
+                  isEditor
+                  markers={[...points].sort((a, b) => a.time - b.time).map(p => p.time)}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center rounded-lg border border-dashed border-border/40 bg-card/20 h-16 flex-shrink-0 text-sm text-muted-foreground">
+              Load a reference video to sync the timeline
+            </div>
+          )}
+
+          {/* Timeline canvas */}
           <Card className="bg-black border-border/50 relative overflow-hidden flex-shrink-0 group">
             <canvas
               ref={canvasRef}
@@ -497,31 +526,10 @@ export default function Scripter() {
             )}
           </Card>
 
-          <div className="flex justify-between text-sm text-muted-foreground px-2">
+          <div className="flex justify-between text-sm text-muted-foreground px-2 flex-shrink-0">
             <span>Points: {points.length}</span>
             <Button variant="ghost" size="sm" onClick={() => setPoints([])} className="text-destructive hover:text-destructive h-8">Clear All</Button>
           </div>
-
-          {videoUrl && (
-            <div className="flex flex-col gap-2 mt-4">
-              <div className="bg-black rounded-lg border border-border/50 overflow-hidden" style={{ maxHeight: "220px" }}>
-                <video
-                  ref={videoRef}
-                  src={videoUrl}
-                  className="w-full h-full object-contain"
-                  preload="auto"
-                  onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
-                />
-              </div>
-              <div className="bg-card/50 border border-border/50 rounded-lg px-3 py-2">
-                <VideoControlBar
-                  videoRef={videoRef}
-                  isEditor
-                  markers={[...points].sort((a, b) => a.time - b.time).map(p => p.time)}
-                />
-              </div>
-            </div>
-          )}
         </TabsContent>
 
         {/* Visual Trigger Tab */}
