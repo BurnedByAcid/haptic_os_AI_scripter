@@ -68,6 +68,7 @@ export default function Scripter() {
   const [vtSampledPatch, setVtSampledPatch] = useState<Uint8Array | null>(null);
   const vtPatchPreviewRef = useRef<HTMLCanvasElement>(null);
   const [vtTolerance, setVtTolerance] = useState(20); // RMS threshold 0-255
+  const [vtMovementLimit, setVtMovementLimit] = useState(300);
   const [vtChosenRange, setVtChosenRange] = useState<[number, number]>([0, 100]);
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
   const [vtProgress, setVtProgress] = useState(0);
@@ -710,13 +711,16 @@ export default function Scripter() {
       maxInWindow = Math.max(maxInWindow, count);
     }
 
-    // Pass 3: pick the widest range level where maxInWindow × strokeSize ≤ 400
+    // Pass 3: pick the widest range level where maxInWindow × strokeSize ≤ vtMovementLimit
+    //         Hard floor at [20, 80] (stroke = 60) — never collapse past that.
     let lo = 0, hi = 100;
     if (maxInWindow > 0) {
-      const maxStroke = Math.floor(400 / maxInWindow);
-      const chosen = VT_RANGE_LEVELS.find(([l, h]) => h - l <= maxStroke);
+      const maxStroke = Math.floor(vtMovementLimit / maxInWindow);
+      // Only consider levels with stroke ≥ 60 (i.e. 20↔80 or wider)
+      const chosen = VT_RANGE_LEVELS.filter(([l, h]) => h - l >= 60)
+                                     .find(([l, h]) => h - l <= maxStroke);
       if (chosen) { [lo, hi] = chosen; }
-      else { lo = hi = 50; }
+      else { lo = 20; hi = 80; }
     }
     setVtChosenRange([lo, hi]);
 
@@ -1035,6 +1039,15 @@ export default function Scripter() {
                     </div>
                     <Slider min={2} max={80} step={1} value={[vtTolerance]} onValueChange={v => setVtTolerance(v[0])} />
                     <p className="text-[10px] text-muted-foreground mt-1">Lower = stricter match (2=exact, 80=loose)</p>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-medium">Movement Limit</span>
+                      <span className="text-xs font-mono text-primary">{vtMovementLimit} units/sec</span>
+                    </div>
+                    <Slider min={60} max={400} step={10} value={[vtMovementLimit]} onValueChange={v => setVtMovementLimit(v[0])} />
+                    <p className="text-[10px] text-muted-foreground mt-1">Max total movement in any 1-second window (default 300)</p>
                   </div>
 
                   <div>
