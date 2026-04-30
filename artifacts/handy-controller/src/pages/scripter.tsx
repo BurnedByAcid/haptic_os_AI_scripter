@@ -586,13 +586,18 @@ export default function Scripter() {
   }, [vtDragging, cssDragToZone]);
 
   const sampleColor = () => {
-    const canvas = vtCanvasRef.current;
-    if (!canvas || !vtZone) return;
-    const ctx = canvas.getContext("2d")!;
+    const video = videoRef.current;
+    if (!video || !vtZone) return;
+    // Use an offscreen canvas — no overlay drawn, pure video pixels
+    const off = document.createElement("canvas");
+    off.width = video.videoWidth || 640;
+    off.height = video.videoHeight || 360;
+    const ctx = off.getContext("2d")!;
+    ctx.drawImage(video, 0, 0);
     const { x, y, w, h } = vtZone;
     const data = ctx.getImageData(x, y, w, h).data;
     let r = 0, g = 0, b = 0, a = 0;
-    const n = data.length / 4;
+    const n = data.length / 4 || 1;
     for (let i = 0; i < data.length; i += 4) {
       r += data[i]; g += data[i + 1]; b += data[i + 2]; a += data[i + 3];
     }
