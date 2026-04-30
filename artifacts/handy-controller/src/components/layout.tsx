@@ -12,9 +12,12 @@ const NAV_ITEMS = [
   { href: "/player", label: "Player", icon: PlaySquare },
   { href: "/control", label: "Control", icon: Settings2 },
   { href: "/library", label: "Library", icon: Library },
+  { href: "/scripter", label: "Scripter", icon: Mic },
+];
+
+const COMING_SOON_ITEMS = [
   { href: "/games", label: "Games", icon: Gamepad2 },
   { href: "/beat", label: "Beat 2 Beat", icon: Activity },
-  { href: "/scripter", label: "Scripter", icon: Mic },
   { href: "/ai", label: "AI Control", icon: Sparkles },
   { href: "/community", label: "Community", icon: Users },
 ];
@@ -95,6 +98,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+
+            {/* Coming Soon group */}
+            <div className="mt-3 rounded-lg border border-border/40 bg-white/[0.04] p-1.5 space-y-0.5">
+              {COMING_SOON_ITEMS.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.href}
+                    className="group/soon relative flex items-center gap-3 px-3 py-2.5 rounded-md cursor-not-allowed select-none"
+                    data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <Icon size={18} className="text-muted-foreground/40" />
+                    <span className="text-sm text-muted-foreground/40">{item.label}</span>
+                    <div className="absolute inset-0 flex items-center justify-center rounded-md opacity-0 group-hover/soon:opacity-100 transition-opacity bg-muted/70 backdrop-blur-[2px]">
+                      <span className="text-xs font-semibold text-foreground/70 tracking-wide">Coming soon!</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </nav>
         </div>
 
