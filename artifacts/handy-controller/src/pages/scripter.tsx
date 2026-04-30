@@ -758,7 +758,7 @@ export default function Scripter() {
       {/* ── Tabs — collapsible tool panel ── */}
       <Tabs
         value={activeTab}
-        onValueChange={v => { setActiveTab(v as "beat" | "timeline" | "visual"); setTabsOpen(true); }}
+        onValueChange={v => { setActiveTab(v as "beat" | "timeline" | "visual"); setTabsOpen(v !== "visual"); }}
         className="flex flex-col min-h-0 flex-shrink-0"
         style={tabsOpen ? { flex: 1, minHeight: 0 } : {}}
       >
