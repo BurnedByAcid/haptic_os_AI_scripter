@@ -65,8 +65,9 @@ export default function Scripter() {
   const vtDragStartRef = useRef<{ cssX: number; cssY: number } | null>(null);
   const vtDragLiveRef = useRef<typeof vtZone>(null); // live preview during drag
   const [vtDragging, setVtDragging] = useState(false);
-  const [vtSampledColor, setVtSampledColor] = useState<[number, number, number, number] | null>(null);
-  const [vtTolerance, setVtTolerance] = useState(40);
+  const [vtSampledPatch, setVtSampledPatch] = useState<Uint8Array | null>(null);
+  const vtPatchPreviewRef = useRef<HTMLCanvasElement>(null);
+  const [vtTolerance, setVtTolerance] = useState(20); // RMS threshold 0-255
   const [vtOnPos, setVtOnPos] = useState(100);
   const [vtOffPos, setVtOffPos] = useState(0);
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
@@ -460,6 +461,25 @@ export default function Scripter() {
     return () => video.removeEventListener("timeupdate", updateTime);
   }, [videoUrl]);
 
+  // Render reference patch to preview canvas
+  useEffect(() => {
+    const preview = vtPatchPreviewRef.current;
+    if (!preview || !vtSampledPatch || !vtZone) return;
+    const { w, h } = vtZone;
+    preview.width = w;
+    preview.height = h;
+    const ctx = preview.getContext("2d")!;
+    const img = ctx.createImageData(w, h);
+    for (let i = 0; i < vtSampledPatch.length; i++) {
+      const v = vtSampledPatch[i];
+      img.data[i * 4] = v;
+      img.data[i * 4 + 1] = v;
+      img.data[i * 4 + 2] = v;
+      img.data[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }, [vtSampledPatch, vtZone]);
+
   // Track the letterbox-corrected rect of the video inside its container
   useEffect(() => {
     const container = videoContainerRef.current;
@@ -554,7 +574,7 @@ export default function Scripter() {
     vtDragLiveRef.current = null;
     setVtDragging(true);
     setVtZone(null);
-    setVtSampledColor(null);
+    setVtSampledPatch(null);
   }, []);
 
   const handleVtPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -586,45 +606,56 @@ export default function Scripter() {
     vtDragStartRef.current = null;
   }, [vtDragging, cssDragToZone]);
 
-  const sampleColor = () => {
+  /** Convert RGBA ImageData pixels to a Uint8Array of grayscale (luma) values */
+  const toGray = (rgba: Uint8ClampedArray): Uint8Array => {
+    const gray = new Uint8Array(rgba.length / 4);
+    for (let i = 0; i < rgba.length; i += 4)
+      gray[i >> 2] = Math.round(0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]);
+    return gray;
+  };
+
+  /** RMS pixel difference between two same-length grayscale arrays (0=identical, 255=max diff) */
+  const patchRms = (a: Uint8Array, b: Uint8Array): number => {
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) { const d = a[i] - b[i]; sum += d * d; }
+    return Math.sqrt(sum / (a.length || 1));
+  };
+
+  const samplePatch = () => {
     const video = videoRef.current;
     if (!video || !vtZone) return;
-    // Use an offscreen canvas — no overlay drawn, pure video pixels
     const off = document.createElement("canvas");
     off.width = video.videoWidth || 640;
     off.height = video.videoHeight || 360;
     const ctx = off.getContext("2d")!;
     ctx.drawImage(video, 0, 0);
     const { x, y, w, h } = vtZone;
-    const data = ctx.getImageData(x, y, w, h).data;
-    let r = 0, g = 0, b = 0, a = 0;
-    const n = data.length / 4 || 1;
-    for (let i = 0; i < data.length; i += 4) {
-      r += data[i]; g += data[i + 1]; b += data[i + 2]; a += data[i + 3];
-    }
-    setVtSampledColor([Math.round(r / n), Math.round(g / n), Math.round(b / n), Math.round(a / n)]);
+    const rgba = ctx.getImageData(x, y, w, h).data;
+    setVtSampledPatch(toGray(rgba));
   };
-
-  const colorDistance = (a: number[], b: number[]) =>
-    Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2 + (a[3] - b[3]) ** 2);
 
   const runAnalysis = async () => {
     const video = videoRef.current;
-    const canvas = vtCanvasRef.current;
-    if (!video || !canvas || !vtZone || !vtSampledColor) return;
+    if (!video || !vtZone || !vtSampledPatch) return;
 
     setVtAnalyzing(true);
     setVtProgress(0);
     setVtPreviewPoints([]);
 
+    const { x, y, w, h } = vtZone;
     const startMs = vtStartTime * 1000;
     const endMs = vtEndTime > 0 ? vtEndTime * 1000 : video.duration * 1000;
-    // Step at video frame cadence (~30fps = 33ms per frame)
     const stepMs = Math.round(1000 / 30);
     const generated: Point[] = [];
     let lastState = false;
     let t = startMs;
     const rangeMs = endMs - startMs;
+
+    // Offscreen canvas for frame sampling — never draws the overlay
+    const off = document.createElement("canvas");
+    off.width = video.videoWidth || 640;
+    off.height = video.videoHeight || 360;
+    const ctx = off.getContext("2d")!;
 
     while (t <= endMs) {
       video.currentTime = t / 1000;
@@ -632,15 +663,10 @@ export default function Scripter() {
         const onSeeked = () => { video.removeEventListener("seeked", onSeeked); res(); };
         video.addEventListener("seeked", onSeeked);
       });
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const px = ctx.getImageData(vtZone.x, vtZone.y, vtZone.w, vtZone.h).data;
-      let r = 0, g = 0, b = 0, a = 0;
-      for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; a += px[i + 3]; }
-      const pn = px.length / 4 || 1;
-      const avg = [r / pn, g / pn, b / pn, a / pn];
-      const dist = colorDistance(avg, vtSampledColor);
-      const matched = dist < vtTolerance;
+      ctx.drawImage(video, 0, 0);
+      const frameGray = toGray(ctx.getImageData(x, y, w, h).data);
+      const rms = patchRms(frameGray, vtSampledPatch);
+      const matched = rms < vtTolerance;
 
       if (matched !== lastState) {
         generated.push({ id: crypto.randomUUID(), time: t, pos: matched ? vtOnPos : vtOffPos });
@@ -911,17 +937,10 @@ export default function Scripter() {
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                   <span className="text-muted-foreground">Zone:</span>
                   <span className="font-mono text-primary">{vtZone.x},{vtZone.y} — {vtZone.w}×{vtZone.h}px</span>
-                  {vtSampledColor && (
-                    <span className="flex items-center gap-1">
-                      <span
-                        className="inline-block w-3.5 h-3.5 rounded border border-border/50"
-                        style={{ background: `rgba(${vtSampledColor.join(",")})` }}
-                      />
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        rgb({vtSampledColor.slice(0,3).join(", ")})
-                      </span>
-                    </span>
-                  )}
+                  {vtSampledPatch
+                    ? <span className="text-primary">Pattern sampled ✓</span>
+                    : <span className="text-muted-foreground">→ expand panel to sample pattern</span>
+                  }
                 </div>
               )}
             </div>
@@ -932,38 +951,40 @@ export default function Scripter() {
             <Card className="bg-card/50 border-primary/20">
                 <CardContent className="p-4 space-y-4">
                   <div>
-                    <p className="text-sm font-medium mb-1">Sampled Color</p>
-                    {vtSampledColor ? (
+                    <p className="text-sm font-medium mb-1">Reference Pattern</p>
+                    {vtSampledPatch && vtZone ? (
                       <div className="flex items-center gap-3">
-                        <div
-                          className="w-10 h-10 rounded border border-border"
-                          style={{ backgroundColor: `rgb(${vtSampledColor[0]},${vtSampledColor[1]},${vtSampledColor[2]})` }}
+                        <canvas
+                          ref={vtPatchPreviewRef}
+                          className="rounded border border-primary/40"
+                          style={{ width: 48, height: 48, imageRendering: "pixelated" }}
                         />
-                        <span className="text-xs font-mono text-muted-foreground">
-                          rgb({vtSampledColor[0]},{vtSampledColor[1]},{vtSampledColor[2]})
+                        <span className="text-xs text-muted-foreground leading-snug">
+                          {vtZone.w}×{vtZone.h}px<br />grayscale patch<br />sampled ✓
                         </span>
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground">Pin a zone first, then sample</p>
+                      <p className="text-xs text-muted-foreground">Draw a zone on the video, then sample</p>
                     )}
                     <Button
                       variant="outline"
                       size="sm"
                       className="mt-2 w-full"
                       disabled={!vtZone}
-                      onClick={sampleColor}
+                      onClick={samplePatch}
                       data-testid="button-vt-sample"
                     >
-                      Sample Color at Zone
+                      Sample Pattern at Zone
                     </Button>
                   </div>
 
                   <div>
                     <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Color Tolerance</span>
-                      <span className="text-sm font-mono text-primary">{vtTolerance}</span>
+                      <span className="text-sm font-medium">Match Sensitivity</span>
+                      <span className="text-xs font-mono text-primary">RMS &lt; {vtTolerance}</span>
                     </div>
-                    <Slider min={5} max={150} step={1} value={[vtTolerance]} onValueChange={v => setVtTolerance(v[0])} />
+                    <Slider min={2} max={80} step={1} value={[vtTolerance]} onValueChange={v => setVtTolerance(v[0])} />
+                    <p className="text-[10px] text-muted-foreground mt-1">Lower = stricter match (2=exact, 80=loose)</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -1019,7 +1040,7 @@ export default function Scripter() {
 
                   <Button
                     className="w-full"
-                    disabled={!vtZone || !vtSampledColor || vtAnalyzing}
+                    disabled={!vtZone || !vtSampledPatch || vtAnalyzing}
                     onClick={runAnalysis}
                     data-testid="button-vt-analyze"
                   >
