@@ -5,8 +5,9 @@ import { setHDSP, stopDevice } from "@/lib/handyApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Play, Pause, Upload, Zap, Square, Link2, Video, Circle, StopCircle, Download, Loader2, CheckCircle2, WifiOff } from "lucide-react";
+import { Upload, Zap, Link2, Video, Circle, StopCircle, Download, Loader2, CheckCircle2, WifiOff } from "lucide-react";
 import { FunscriptWaveform } from "@/components/funscript-waveform";
+import { VideoControlBar } from "@/components/video-control-bar";
 
 function parseFunscript(json: unknown): Funscript {
   if (typeof json !== "object" || json === null) throw new Error("Not an object");
@@ -394,7 +395,7 @@ export default function Player() {
                 {/* Tap-anywhere Finish Mode zone */}
                 {isPlaying && connected && !finishMode && !isRecording && (
                   <div
-                    className="absolute inset-0 flex items-end justify-center pb-20 cursor-pointer select-none"
+                    className="absolute inset-0 flex items-end justify-center pb-6 cursor-pointer select-none"
                     onClick={e => { e.stopPropagation(); triggerFinishMode(); }}
                     title="Tap anywhere to trigger Finish Mode"
                   >
@@ -410,7 +411,7 @@ export default function Player() {
                     <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-sm font-bold px-3 py-1.5 rounded-full">
                       <Circle className="h-3 w-3 fill-white animate-pulse" /> RECORDING
                     </div>
-                    <div className="absolute bottom-20 left-1/2 -translate-x-1/2 text-white text-xs bg-black/60 backdrop-blur px-3 py-1.5 rounded-full">
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white text-xs bg-black/60 backdrop-blur px-3 py-1.5 rounded-full">
                       {recordedActions.length} strokes recorded
                     </div>
                   </div>
@@ -423,25 +424,6 @@ export default function Player() {
                     </div>
                   </div>
                 )}
-
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-4">
-                  <Button variant="ghost" size="icon" onClick={handlePlayPause} className="text-white hover:bg-white/20">
-                    {isPlaying ? <Pause /> : <Play />}
-                  </Button>
-                  <div className="flex-1 h-2 bg-white/20 rounded-full cursor-pointer relative overflow-hidden" onClick={(e) => {
-                    if (videoRef.current) {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      videoRef.current.currentTime = ((e.clientX - rect.left) / rect.width) * videoRef.current.duration;
-                    }
-                  }}>
-                    <div className="h-full bg-primary" style={{ width: videoRef.current ? `${(videoRef.current.currentTime / videoRef.current.duration) * 100}%` : "0%" }} />
-                  </div>
-                  {isRecording && (
-                    <Button size="sm" variant="destructive" onClick={recordPoint} className="text-xs h-8 gap-1.5 font-bold">
-                      ● STROKE
-                    </Button>
-                  )}
-                </div>
               </div>
             ) : embedUrl ? (
               <div className="w-full h-full relative">
@@ -466,6 +448,22 @@ export default function Player() {
               </div>
             )}
           </Card>
+
+          {/* Video Controls */}
+          {videoUrl && (
+            <Card className="border-border/50 bg-card/50">
+              <CardContent className="pt-3 pb-2 px-4">
+                <VideoControlBar
+                  videoRef={videoRef}
+                  extraControls={isRecording ? (
+                    <Button size="sm" variant="destructive" onClick={recordPoint} className="text-xs h-7 gap-1.5 font-bold">
+                      ● STROKE
+                    </Button>
+                  ) : undefined}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Funscript waveform */}
           <Card className="border-border/50 bg-card/50 overflow-hidden">

@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Trash2, Download, FilePlus, Upload } from "lucide-react";
+import { VideoControlBar } from "@/components/video-control-bar";
 
 const STORAGE_KEY = "scripter_session_v1";
 
@@ -502,15 +503,23 @@ export default function Scripter() {
           </div>
 
           {videoUrl && (
-            <div className="flex-1 min-h-0 bg-black rounded-lg border border-border/50 overflow-hidden mt-4">
-              <video
-                ref={videoRef}
-                src={videoUrl}
-                className="w-full h-full object-contain"
-                controls
-                preload="auto"
-                onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
-              />
+            <div className="flex flex-col gap-2 mt-4">
+              <div className="bg-black rounded-lg border border-border/50 overflow-hidden" style={{ maxHeight: "220px" }}>
+                <video
+                  ref={videoRef}
+                  src={videoUrl}
+                  className="w-full h-full object-contain"
+                  preload="auto"
+                  onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
+                />
+              </div>
+              <div className="bg-card/50 border border-border/50 rounded-lg px-3 py-2">
+                <VideoControlBar
+                  videoRef={videoRef}
+                  isEditor
+                  markers={[...points].sort((a, b) => a.time - b.time).map(p => p.time)}
+                />
+              </div>
             </div>
           )}
         </TabsContent>
