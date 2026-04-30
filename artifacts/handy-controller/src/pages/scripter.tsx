@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
+import { Progress } from "@/components/ui/progress";
 import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp } from "lucide-react";
 import { VideoControlBar } from "@/components/video-control-bar";
 
@@ -774,7 +775,7 @@ export default function Scripter() {
       </div>
 
       {/* ── Shared video player — takes 2/3 of available height ── */}
-      <div ref={videoBlockRef} className="flex flex-col rounded-lg border border-border/50 overflow-hidden min-h-0" style={{ flex: 2 }}>
+      <div ref={videoBlockRef} className={`flex flex-col rounded-lg border border-border/50 overflow-hidden min-h-0 ${vtAnalyzing ? "hidden" : ""}`} style={{ flex: 2 }}>
         {/* Toolbar */}
         <div className="bg-card/50 border-b border-border px-3 py-2 flex gap-2 items-center flex-shrink-0 flex-wrap">
           <Button variant="secondary" size="sm" className="relative cursor-pointer">
@@ -983,29 +984,42 @@ export default function Scripter() {
 
         {/* Visual Trigger Tab */}
         <TabsContent value="visual" className="flex-1 flex gap-3 mt-3 min-h-0 overflow-hidden">
-          {/* Zone status */}
-          <div className="flex-1 flex flex-col gap-2 min-h-0 justify-start">
-            <div className="rounded-lg border border-border/50 bg-card/40 p-3 flex flex-col gap-2">
-              <p className="text-xs text-muted-foreground">
-                {videoUrl
-                  ? "Click and drag on the video above to draw a sampling zone (capped at 25×25px on screen)."
-                  : "Load a video using the toolbar above to get started."}
-              </p>
-              {vtZone && (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                  <span className="text-muted-foreground">Zone:</span>
-                  <span className="font-mono text-primary">{vtZone.x},{vtZone.y} — {vtZone.w}×{vtZone.h}px</span>
-                  {vtSampledPatch
-                    ? <span className="text-primary">Pattern sampled ✓</span>
-                    : <span className="text-muted-foreground">→ expand panel to sample pattern</span>
-                  }
-                </div>
-              )}
+          {/* ── Analysis in progress: just show progress bar ── */}
+          {vtAnalyzing && (
+            <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8">
+              <p className="text-sm text-muted-foreground">Scanning video for pattern matches…</p>
+              <div className="w-full max-w-md">
+                <Progress value={vtProgress} className="h-3" />
+              </div>
+              <p className="text-2xl font-mono font-bold text-primary">{vtProgress}%</p>
             </div>
-          </div>
+          )}
+
+          {/* Zone status */}
+          {!vtAnalyzing && (
+            <div className="flex-1 flex flex-col gap-2 min-h-0 justify-start">
+              <div className="rounded-lg border border-border/50 bg-card/40 p-3 flex flex-col gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {videoUrl
+                    ? "Click and drag on the video above to draw a sampling zone (capped at 25×25px on screen)."
+                    : "Load a video using the toolbar above to get started."}
+                </p>
+                {vtZone && (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    <span className="text-muted-foreground">Zone:</span>
+                    <span className="font-mono text-primary">{vtZone.x},{vtZone.y} — {vtZone.w}×{vtZone.h}px</span>
+                    {vtSampledPatch
+                      ? <span className="text-primary">Pattern sampled ✓</span>
+                      : <span className="text-muted-foreground">→ expand panel to sample pattern</span>
+                    }
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Settings panel */}
-          <div className="w-64 flex-shrink-0 overflow-auto">
+          {!vtAnalyzing && <div className="w-64 flex-shrink-0 overflow-auto">
             <Card className="bg-card/50 border-primary/20">
                 <CardContent className="p-4 space-y-4">
                   <div>
@@ -1121,7 +1135,7 @@ export default function Scripter() {
                   )}
                 </CardContent>
               </Card>
-            </div>
+            </div>}
         </TabsContent>
         </>}
       </Tabs>
