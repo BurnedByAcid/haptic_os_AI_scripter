@@ -51,9 +51,6 @@ export default function Scripter() {
 
   // ─── Visual Trigger state ───
   const vtCanvasRef = useRef<HTMLCanvasElement>(null);
-  const vtVideoRef = useRef<HTMLVideoElement>(null);
-  const vtVideoUrl = useRef<string | null>(null);
-  const [vtVideoLoaded, setVtVideoLoaded] = useState(false);
   const [vtZone, setVtZone] = useState<{ x: number; y: number } | null>(null);
   const [vtSampledColor, setVtSampledColor] = useState<[number, number, number, number] | null>(null);
   const [vtTolerance, setVtTolerance] = useState(40);
@@ -452,27 +449,12 @@ export default function Scripter() {
 
   // ─────────────── Visual Trigger ───────────────
 
-  const handleVtVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    vtVideoUrl.current = url;
-    const video = vtVideoRef.current!;
-    video.src = url;
-    video.currentTime = 0;
-    video.onloadedmetadata = () => {
-      setVtEndTime(Math.round(video.duration));
-    };
-    video.onloadeddata = () => {
-      setVtVideoLoaded(true);
-      drawVtFrame();
-    };
-  };
+  // VT uses the shared videoRef — no separate video needed
 
   const drawVtFrame = useCallback(() => {
     const canvas = vtCanvasRef.current;
-    const video = vtVideoRef.current;
-    if (!canvas || !video) return;
+    const video = videoRef.current;
+    if (!canvas || !video || !video.readyState) return;
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 360;
     const ctx = canvas.getContext("2d")!;
@@ -486,9 +468,10 @@ export default function Scripter() {
     }
   }, [vtZone]);
 
+  // Redraw VT frame whenever video position changes or zone changes
   useEffect(() => {
-    if (vtVideoLoaded) drawVtFrame();
-  }, [vtZone, vtVideoLoaded, drawVtFrame]);
+    if (videoUrl) drawVtFrame();
+  }, [vtZone, videoUrl, currentTime, drawVtFrame]);
 
   const handleVtCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = vtCanvasRef.current;
@@ -519,7 +502,7 @@ export default function Scripter() {
     Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2 + (a[3] - b[3]) ** 2);
 
   const runAnalysis = async () => {
-    const video = vtVideoRef.current;
+    const video = videoRef.current;
     const canvas = vtCanvasRef.current;
     if (!video || !canvas || !vtZone || !vtSampledColor) return;
 
@@ -570,15 +553,17 @@ export default function Scripter() {
   };
 
   return (
-    <div className="p-6 h-full flex flex-col max-w-[1600px] mx-auto gap-6">
-      <div className="flex justify-between items-end">
+    <div className="p-4 h-full flex flex-col max-w-[1600px] mx-auto gap-3">
+      {/* Header */}
+      <div className="flex justify-between items-center flex-shrink-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Scripter</h1>
-          <p className="text-muted-foreground">Create and edit Funscripts.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Scripter</h1>
+          <p className="text-muted-foreground text-sm">Create and edit Funscripts.</p>
         </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
+            size="sm"
             onClick={() => {
               if (points.length === 0 || window.confirm("Start a new script? All unsaved points will be cleared.")) {
                 setPoints([]);
@@ -590,241 +575,199 @@ export default function Scripter() {
           >
             <FilePlus className="mr-2 h-4 w-4" /> New Script
           </Button>
-          <Button onClick={exportScript} disabled={points.length === 0} data-testid="button-export-script">
+          <Button size="sm" onClick={exportScript} disabled={points.length === 0} data-testid="button-export-script">
             <Download className="mr-2 h-4 w-4" /> Export .funscript
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="beat" className="flex-1 flex flex-col min-h-0">
-        <TabsList className="bg-card/50 w-fit">
+      {/* ── Shared video player — takes 2/3 of available height ── */}
+      <div className="flex flex-col rounded-lg border border-border/50 overflow-hidden min-h-0" style={{ flex: 2 }}>
+        {/* Toolbar */}
+        <div className="bg-card/50 border-b border-border px-3 py-2 flex gap-2 items-center flex-shrink-0 flex-wrap">
+          <Button variant="secondary" size="sm" className="relative cursor-pointer">
+            <span>Load Video</span>
+            <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
+          </Button>
+          <Button variant="outline" size="sm" className="relative cursor-pointer" data-testid="button-import-funscript">
+            <Upload className="mr-2 h-4 w-4" /><span>Import .funscript</span>
+            <input type="file" accept=".funscript,.json,application/json" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImportFunscript} />
+          </Button>
+          <label className="flex items-center gap-2 text-sm cursor-pointer ml-auto">
+            <input
+              type="checkbox"
+              checked={realtimeTest}
+              onChange={e => setRealtimeTest(e.target.checked)}
+              className="rounded border-border bg-black"
+            />
+            Real-time Test (Handy)
+          </label>
+        </div>
+        {/* Video */}
+        <div className="flex-1 min-h-0 bg-black relative">
+          <video
+            ref={videoRef}
+            src={videoUrl ?? undefined}
+            className="w-full h-full object-contain"
+            preload="auto"
+            onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
+            onLoadedMetadata={e => setVtEndTime(Math.round(e.currentTarget.duration))}
+          />
+          {!videoUrl && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-2">
+              <Upload className="h-8 w-8 opacity-30" />
+              <span className="text-sm">Load a video to get started</span>
+            </div>
+          )}
+        </div>
+        {/* Controls bar */}
+        <div className="bg-card/60 border-t border-border/50 px-3 py-2 flex-shrink-0">
+          <VideoControlBar
+            videoRef={videoRef}
+            isEditor
+            markers={[...points].sort((a, b) => a.time - b.time).map(p => p.time)}
+          />
+        </div>
+      </div>
+
+      {/* ── Tabs — take 1/3 of available height ── */}
+      <Tabs defaultValue="beat" className="flex flex-col min-h-0" style={{ flex: 1 }}>
+        <TabsList className="bg-card/50 w-fit flex-shrink-0">
           <TabsTrigger value="beat">Beat Detector</TabsTrigger>
           <TabsTrigger value="timeline">Timeline Editor</TabsTrigger>
           <TabsTrigger value="visual">Visual Trigger</TabsTrigger>
         </TabsList>
 
         {/* Beat Detector Tab */}
-        <TabsContent value="beat" className="flex-1 flex flex-col gap-4 mt-4 min-h-0 overflow-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Waveform canvas */}
-            <div className="md:col-span-2 bg-black rounded-lg border border-border/50 overflow-hidden relative min-h-[240px]">
-              <canvas ref={bdCanvasRef} className="w-full h-full absolute inset-0" width={800} height={300} />
-              {!bdIsActive && (
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-                  Select an input source to begin
-                </div>
-              )}
-              {bdIsRecording && (
-                <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-xs font-bold px-3 py-1.5 rounded-full">
-                  <span className="h-2 w-2 rounded-full bg-white animate-pulse inline-block" /> REC · {bdPointsAdded} points
-                </div>
-              )}
-            </div>
+        <TabsContent value="beat" className="flex-1 flex gap-3 mt-3 min-h-0 overflow-hidden">
+          {/* Waveform canvas */}
+          <div className="flex-1 bg-black rounded-lg border border-border/50 overflow-hidden relative min-h-0">
+            <canvas ref={bdCanvasRef} className="w-full h-full absolute inset-0" width={800} height={300} />
+            {!bdIsActive && (
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                Select an input source to begin
+              </div>
+            )}
+            {bdIsRecording && (
+              <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-xs font-bold px-3 py-1.5 rounded-full">
+                <span className="h-2 w-2 rounded-full bg-white animate-pulse inline-block" /> REC · {bdPointsAdded} points
+              </div>
+            )}
+          </div>
 
-            {/* Controls panel */}
-            <div className="space-y-4">
-              {/* Input source */}
-              <Card className="bg-card/50 border-border/50">
-                <CardContent className="pt-4 space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Input Source</p>
-                  {bdIsActive ? (
-                    <Button variant="destructive" className="w-full" onClick={bdStop}>
-                      <Square className="mr-2 h-4 w-4" /> Stop Audio
-                    </Button>
-                  ) : (
-                    <>
-                      <Button variant="secondary" className="w-full" onClick={bdStartMic}>
-                        <Mic className="mr-2 h-4 w-4" /> Use Microphone
-                      </Button>
-                      <Button variant="secondary" className="w-full relative cursor-pointer">
-                        <Upload className="mr-2 h-4 w-4" /><span>Upload Audio</span>
-                        <input type="file" accept="audio/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={bdStartFile} />
-                      </Button>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* BPM + Record */}
-              <Card className="bg-card/50 border-primary/20">
-                <CardContent className="pt-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">BPM</span>
-                    <span className="text-3xl font-bold font-mono text-primary">{bdBpm > 0 ? bdBpm : "—"}</span>
-                  </div>
-                  <Button
-                    className={`w-full ${bdIsRecording ? "bg-red-600 hover:bg-red-700 text-white" : ""}`}
-                    variant={bdIsRecording ? "destructive" : "default"}
-                    disabled={!bdIsActive}
-                    onClick={bdToggleRecord}
-                  >
-                    {bdIsRecording ? (
-                      <><Square className="mr-2 h-4 w-4" /> Stop Recording</>
-                    ) : (
-                      <><span className="mr-2 text-base leading-none">●</span> Record Beats to Script</>
-                    )}
+          {/* Controls panel */}
+          <div className="w-56 flex flex-col gap-3 overflow-auto flex-shrink-0">
+            <Card className="bg-card/50 border-border/50 flex-shrink-0">
+              <CardContent className="pt-3 pb-3 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Input Source</p>
+                {bdIsActive ? (
+                  <Button variant="destructive" size="sm" className="w-full" onClick={bdStop}>
+                    <Square className="mr-2 h-3.5 w-3.5" /> Stop Audio
                   </Button>
-                  {bdPointsAdded > 0 && !bdIsRecording && (
-                    <p className="text-xs text-center text-muted-foreground">
-                      {bdPointsAdded} beat points added → switch to Timeline Editor to refine
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
+                ) : (
+                  <>
+                    <Button variant="secondary" size="sm" className="w-full" onClick={bdStartMic}>
+                      <Mic className="mr-2 h-3.5 w-3.5" /> Use Microphone
+                    </Button>
+                    <Button variant="secondary" size="sm" className="w-full relative cursor-pointer">
+                      <Upload className="mr-2 h-3.5 w-3.5" /><span>Upload Audio</span>
+                      <input type="file" accept="audio/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={bdStartFile} />
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-              {/* Sensitivity */}
-              <Card className="bg-card/50 border-border/50">
-                <CardContent className="pt-4 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sensitivity</span>
-                    <span className="font-mono text-primary text-sm">{bdSensitivity.toFixed(1)}×</span>
-                  </div>
-                  <Slider
-                    min={1.0} max={3.0} step={0.1}
-                    value={[bdSensitivity]}
-                    onValueChange={v => setBdSensitivity(v[0])}
-                  />
-                  <p className="text-[10px] text-muted-foreground">Higher = fewer, stronger beats detected</p>
-                </CardContent>
-              </Card>
-            </div>
+            <Card className="bg-card/50 border-primary/20 flex-shrink-0">
+              <CardContent className="pt-3 pb-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">BPM</span>
+                  <span className="text-2xl font-bold font-mono text-primary">{bdBpm > 0 ? bdBpm : "—"}</span>
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full"
+                  variant={bdIsRecording ? "destructive" : "default"}
+                  disabled={!bdIsActive}
+                  onClick={bdToggleRecord}
+                >
+                  {bdIsRecording ? (
+                    <><Square className="mr-2 h-3.5 w-3.5" /> Stop</>
+                  ) : (
+                    <><span className="mr-1.5 text-sm leading-none">●</span> Record to Script</>
+                  )}
+                </Button>
+                {bdPointsAdded > 0 && !bdIsRecording && (
+                  <p className="text-[10px] text-center text-muted-foreground">{bdPointsAdded} pts added → Timeline Editor</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 border-border/50 flex-shrink-0">
+              <CardContent className="pt-3 pb-3 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sensitivity</span>
+                  <span className="font-mono text-primary text-xs">{bdSensitivity.toFixed(1)}×</span>
+                </div>
+                <Slider min={1.0} max={3.0} step={0.1} value={[bdSensitivity]} onValueChange={v => setBdSensitivity(v[0])} />
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
         {/* Timeline Tab */}
-        <TabsContent value="timeline" className="flex-1 flex flex-col gap-3 mt-4 min-h-0 overflow-auto">
-          {/* Toolbar */}
-          <div className="flex gap-4 items-center bg-card/50 p-3 rounded-lg border border-border flex-shrink-0">
-            <Button variant="secondary" className="relative cursor-pointer" size="sm">
-              <span>Load Reference Video</span>
-              <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
-            </Button>
-            <Button variant="outline" className="relative cursor-pointer" size="sm" data-testid="button-import-funscript">
-              <Upload className="mr-2 h-4 w-4" />
-              <span>Import .funscript</span>
-              <input
-                type="file"
-                accept=".funscript,.json,application/json"
-                className="absolute inset-0 opacity-0 cursor-pointer"
-                onChange={handleImportFunscript}
-              />
-            </Button>
-            <label className="flex items-center gap-2 text-sm cursor-pointer ml-auto">
-              <input
-                type="checkbox"
-                checked={realtimeTest}
-                onChange={e => setRealtimeTest(e.target.checked)}
-                className="rounded border-border bg-black"
-              />
-              Real-time Test (Handy)
-            </label>
-          </div>
-
-          {/* Reference video + controls (top, always visible) */}
-          {videoUrl ? (
-            <div className="flex flex-col gap-0 rounded-lg border border-border/50 overflow-hidden flex-shrink-0">
-              <div className="bg-black" style={{ maxHeight: "200px" }}>
-                <video
-                  ref={videoRef}
-                  src={videoUrl}
-                  className="w-full object-contain"
-                  style={{ maxHeight: "200px" }}
-                  preload="auto"
-                  onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
-                />
-              </div>
-              <div className="bg-card/60 border-t border-border/50 px-3 py-2">
-                <VideoControlBar
-                  videoRef={videoRef}
-                  isEditor
-                  markers={[...points].sort((a, b) => a.time - b.time).map(p => p.time)}
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center rounded-lg border border-dashed border-border/40 bg-card/20 h-16 flex-shrink-0 text-sm text-muted-foreground">
-              Load a reference video to sync the timeline
-            </div>
-          )}
-
-          {/* Timeline canvas */}
-          <Card className="bg-black border-border/50 relative overflow-hidden flex-shrink-0 group">
+        <TabsContent value="timeline" className="flex-1 flex flex-col gap-2 mt-3 min-h-0">
+          {/* Timeline canvas fills the space */}
+          <Card className="bg-black border-border/50 relative overflow-hidden flex-1 min-h-0 group">
             <canvas
               ref={canvasRef}
               width={1600}
               height={300}
-              className="w-full h-[300px] cursor-crosshair"
+              className="w-full h-full cursor-crosshair"
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
               onMouseLeave={handleCanvasMouseUp}
             />
             {points.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-muted-foreground">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-muted-foreground text-sm">
                 Click anywhere to add control points
               </div>
             )}
             {selectedPointId && (
-              <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="destructive" size="icon" onClick={deleteSelected} title="Delete selected point">
-                  <Trash2 className="h-4 w-4" />
+              <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="destructive" size="icon" className="h-7 w-7" onClick={deleteSelected} title="Delete selected point">
+                  <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
             )}
           </Card>
-
-          <div className="flex justify-between text-sm text-muted-foreground px-2 flex-shrink-0">
+          <div className="flex justify-between text-xs text-muted-foreground px-1 flex-shrink-0">
             <span>Points: {points.length}</span>
-            <Button variant="ghost" size="sm" onClick={() => setPoints([])} className="text-destructive hover:text-destructive h-8">Clear All</Button>
+            <Button variant="ghost" size="sm" onClick={() => setPoints([])} className="text-destructive hover:text-destructive h-7 text-xs">Clear All</Button>
           </div>
         </TabsContent>
 
         {/* Visual Trigger Tab */}
-        <TabsContent value="visual" className="flex-1 flex flex-col gap-4 mt-4 min-h-0 overflow-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Video preview */}
-            <div className="lg:col-span-2 space-y-3">
-              <div className="flex gap-3 items-center">
-                <Button variant="secondary" size="sm" className="relative cursor-pointer">
-                  <span>Load Video</span>
-                  <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVtVideoUpload} />
-                </Button>
-                {vtVideoLoaded && (
-                  <span className="text-xs text-muted-foreground">Click on the video to pin the 5×5 sampling zone</span>
-                )}
-              </div>
-              <div className="relative bg-black rounded-lg border border-border/50 overflow-hidden min-h-[200px] flex items-center justify-center">
-                {!vtVideoLoaded && (
-                  <span className="text-muted-foreground text-sm">No video loaded</span>
-                )}
-                <canvas
-                  ref={vtCanvasRef}
-                  className={`w-full ${vtVideoLoaded ? "block cursor-crosshair" : "hidden"}`}
-                  onClick={handleVtCanvasClick}
-                />
-                <video ref={vtVideoRef} className="hidden" />
-              </div>
-              {vtVideoLoaded && (
-                <input
-                  type="range"
-                  min={0}
-                  max={vtVideoRef.current?.duration || 100}
-                  step={0.033}
-                  defaultValue={0}
-                  className="w-full accent-cyan-400"
-                  onChange={e => {
-                    if (vtVideoRef.current) {
-                      vtVideoRef.current.currentTime = Number(e.target.value);
-                      drawVtFrame();
-                    }
-                  }}
-                />
-              )}
+        <TabsContent value="visual" className="flex-1 flex gap-3 mt-3 min-h-0 overflow-hidden">
+          {/* Zone picker canvas (mirrors shared video, clickable) */}
+          <div className="flex-1 flex flex-col gap-1 min-h-0">
+            <p className="text-xs text-muted-foreground flex-shrink-0">
+              {videoUrl ? "Click the frame to pin the 5×5 sampling zone, then use the player above to seek" : "Load a video above to get started"}
+            </p>
+            <div className="flex-1 relative bg-black rounded-lg border border-border/50 overflow-hidden flex items-center justify-center min-h-0">
+              {!videoUrl && <span className="text-muted-foreground text-sm">No video loaded</span>}
+              <canvas
+                ref={vtCanvasRef}
+                className={`w-full h-full object-contain ${videoUrl ? "block cursor-crosshair" : "hidden"}`}
+                onClick={handleVtCanvasClick}
+              />
             </div>
+          </div>
 
-            {/* Controls */}
-            <div className="space-y-4">
-              <Card className="bg-card/50 border-primary/20">
+          {/* Settings panel */}
+          <div className="w-64 flex-shrink-0 overflow-auto">
+            <Card className="bg-card/50 border-primary/20">
                 <CardContent className="p-4 space-y-4">
                   <div>
                     <p className="text-sm font-medium mb-1">Sampled Color</p>
@@ -941,7 +884,6 @@ export default function Scripter() {
                 </CardContent>
               </Card>
             </div>
-          </div>
         </TabsContent>
       </Tabs>
     </div>
