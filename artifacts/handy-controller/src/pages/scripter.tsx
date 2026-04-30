@@ -68,7 +68,7 @@ export default function Scripter() {
   const [vtSampledPatch, setVtSampledPatch] = useState<Uint8Array | null>(null);
   const vtPatchPreviewRef = useRef<HTMLCanvasElement>(null);
   const [vtTolerance, setVtTolerance] = useState(20); // RMS threshold 0-255
-  const [vtOnPos, setVtOnPos] = useState(100);
+  const [vtChosenRange, setVtChosenRange] = useState<[number, number]>([0, 100]);
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
   const [vtProgress, setVtProgress] = useState(0);
   const [vtStartTime, setVtStartTime] = useState(0);
@@ -633,6 +633,36 @@ export default function Scripter() {
     setVtSampledPatch(toGray(rgba));
   };
 
+  /**
+   * Range levels sorted from widest stroke to narrowest.
+   * Each entry is [lo, hi]; stroke size = hi - lo.
+   * Rule: each trigger = one movement of strokeSize.
+   * Max total movement in any 1-second window must stay ≤ 400.
+   */
+  const VT_RANGE_LEVELS: [number, number][] = [
+    [0, 100], // 100 — up to 4 triggers/sec
+    [0,  95], //  95
+    [5,  95], //  90
+    [5,  90], //  85
+    [10, 90], //  80 — up to 5 triggers/sec
+    [10, 85], //  75
+    [15, 85], //  70
+    [15, 80], //  65
+    [20, 80], //  60
+    [20, 75], //  55
+    [25, 75], //  50
+    [25, 70], //  45
+    [30, 70], //  40
+    [30, 65], //  35
+    [35, 65], //  30
+    [35, 60], //  25
+    [40, 60], //  20
+    [40, 55], //  15
+    [45, 55], //  10
+    [45, 50], //   5
+    [50, 50], //   0 — last resort
+  ];
+
   const runAnalysis = async () => {
     const video = videoRef.current;
     if (!video || !vtZone || !vtSampledPatch) return;
@@ -645,7 +675,7 @@ export default function Scripter() {
     const startMs = vtStartTime * 1000;
     const endMs = vtEndTime > 0 ? vtEndTime * 1000 : video.duration * 1000;
     const stepMs = Math.round(1000 / 30);
-    const generated: Point[] = [];
+    const triggerTimes: number[] = [];
     let lastState = false;
     let t = startMs;
     const rangeMs = endMs - startMs;
@@ -656,6 +686,7 @@ export default function Scripter() {
     off.height = video.videoHeight || 360;
     const ctx = off.getContext("2d")!;
 
+    // Pass 1: collect rising-edge timestamps
     while (t <= endMs) {
       video.currentTime = t / 1000;
       await new Promise<void>(res => {
@@ -664,17 +695,37 @@ export default function Scripter() {
       });
       ctx.drawImage(video, 0, 0);
       const frameGray = toGray(ctx.getImageData(x, y, w, h).data);
-      const rms = patchRms(frameGray, vtSampledPatch);
-      const matched = rms < vtTolerance;
-
-      if (matched && !lastState) {
-        generated.push({ id: crypto.randomUUID(), time: t, pos: vtOnPos });
-      }
+      const matched = patchRms(frameGray, vtSampledPatch) < vtTolerance;
+      if (matched && !lastState) triggerTimes.push(t);
       lastState = matched;
-
       t += stepMs;
       setVtProgress(Math.round(((t - startMs) / rangeMs) * 100));
     }
+
+    // Pass 2: find the busiest 1-second window (max triggers in any 1 s)
+    let maxInWindow = 0;
+    for (let i = 0; i < triggerTimes.length; i++) {
+      let count = 1;
+      for (let j = i + 1; j < triggerTimes.length && triggerTimes[j] - triggerTimes[i] < 1000; j++) count++;
+      maxInWindow = Math.max(maxInWindow, count);
+    }
+
+    // Pass 3: pick the widest range level where maxInWindow × strokeSize ≤ 400
+    let lo = 0, hi = 100;
+    if (maxInWindow > 0) {
+      const maxStroke = Math.floor(400 / maxInWindow);
+      const chosen = VT_RANGE_LEVELS.find(([l, h]) => h - l <= maxStroke);
+      if (chosen) { [lo, hi] = chosen; }
+      else { lo = hi = 50; }
+    }
+    setVtChosenRange([lo, hi]);
+
+    // Pass 4: assign alternating hi/lo positions
+    const generated: Point[] = triggerTimes.map((time, i) => ({
+      id: crypto.randomUUID(),
+      time,
+      pos: i % 2 === 0 ? hi : lo,
+    }));
 
     setVtPreviewPoints(generated);
     setVtAnalyzing(false);
@@ -987,17 +1038,16 @@ export default function Scripter() {
                   </div>
 
                   <div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Position when triggered (0–100)</label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={vtOnPos}
-                        onChange={e => setVtOnPos(Number(e.target.value))}
-                        className="w-full bg-input rounded px-2 py-1 text-sm mt-1 border border-border"
-                      />
+                    <p className="text-xs font-medium mb-1 text-muted-foreground uppercase tracking-wider">Output Range</p>
+                    <div className="bg-background/60 rounded border border-border/50 px-3 py-2 text-sm">
+                      <span className="font-mono text-primary">{vtChosenRange[0]}</span>
+                      <span className="text-muted-foreground mx-2">↔</span>
+                      <span className="font-mono text-primary">{vtChosenRange[1]}</span>
+                      <span className="text-xs text-muted-foreground ml-2">(auto)</span>
                     </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Alternates hi↔lo. Collapses automatically to keep movement ≤ 400 units/sec.
+                    </p>
                   </div>
 
                   <div>
