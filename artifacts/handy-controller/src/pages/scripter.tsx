@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
-import { Trash2, Download, FilePlus } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload } from "lucide-react";
 
 const STORAGE_KEY = "scripter_session_v1";
 
@@ -238,6 +238,51 @@ export default function Scripter() {
     if (file) setVideoUrl(URL.createObjectURL(file));
   };
 
+  const handleImportFunscript = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        if (!Array.isArray(parsed?.actions)) {
+          alert("Invalid .funscript file: missing actions array.");
+          return;
+        }
+        const imported: Point[] = parsed.actions
+          .filter(
+            (a: unknown) =>
+              a !== null &&
+              typeof a === "object" &&
+              typeof (a as Record<string, unknown>).at === "number" &&
+              typeof (a as Record<string, unknown>).pos === "number"
+          )
+          .map((a: { at: number; pos: number }) => ({
+            id: crypto.randomUUID(),
+            time: a.at,
+            pos: Math.max(0, Math.min(100, a.pos)),
+          }));
+        if (imported.length === 0) {
+          alert("No valid actions found in the .funscript file.");
+          return;
+        }
+        if (
+          points.length === 0 ||
+          window.confirm(
+            `Replace current ${points.length} point(s) with ${imported.length} imported point(s)?`
+          )
+        ) {
+          setPoints(imported);
+          setSelectedPointId(null);
+        }
+      } catch {
+        alert("Could not parse the file. Make sure it is a valid .funscript or JSON file.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -404,6 +449,16 @@ export default function Scripter() {
             <Button variant="secondary" className="relative cursor-pointer" size="sm">
               <span>Load Reference Video</span>
               <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
+            </Button>
+            <Button variant="outline" className="relative cursor-pointer" size="sm" data-testid="button-import-funscript">
+              <Upload className="mr-2 h-4 w-4" />
+              <span>Import .funscript</span>
+              <input
+                type="file"
+                accept=".funscript,.json,application/json"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                onChange={handleImportFunscript}
+              />
             </Button>
             <label className="flex items-center gap-2 text-sm cursor-pointer ml-auto">
               <input
