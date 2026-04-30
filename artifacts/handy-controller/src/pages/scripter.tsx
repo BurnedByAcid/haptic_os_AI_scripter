@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
-import { Trash2, Download, FilePlus, Upload, Mic, Square } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp } from "lucide-react";
 import { VideoControlBar } from "@/components/video-control-bar";
 
 const STORAGE_KEY = "scripter_session_v1";
@@ -45,6 +45,15 @@ export default function Scripter() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [realtimeTest, setRealtimeTest] = useState(false);
+
+  // ─── Layout state ───
+  const [tabsOpen, setTabsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"beat" | "timeline" | "visual">("beat");
+
+  // ─── Video rect (for VT overlay alignment) ───
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+  const [videoRect, setVideoRect] = useState({ left: 0, top: 0, width: 0, height: 0 });
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const isDragging = useRef(false);
@@ -447,6 +456,31 @@ export default function Scripter() {
     return () => video.removeEventListener("timeupdate", updateTime);
   }, [videoUrl]);
 
+  // Track the letterbox-corrected rect of the video inside its container
+  useEffect(() => {
+    const container = videoContainerRef.current;
+    const video = videoRef.current;
+    if (!container || !video) return;
+    const compute = () => {
+      const cw = container.clientWidth;
+      const ch = container.clientHeight;
+      const vw = video.videoWidth || 0;
+      const vh = video.videoHeight || 0;
+      if (!vw || !vh) { setVideoRect({ left: 0, top: 0, width: cw, height: ch }); return; }
+      const cAR = cw / ch;
+      const vAR = vw / vh;
+      let dw: number, dh: number, dx: number, dy: number;
+      if (cAR > vAR) { dh = ch; dw = ch * vAR; dx = (cw - dw) / 2; dy = 0; }
+      else            { dw = cw; dh = cw / vAR; dx = 0; dy = (ch - dh) / 2; }
+      setVideoRect({ left: dx, top: dy, width: dw, height: dh });
+    };
+    const ro = new ResizeObserver(compute);
+    ro.observe(container);
+    video.addEventListener("loadedmetadata", compute);
+    compute();
+    return () => { ro.disconnect(); video.removeEventListener("loadedmetadata", compute); };
+  }, [videoUrl]);
+
   // ─────────────── Visual Trigger ───────────────
 
   // VT uses the shared videoRef — no separate video needed
@@ -604,7 +638,7 @@ export default function Scripter() {
           </label>
         </div>
         {/* Video */}
-        <div className="flex-1 min-h-0 bg-black relative">
+        <div ref={videoContainerRef} className="flex-1 min-h-0 bg-black relative">
           <video
             ref={videoRef}
             src={videoUrl ?? undefined}
@@ -619,6 +653,25 @@ export default function Scripter() {
               <span className="text-sm">Load a video to get started</span>
             </div>
           )}
+          {/* VT zone-picker overlay — only shown on Visual Trigger tab */}
+          {activeTab === "visual" && videoUrl && (
+            <canvas
+              ref={vtCanvasRef}
+              className="absolute cursor-crosshair z-10"
+              style={{
+                left: videoRect.left,
+                top: videoRect.top,
+                width: videoRect.width,
+                height: videoRect.height,
+              }}
+              onClick={handleVtCanvasClick}
+            />
+          )}
+          {activeTab === "visual" && videoUrl && (
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/70 text-xs text-muted-foreground px-3 py-1 rounded-full pointer-events-none z-20">
+              Click the video to pin sampling zone
+            </div>
+          )}
         </div>
         {/* Controls bar */}
         <div className="bg-card/60 border-t border-border/50 px-3 py-2 flex-shrink-0">
@@ -630,14 +683,31 @@ export default function Scripter() {
         </div>
       </div>
 
-      {/* ── Tabs — take 1/3 of available height ── */}
-      <Tabs defaultValue="beat" className="flex flex-col min-h-0" style={{ flex: 1 }}>
-        <TabsList className="bg-card/50 w-fit flex-shrink-0">
-          <TabsTrigger value="beat">Beat Detector</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline Editor</TabsTrigger>
-          <TabsTrigger value="visual">Visual Trigger</TabsTrigger>
+      {/* ── Tabs — collapsible tool panel ── */}
+      <Tabs
+        value={activeTab}
+        onValueChange={v => { setActiveTab(v as "beat" | "timeline" | "visual"); setTabsOpen(true); }}
+        className="flex flex-col min-h-0 flex-shrink-0"
+        style={tabsOpen ? { flex: 1, minHeight: 0 } : {}}
+      >
+        <TabsList className="bg-card/50 w-full flex-shrink-0 flex justify-between items-center h-9 px-1">
+          <div className="flex">
+            <TabsTrigger value="beat" className="text-xs h-7">Beat Detector</TabsTrigger>
+            <TabsTrigger value="timeline" className="text-xs h-7">Timeline Editor</TabsTrigger>
+            <TabsTrigger value="visual" className="text-xs h-7">Visual Trigger</TabsTrigger>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 ml-auto text-muted-foreground hover:text-foreground"
+            onClick={() => setTabsOpen(o => !o)}
+            title={tabsOpen ? "Collapse tools" : "Expand tools"}
+          >
+            {tabsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+          </Button>
         </TabsList>
 
+        {tabsOpen && <>
         {/* Beat Detector Tab */}
         <TabsContent value="beat" className="flex-1 flex gap-3 mt-3 min-h-0 overflow-hidden">
           {/* Waveform canvas */}
@@ -750,18 +820,32 @@ export default function Scripter() {
 
         {/* Visual Trigger Tab */}
         <TabsContent value="visual" className="flex-1 flex gap-3 mt-3 min-h-0 overflow-hidden">
-          {/* Zone picker canvas (mirrors shared video, clickable) */}
-          <div className="flex-1 flex flex-col gap-1 min-h-0">
-            <p className="text-xs text-muted-foreground flex-shrink-0">
-              {videoUrl ? "Click the frame to pin the 5×5 sampling zone, then use the player above to seek" : "Load a video above to get started"}
-            </p>
-            <div className="flex-1 relative bg-black rounded-lg border border-border/50 overflow-hidden flex items-center justify-center min-h-0">
-              {!videoUrl && <span className="text-muted-foreground text-sm">No video loaded</span>}
-              <canvas
-                ref={vtCanvasRef}
-                className={`w-full h-full object-contain ${videoUrl ? "block cursor-crosshair" : "hidden"}`}
-                onClick={handleVtCanvasClick}
-              />
+          {/* Zone status */}
+          <div className="flex-1 flex flex-col gap-2 min-h-0 justify-start">
+            <div className="rounded-lg border border-border/50 bg-card/40 p-3 flex flex-col gap-2">
+              <p className="text-xs text-muted-foreground">
+                {videoUrl
+                  ? "The video above is interactive — click anywhere on it to pin the 5×5 sampling zone."
+                  : "Load a video using the toolbar above to get started."}
+              </p>
+              {vtZone && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-muted-foreground">Zone:</span>
+                  <span className="font-mono text-primary">{vtZone.x}, {vtZone.y}</span>
+                  {vtSampledColor && (
+                    <>
+                      <span className="text-muted-foreground ml-2">Color:</span>
+                      <span
+                        className="inline-block w-4 h-4 rounded border border-border/50"
+                        style={{ background: `rgba(${vtSampledColor.join(",")})` }}
+                      />
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        rgb({vtSampledColor.slice(0,3).join(", ")})
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -885,6 +969,7 @@ export default function Scripter() {
               </Card>
             </div>
         </TabsContent>
+        </>}
       </Tabs>
     </div>
   );
