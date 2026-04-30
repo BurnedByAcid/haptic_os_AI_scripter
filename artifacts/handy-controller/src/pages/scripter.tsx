@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
-import { Trash2, Download, FilePlus, Upload } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload, Mic, Square } from "lucide-react";
 import { VideoControlBar } from "@/components/video-control-bar";
 
 const STORAGE_KEY = "scripter_session_v1";
@@ -64,6 +64,164 @@ export default function Scripter() {
   const [vtStartTime, setVtStartTime] = useState(0);
   const [vtEndTime, setVtEndTime] = useState(0);
   const [vtPreviewPoints, setVtPreviewPoints] = useState<Point[]>([]);
+
+  // ─── Beat Detector state ───
+  const bdCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [bdIsActive, setBdIsActive] = useState(false);
+  const [bdBpm, setBdBpm] = useState(0);
+  const [bdSensitivity, setBdSensitivity] = useState(1.5);
+  const [bdIsRecording, setBdIsRecording] = useState(false);
+  const bdAudioCtxRef = useRef<AudioContext | null>(null);
+  const bdAnalyserRef = useRef<AnalyserNode | null>(null);
+  const bdSourceRef = useRef<MediaStreamAudioSourceNode | AudioBufferSourceNode | null>(null);
+  const bdRafRef = useRef<number | null>(null);
+  const bdLastBeatRef = useRef(0);
+  const bdEnergyHistoryRef = useRef<number[]>([]);
+  const bdBeatIntervalHistoryRef = useRef<number[]>([]);
+  const bdSensitivityRef = useRef(bdSensitivity);
+  const bdIsRecordingRef = useRef(bdIsRecording);
+  const bdRecordStartRef = useRef(0);
+  const bdBeatPosRef = useRef(0); // alternates 0 ↔ 100
+  const [bdPointsAdded, setBdPointsAdded] = useState(0);
+
+  useEffect(() => { bdSensitivityRef.current = bdSensitivity; }, [bdSensitivity]);
+  useEffect(() => { bdIsRecordingRef.current = bdIsRecording; }, [bdIsRecording]);
+
+  const bdLoop = useCallback(() => {
+    if (!bdAnalyserRef.current || !bdCanvasRef.current) return;
+    const analyser = bdAnalyserRef.current;
+    const canvas = bdCanvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteTimeDomainData(dataArray);
+
+    let energy = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      const val = (dataArray[i] - 128) / 128;
+      energy += val * val;
+    }
+    const history = bdEnergyHistoryRef.current;
+    history.push(energy);
+    if (history.length > 43) history.shift();
+    const avgEnergy = history.reduce((a, b) => a + b, 0) / history.length;
+    const now = performance.now();
+
+    const isBeat = energy > avgEnergy * bdSensitivityRef.current && now - bdLastBeatRef.current > 250;
+    if (isBeat) {
+      const interval = now - bdLastBeatRef.current;
+      if (interval > 0 && interval < 3000) {
+        bdBeatIntervalHistoryRef.current.push(interval);
+        if (bdBeatIntervalHistoryRef.current.length > 8) bdBeatIntervalHistoryRef.current.shift();
+        const avgInterval = bdBeatIntervalHistoryRef.current.reduce((a, b) => a + b, 0) / bdBeatIntervalHistoryRef.current.length;
+        setBdBpm(Math.round(60000 / avgInterval));
+      }
+      bdLastBeatRef.current = now;
+
+      if (bdIsRecordingRef.current) {
+        const beatMs = Math.round(now - bdRecordStartRef.current);
+        const pos = bdBeatPosRef.current;
+        bdBeatPosRef.current = pos === 0 ? 100 : 0;
+        setPoints(prev => [...prev, { id: crypto.randomUUID(), time: beatMs, pos }]);
+        setBdPointsAdded(c => c + 1);
+      }
+
+      ctx.fillStyle = "rgba(0, 229, 255, 0.25)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "hsl(186, 100%, 50%)";
+    ctx.beginPath();
+    const sliceWidth = canvas.width / dataArray.length;
+    let x = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      const v = dataArray[i] / 128.0;
+      const y = (v * canvas.height) / 2;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+      x += sliceWidth;
+    }
+    ctx.stroke();
+
+    bdRafRef.current = requestAnimationFrame(bdLoop);
+  }, [setPoints]);
+
+  const bdSetupAudio = useCallback((stream: MediaStream) => {
+    const ctx = new AudioContext();
+    bdAudioCtxRef.current = ctx;
+    const source = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    bdSourceRef.current = source;
+    bdAnalyserRef.current = analyser;
+    bdLoop();
+  }, [bdLoop]);
+
+  const bdStartMic = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      bdSetupAudio(stream);
+      setBdIsActive(true);
+    } catch (e) { console.error(e); }
+  }, [bdSetupAudio]);
+
+  const bdStartFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const ctx = new AudioContext();
+      bdAudioCtxRef.current = ctx;
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      bdAnalyserRef.current = analyser;
+      bdSourceRef.current = source;
+      source.start(0);
+      setBdIsActive(true);
+      bdLoop();
+    } catch (err) { console.error(err); }
+  }, [bdLoop]);
+
+  const bdStop = useCallback(() => {
+    setBdIsActive(false);
+    setBdIsRecording(false);
+    bdIsRecordingRef.current = false;
+    if (bdRafRef.current) cancelAnimationFrame(bdRafRef.current);
+    if (bdSourceRef.current instanceof AudioBufferSourceNode) {
+      try { bdSourceRef.current.stop(); } catch { /* ignore */ }
+    } else if (bdSourceRef.current instanceof MediaStreamAudioSourceNode) {
+      bdSourceRef.current.mediaStream.getTracks().forEach(t => t.stop());
+    }
+    if (bdAudioCtxRef.current) bdAudioCtxRef.current.close();
+    bdEnergyHistoryRef.current = [];
+    bdBeatIntervalHistoryRef.current = [];
+    bdLastBeatRef.current = 0;
+    setBdBpm(0);
+  }, []);
+
+  useEffect(() => { return bdStop; }, [bdStop]);
+
+  const bdToggleRecord = useCallback(() => {
+    if (!bdIsRecordingRef.current) {
+      bdRecordStartRef.current = performance.now();
+      bdBeatPosRef.current = 100; // first beat will be 100
+      setBdPointsAdded(0);
+      setBdIsRecording(true);
+    } else {
+      setBdIsRecording(false);
+    }
+  }, []);
 
   // ─────────────── Timeline drawing ───────────────
 
@@ -438,11 +596,100 @@ export default function Scripter() {
         </div>
       </div>
 
-      <Tabs defaultValue="visual" className="flex-1 flex flex-col min-h-0">
+      <Tabs defaultValue="beat" className="flex-1 flex flex-col min-h-0">
         <TabsList className="bg-card/50 w-fit">
+          <TabsTrigger value="beat">Beat Detector</TabsTrigger>
           <TabsTrigger value="timeline">Timeline Editor</TabsTrigger>
           <TabsTrigger value="visual">Visual Trigger</TabsTrigger>
         </TabsList>
+
+        {/* Beat Detector Tab */}
+        <TabsContent value="beat" className="flex-1 flex flex-col gap-4 mt-4 min-h-0 overflow-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Waveform canvas */}
+            <div className="md:col-span-2 bg-black rounded-lg border border-border/50 overflow-hidden relative min-h-[240px]">
+              <canvas ref={bdCanvasRef} className="w-full h-full absolute inset-0" width={800} height={300} />
+              {!bdIsActive && (
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                  Select an input source to begin
+                </div>
+              )}
+              {bdIsRecording && (
+                <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-xs font-bold px-3 py-1.5 rounded-full">
+                  <span className="h-2 w-2 rounded-full bg-white animate-pulse inline-block" /> REC · {bdPointsAdded} points
+                </div>
+              )}
+            </div>
+
+            {/* Controls panel */}
+            <div className="space-y-4">
+              {/* Input source */}
+              <Card className="bg-card/50 border-border/50">
+                <CardContent className="pt-4 space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Input Source</p>
+                  {bdIsActive ? (
+                    <Button variant="destructive" className="w-full" onClick={bdStop}>
+                      <Square className="mr-2 h-4 w-4" /> Stop Audio
+                    </Button>
+                  ) : (
+                    <>
+                      <Button variant="secondary" className="w-full" onClick={bdStartMic}>
+                        <Mic className="mr-2 h-4 w-4" /> Use Microphone
+                      </Button>
+                      <Button variant="secondary" className="w-full relative cursor-pointer">
+                        <Upload className="mr-2 h-4 w-4" /><span>Upload Audio</span>
+                        <input type="file" accept="audio/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={bdStartFile} />
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* BPM + Record */}
+              <Card className="bg-card/50 border-primary/20">
+                <CardContent className="pt-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">BPM</span>
+                    <span className="text-3xl font-bold font-mono text-primary">{bdBpm > 0 ? bdBpm : "—"}</span>
+                  </div>
+                  <Button
+                    className={`w-full ${bdIsRecording ? "bg-red-600 hover:bg-red-700 text-white" : ""}`}
+                    variant={bdIsRecording ? "destructive" : "default"}
+                    disabled={!bdIsActive}
+                    onClick={bdToggleRecord}
+                  >
+                    {bdIsRecording ? (
+                      <><Square className="mr-2 h-4 w-4" /> Stop Recording</>
+                    ) : (
+                      <><span className="mr-2 text-base leading-none">●</span> Record Beats to Script</>
+                    )}
+                  </Button>
+                  {bdPointsAdded > 0 && !bdIsRecording && (
+                    <p className="text-xs text-center text-muted-foreground">
+                      {bdPointsAdded} beat points added → switch to Timeline Editor to refine
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Sensitivity */}
+              <Card className="bg-card/50 border-border/50">
+                <CardContent className="pt-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Sensitivity</span>
+                    <span className="font-mono text-primary text-sm">{bdSensitivity.toFixed(1)}×</span>
+                  </div>
+                  <Slider
+                    min={1.0} max={3.0} step={0.1}
+                    value={[bdSensitivity]}
+                    onValueChange={v => setBdSensitivity(v[0])}
+                  />
+                  <p className="text-[10px] text-muted-foreground">Higher = fewer, stronger beats detected</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
 
         {/* Timeline Tab */}
         <TabsContent value="timeline" className="flex-1 flex flex-col gap-3 mt-4 min-h-0 overflow-auto">
