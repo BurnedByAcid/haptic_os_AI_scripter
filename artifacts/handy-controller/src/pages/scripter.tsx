@@ -437,7 +437,7 @@ export default function Scripter() {
         </div>
       </div>
 
-      <Tabs defaultValue="timeline" className="flex-1 flex flex-col min-h-0">
+      <Tabs defaultValue="visual" className="flex-1 flex flex-col min-h-0">
         <TabsList className="bg-card/50 w-fit">
           <TabsTrigger value="timeline">Timeline Editor</TabsTrigger>
           <TabsTrigger value="visual">Visual Trigger</TabsTrigger>
@@ -503,7 +503,14 @@ export default function Scripter() {
 
           {videoUrl && (
             <div className="flex-1 min-h-0 bg-black rounded-lg border border-border/50 overflow-hidden mt-4">
-              <video ref={videoRef} src={videoUrl} className="w-full h-full object-contain" controls />
+              <video
+                ref={videoRef}
+                src={videoUrl}
+                className="w-full h-full object-contain"
+                controls
+                preload="auto"
+                onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
+              />
             </div>
           )}
         </TabsContent>

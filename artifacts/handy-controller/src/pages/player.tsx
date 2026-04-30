@@ -386,6 +386,8 @@ export default function Player() {
                   onPause={handlePause}
                   onSeeking={handleSeeking}
                   onSeeked={handleSeeked}
+                  onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
+                  preload="auto"
                   controls={false}
                 />
 
