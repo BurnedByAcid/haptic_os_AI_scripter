@@ -60,7 +60,10 @@ export default function Scripter() {
 
   // ─── Visual Trigger state ───
   const vtCanvasRef = useRef<HTMLCanvasElement>(null);
-  const [vtZone, setVtZone] = useState<{ x: number; y: number } | null>(null);
+  const [vtZone, setVtZone] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const vtDragStartRef = useRef<{ cssX: number; cssY: number } | null>(null);
+  const vtDragLiveRef = useRef<typeof vtZone>(null); // live preview during drag
+  const [vtDragging, setVtDragging] = useState(false);
   const [vtSampledColor, setVtSampledColor] = useState<[number, number, number, number] | null>(null);
   const [vtTolerance, setVtTolerance] = useState(40);
   const [vtOnPos, setVtOnPos] = useState(100);
@@ -493,12 +496,22 @@ export default function Scripter() {
     canvas.height = video.videoHeight || 360;
     const ctx = canvas.getContext("2d")!;
     ctx.drawImage(video, 0, 0);
-    if (vtZone) {
+    const zone = vtDragLiveRef.current ?? vtZone;
+    if (zone) {
+      const { x, y, w, h } = zone;
       ctx.strokeStyle = "hsl(186, 100%, 50%)";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(vtZone.x - 2, vtZone.y - 2, 9, 9);
-      ctx.fillStyle = "rgba(0,229,255,0.25)";
-      ctx.fillRect(vtZone.x - 2, vtZone.y - 2, 9, 9);
+      ctx.lineWidth = Math.max(1, canvas.width / 600);
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillStyle = "rgba(0,229,255,0.18)";
+      ctx.fillRect(x, y, w, h);
+      // Dimension label
+      const fontSize = Math.max(10, Math.round(canvas.width / 70));
+      ctx.font = `bold ${fontSize}px monospace`;
+      ctx.fillStyle = "hsl(186, 100%, 50%)";
+      ctx.shadowColor = "#000";
+      ctx.shadowBlur = 3;
+      ctx.fillText(`${w}×${h}`, x + w + 3, y + fontSize);
+      ctx.shadowBlur = 0;
     }
   }, [vtZone]);
 
@@ -507,28 +520,82 @@ export default function Scripter() {
     if (videoUrl) drawVtFrame();
   }, [vtZone, videoUrl, currentTime, drawVtFrame]);
 
-  const handleVtCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = vtCanvasRef.current;
-    if (!canvas) return;
+  // Convert a CSS-space drag rect (clamped to 25×25px) into video pixel coords
+  const cssDragToZone = useCallback((
+    startCssX: number, startCssY: number,
+    endCssX: number, endCssY: number,
+    canvas: HTMLCanvasElement
+  ) => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    const x = Math.round((e.clientX - rect.left) * scaleX);
-    const y = Math.round((e.clientY - rect.top) * scaleY);
-    setVtZone({ x, y });
+    const MAX_CSS = 25;
+    const rawCssW = endCssX - startCssX;
+    const rawCssH = endCssY - startCssY;
+    const cssW = Math.max(1, Math.min(MAX_CSS, Math.abs(rawCssW)));
+    const cssH = Math.max(1, Math.min(MAX_CSS, Math.abs(rawCssH)));
+    const cssTlX = rawCssW >= 0 ? startCssX : startCssX - cssW;
+    const cssTlY = rawCssH >= 0 ? startCssY : startCssY - cssH;
+    return {
+      x: Math.max(0, Math.round(cssTlX * scaleX)),
+      y: Math.max(0, Math.round(cssTlY * scaleY)),
+      w: Math.max(1, Math.round(cssW * scaleX)),
+      h: Math.max(1, Math.round(cssH * scaleY)),
+    };
+  }, []);
+
+  const handleVtPointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = vtCanvasRef.current;
+    if (!canvas) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = canvas.getBoundingClientRect();
+    vtDragStartRef.current = { cssX: e.clientX - rect.left, cssY: e.clientY - rect.top };
+    vtDragLiveRef.current = null;
+    setVtDragging(true);
+    setVtZone(null);
     setVtSampledColor(null);
-  };
+  }, []);
+
+  const handleVtPointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!vtDragging || !vtDragStartRef.current) return;
+    const canvas = vtCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const zone = cssDragToZone(
+      vtDragStartRef.current.cssX, vtDragStartRef.current.cssY,
+      e.clientX - rect.left, e.clientY - rect.top, canvas
+    );
+    vtDragLiveRef.current = zone;
+    drawVtFrame();
+  }, [vtDragging, cssDragToZone, drawVtFrame]);
+
+  const handleVtPointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!vtDragging || !vtDragStartRef.current) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    const canvas = vtCanvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const zone = cssDragToZone(
+      vtDragStartRef.current.cssX, vtDragStartRef.current.cssY,
+      e.clientX - rect.left, e.clientY - rect.top, canvas
+    );
+    vtDragLiveRef.current = null;
+    setVtZone(zone);
+    setVtDragging(false);
+    vtDragStartRef.current = null;
+  }, [vtDragging, cssDragToZone]);
 
   const sampleColor = () => {
     const canvas = vtCanvasRef.current;
     if (!canvas || !vtZone) return;
     const ctx = canvas.getContext("2d")!;
-    const data = ctx.getImageData(vtZone.x, vtZone.y, 5, 5).data;
+    const { x, y, w, h } = vtZone;
+    const data = ctx.getImageData(x, y, w, h).data;
     let r = 0, g = 0, b = 0, a = 0;
+    const n = data.length / 4;
     for (let i = 0; i < data.length; i += 4) {
       r += data[i]; g += data[i + 1]; b += data[i + 2]; a += data[i + 3];
     }
-    const n = 25;
     setVtSampledColor([Math.round(r / n), Math.round(g / n), Math.round(b / n), Math.round(a / n)]);
   };
 
@@ -561,10 +628,11 @@ export default function Scripter() {
       });
       const ctx = canvas.getContext("2d")!;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const px = ctx.getImageData(vtZone.x, vtZone.y, 5, 5).data;
+      const px = ctx.getImageData(vtZone.x, vtZone.y, vtZone.w, vtZone.h).data;
       let r = 0, g = 0, b = 0, a = 0;
       for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; a += px[i + 3]; }
-      const avg = [r / 25, g / 25, b / 25, a / 25];
+      const pn = px.length / 4 || 1;
+      const avg = [r / pn, g / pn, b / pn, a / pn];
       const dist = colorDistance(avg, vtSampledColor);
       const matched = dist < vtTolerance;
 
@@ -657,19 +725,23 @@ export default function Scripter() {
           {activeTab === "visual" && videoUrl && (
             <canvas
               ref={vtCanvasRef}
-              className="absolute cursor-crosshair z-10"
+              className="absolute z-10"
               style={{
                 left: videoRect.left,
                 top: videoRect.top,
                 width: videoRect.width,
                 height: videoRect.height,
+                cursor: vtDragging ? "crosshair" : "crosshair",
               }}
-              onClick={handleVtCanvasClick}
+              onPointerDown={handleVtPointerDown}
+              onPointerMove={handleVtPointerMove}
+              onPointerUp={handleVtPointerUp}
+              onPointerLeave={handleVtPointerUp}
             />
           )}
-          {activeTab === "visual" && videoUrl && (
+          {activeTab === "visual" && videoUrl && !vtZone && !vtDragging && (
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/70 text-xs text-muted-foreground px-3 py-1 rounded-full pointer-events-none z-20">
-              Click the video to pin sampling zone
+              Click and drag on the video to draw sampling zone (max 25×25px)
             </div>
           )}
         </div>
@@ -825,24 +897,23 @@ export default function Scripter() {
             <div className="rounded-lg border border-border/50 bg-card/40 p-3 flex flex-col gap-2">
               <p className="text-xs text-muted-foreground">
                 {videoUrl
-                  ? "The video above is interactive — click anywhere on it to pin the 5×5 sampling zone."
+                  ? "Click and drag on the video above to draw a sampling zone (capped at 25×25px on screen)."
                   : "Load a video using the toolbar above to get started."}
               </p>
               {vtZone && (
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                   <span className="text-muted-foreground">Zone:</span>
-                  <span className="font-mono text-primary">{vtZone.x}, {vtZone.y}</span>
+                  <span className="font-mono text-primary">{vtZone.x},{vtZone.y} — {vtZone.w}×{vtZone.h}px</span>
                   {vtSampledColor && (
-                    <>
-                      <span className="text-muted-foreground ml-2">Color:</span>
+                    <span className="flex items-center gap-1">
                       <span
-                        className="inline-block w-4 h-4 rounded border border-border/50"
+                        className="inline-block w-3.5 h-3.5 rounded border border-border/50"
                         style={{ background: `rgba(${vtSampledColor.join(",")})` }}
                       />
                       <span className="font-mono text-[10px] text-muted-foreground">
                         rgb({vtSampledColor.slice(0,3).join(", ")})
                       </span>
-                    </>
+                    </span>
                   )}
                 </div>
               )}
