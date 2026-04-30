@@ -376,9 +376,9 @@ export default function Player() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
         <div className="lg:col-span-2 flex flex-col gap-4">
-          <Card className="flex-1 bg-black overflow-hidden relative border-border/50 min-h-[300px]">
+          <Card className="flex-1 bg-black overflow-hidden relative border-border/50 min-h-[300px] flex flex-col">
             {videoUrl ? (
-              <div className="w-full h-full relative group">
+              <div className="flex-1 min-h-0 relative group">
                 <video
                   ref={videoRef}
                   src={videoUrl}
@@ -426,7 +426,7 @@ export default function Player() {
                 )}
               </div>
             ) : embedUrl ? (
-              <div className="w-full h-full relative">
+              <div className="flex-1 min-h-0 relative">
                 <iframe
                   src={embedUrl}
                   className="w-full h-full border-0"
@@ -441,18 +441,16 @@ export default function Player() {
                 )}
               </div>
             ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
+              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
                 <Upload className="h-12 w-12 mb-4 opacity-50" />
                 <h3 className="text-xl font-medium text-foreground mb-2">No Video Loaded</h3>
                 <p className="mb-4 max-w-sm text-sm">Load a local file or paste a URL from YouTube, Pornhub, xVideos, and more.</p>
               </div>
             )}
-          </Card>
 
-          {/* Video Controls */}
-          {videoUrl && (
-            <Card className="border-border/50 bg-card/50">
-              <CardContent className="pt-3 pb-2 px-4">
+            {/* Controls strip — directly below the video, inside the card */}
+            {videoUrl && (
+              <div className="bg-card/80 border-t border-border/40 px-4 py-2 flex-shrink-0">
                 <VideoControlBar
                   videoRef={videoRef}
                   extraControls={isRecording ? (
@@ -461,9 +459,9 @@ export default function Player() {
                     </Button>
                   ) : undefined}
                 />
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            )}
+          </Card>
 
           {/* Funscript waveform */}
           <Card className="border-border/50 bg-card/50 overflow-hidden">
