@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard } from "lucide-react";
 import { VideoControlBar } from "@/components/video-control-bar";
 
 const STORAGE_KEY = "scripter_session_v1";
@@ -62,7 +62,7 @@ export default function Scripter() {
       return [];
     }
   });
-  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoFileName, setVideoFileName] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -79,8 +79,10 @@ export default function Scripter() {
   // Stable refs so keyboard handler always sees latest values without re-subscribing
   const currentTimeRef = useRef(0);
   const pointsRef = useRef<Point[]>([]);
+  const selectedIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
   useEffect(() => { pointsRef.current = points; }, [points]);
+  useEffect(() => { selectedIdsRef.current = selectedIds; }, [selectedIds]);
 
   // ─── Video rect (for VT overlay alignment) ───
   const videoBlockRef = useRef<HTMLDivElement>(null);
@@ -90,6 +92,17 @@ export default function Scripter() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const isDragging = useRef(false);
+  // Clipboard: relative-time offsets so paste anchors to playhead
+  const clipboardRef = useRef<Array<{ relTime: number; pos: number }>>([]);
+  // Rubber-band selection box (canvas pixel coords)
+  const isRubberBanding = useRef(false);
+  const selBoxRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  // Drag anchor: snapshot of every selected point's position at drag-start
+  const dragAnchorRef = useRef<{
+    mouseTime: number;
+    mouseY: number;
+    items: { id: string; origTime: number; origPos: number }[];
+  } | null>(null);
 
   // ─── Visual Trigger state ───
   const vtCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -339,7 +352,7 @@ export default function Scripter() {
         const x = timeToX(p.time);
         if (x < -12 || x > W + 12) return;
         const y = H - (p.pos / 100) * H;
-        const sel = p.id === selectedPointId;
+        const sel = selectedIds.has(p.id);
         ctx.fillStyle = sel ? "hsl(186,100%,50%)" : "#fff";
         ctx.beginPath();
         ctx.arc(x, y, sel ? 6 : 4, 0, Math.PI * 2);
@@ -373,6 +386,22 @@ export default function Scripter() {
       });
     }
 
+    // ── Rubber-band selection box ──
+    const box = selBoxRef.current;
+    if (box) {
+      const rx = Math.min(box.x1, box.x2);
+      const ry = Math.min(box.y1, box.y2);
+      const rw = Math.abs(box.x2 - box.x1);
+      const rh = Math.abs(box.y2 - box.y1);
+      ctx.fillStyle = "rgba(0,229,255,0.08)";
+      ctx.fillRect(rx, ry, rw, rh);
+      ctx.strokeStyle = "rgba(0,229,255,0.7)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 2]);
+      ctx.strokeRect(rx, ry, rw, rh);
+      ctx.setLineDash([]);
+    }
+
     // ── Center playhead ──
     ctx.strokeStyle = "rgba(255,255,255,0.90)";
     ctx.lineWidth = 2;
@@ -397,7 +426,7 @@ export default function Scripter() {
     ctx.textAlign = "center";
     ctx.fillText(fmtMs(currentTime), centerX, 26);
 
-  }, [points, vtPreviewPoints, selectedPointId, currentTime, tlZoomLevel]);
+  }, [points, vtPreviewPoints, selectedIds, currentTime, tlZoomLevel]);
 
   useEffect(() => {
     drawTimeline();
@@ -444,34 +473,129 @@ export default function Scripter() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const { x, y } = canvasClientToCanvas(e);
+    const { xToTime } = tlCoordsForCanvas(canvas);
     const clickedPoint = getPointAtCursor(x, y, canvas);
+
     if (clickedPoint) {
-      setSelectedPointId(clickedPoint.id);
-      isDragging.current = true;
+      const isModifier = e.shiftKey || e.ctrlKey || e.metaKey;
+      if (isModifier) {
+        // Toggle this point in/out of selection without starting a drag
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          if (next.has(clickedPoint.id)) next.delete(clickedPoint.id);
+          else next.add(clickedPoint.id);
+          return next;
+        });
+      } else {
+        // If point not already selected, replace selection with just this one
+        if (!selectedIds.has(clickedPoint.id)) {
+          setSelectedIds(new Set([clickedPoint.id]));
+        }
+        // Snapshot all currently-selected point positions for group drag
+        const currentSel = selectedIds.has(clickedPoint.id)
+          ? selectedIds
+          : new Set([clickedPoint.id]);
+        dragAnchorRef.current = {
+          mouseTime: xToTime(x),
+          mouseY: y,
+          items: pointsRef.current
+            .filter(p => currentSel.has(p.id))
+            .map(p => ({ id: p.id, origTime: p.time, origPos: p.pos })),
+        };
+        isDragging.current = true;
+      }
     } else {
-      setSelectedPointId(null);
-      const { xToTime } = tlCoordsForCanvas(canvas);
-      const time = Math.max(0, xToTime(x));
-      const pos = Math.max(0, Math.min(100, Math.round(100 - (y / canvas.height) * 100)));
-      const newPoint = { id: crypto.randomUUID(), time, pos };
-      setPoints(prev => [...prev, newPoint]);
-      setSelectedPointId(newPoint.id);
+      // Empty space: start rubber-band (no immediate point creation)
+      if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        setSelectedIds(new Set());
+      }
+      selBoxRef.current = { x1: x, y1: y, x2: x, y2: y };
+      isRubberBanding.current = true;
     }
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging.current || !selectedPointId) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const { x, y } = canvasClientToCanvas(e);
-    const { xToTime } = tlCoordsForCanvas(canvas);
-    const newTime = Math.max(0, xToTime(x));
-    const newPos = Math.max(0, Math.min(100, Math.round(100 - (y / canvas.height) * 100)));
-    setPoints(pts => pts.map(p => p.id === selectedPointId ? { ...p, time: newTime, pos: newPos } : p));
-    if (realtimeTest && connected && key) setHDSP(key, newPos, 87);
+
+    if (isDragging.current && dragAnchorRef.current) {
+      const { xToTime } = tlCoordsForCanvas(canvas);
+      const { mouseTime, mouseY, items } = dragAnchorRef.current;
+      const deltaTime = xToTime(x) - mouseTime;
+      const deltaPosRaw = ((mouseY - y) / canvas.height) * 100;
+      setPoints(pts => pts.map(p => {
+        const orig = items.find(it => it.id === p.id);
+        if (!orig) return p;
+        const newTime = Math.max(0, orig.origTime + deltaTime);
+        const newPos = Math.max(0, Math.min(100, Math.round(orig.origPos + deltaPosRaw)));
+        return { ...p, time: newTime, pos: newPos };
+      }));
+      if (realtimeTest && connected && key) {
+        const anchorItem = items[0];
+        if (anchorItem) {
+          const newPos = Math.max(0, Math.min(100, Math.round(anchorItem.origPos + ((mouseY - y) / canvas.height) * 100)));
+          setHDSP(key, newPos, 87);
+        }
+      }
+      return;
+    }
+
+    if (isRubberBanding.current && selBoxRef.current) {
+      selBoxRef.current = { ...selBoxRef.current, x2: x, y2: y };
+      drawTimeline(); // immediate redraw to show the box
+    }
   };
 
-  const handleCanvasMouseUp = () => { isDragging.current = false; };
+  const handleCanvasMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+
+    if (isDragging.current) {
+      isDragging.current = false;
+      dragAnchorRef.current = null;
+      return;
+    }
+
+    if (isRubberBanding.current && canvas) {
+      const box = selBoxRef.current;
+      isRubberBanding.current = false;
+      selBoxRef.current = null;
+
+      if (!box) return;
+
+      const dragDist = Math.hypot(box.x2 - box.x1, box.y2 - box.y1);
+
+      if (dragDist < 5) {
+        // Treated as a click on empty space — create a new point
+        if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          const { xToTime } = tlCoordsForCanvas(canvas);
+          const time = Math.max(0, xToTime(box.x1));
+          const pos = Math.max(0, Math.min(100, Math.round(100 - (box.y1 / canvas.height) * 100)));
+          const newPoint: Point = { id: crypto.randomUUID(), time, pos };
+          setPoints(prev => [...prev, newPoint]);
+          setSelectedIds(new Set([newPoint.id]));
+        }
+      } else {
+        // Rubber-band: select all points whose canvas coords fall inside the box
+        const { timeToX } = tlCoordsForCanvas(canvas);
+        const xMin = Math.min(box.x1, box.x2);
+        const xMax = Math.max(box.x1, box.x2);
+        const yMin = Math.min(box.y1, box.y2);
+        const yMax = Math.max(box.y1, box.y2);
+        const inBox = pointsRef.current.filter(p => {
+          const px = timeToX(p.time);
+          const py = canvas.height - (p.pos / 100) * canvas.height;
+          return px >= xMin && px <= xMax && py >= yMin && py <= yMax;
+        });
+        if (e.shiftKey || e.ctrlKey || e.metaKey) {
+          setSelectedIds(prev => new Set([...prev, ...inBox.map(p => p.id)]));
+        } else {
+          setSelectedIds(new Set(inBox.map(p => p.id)));
+        }
+      }
+      drawTimeline(); // clear rubber-band
+    }
+  };
 
   const exportScript = async () => {
     const sorted = [...points].sort((a, b) => a.time - b.time);
@@ -527,10 +651,33 @@ export default function Scripter() {
   };
 
   const deleteSelected = () => {
-    if (selectedPointId) {
-      setPoints(pts => pts.filter(p => p.id !== selectedPointId));
-      setSelectedPointId(null);
-    }
+    if (selectedIds.size === 0) return;
+    setPoints(pts => pts.filter(p => !selectedIds.has(p.id)));
+    setSelectedIds(new Set());
+  };
+
+  const copySelected = () => {
+    if (selectedIds.size === 0) return;
+    const sel = pointsRef.current.filter(p => selectedIds.has(p.id));
+    const minTime = Math.min(...sel.map(p => p.time));
+    clipboardRef.current = sel.map(p => ({ relTime: p.time - minTime, pos: p.pos }));
+  };
+
+  const cutSelected = () => {
+    copySelected();
+    deleteSelected();
+  };
+
+  const pasteClipboard = () => {
+    if (clipboardRef.current.length === 0) return;
+    const anchor = currentTimeRef.current;
+    const pasted: Point[] = clipboardRef.current.map(entry => ({
+      id: crypto.randomUUID(),
+      time: anchor + entry.relTime,
+      pos: entry.pos,
+    }));
+    setPoints(prev => [...prev, ...pasted]);
+    setSelectedIds(new Set(pasted.map(p => p.id)));
   };
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -576,7 +723,7 @@ export default function Scripter() {
           )
         ) {
           setPoints(imported);
-          setSelectedPointId(null);
+          setSelectedIds(new Set());
         }
       } catch {
         alert("Could not parse the file. Make sure it is a valid .funscript or JSON file.");
@@ -623,8 +770,61 @@ export default function Scripter() {
 
       const pts = pointsRef.current;
       const now = currentTimeRef.current;
+      const selIds = selectedIdsRef.current;
+      const isMod = e.ctrlKey || e.metaKey;
+
+      // ── Ctrl/Cmd combos ──
+      if (isMod) {
+        switch (e.key.toLowerCase()) {
+          case "a":
+            e.preventDefault();
+            setSelectedIds(new Set(pts.map(p => p.id)));
+            return;
+          case "c": {
+            e.preventDefault();
+            const sel = pts.filter(p => selIds.has(p.id));
+            if (sel.length === 0) return;
+            const minTime = Math.min(...sel.map(p => p.time));
+            clipboardRef.current = sel.map(p => ({ relTime: p.time - minTime, pos: p.pos }));
+            return;
+          }
+          case "x": {
+            e.preventDefault();
+            const sel = pts.filter(p => selIds.has(p.id));
+            if (sel.length === 0) return;
+            const minTime = Math.min(...sel.map(p => p.time));
+            clipboardRef.current = sel.map(p => ({ relTime: p.time - minTime, pos: p.pos }));
+            setPoints(prev => prev.filter(p => !selIds.has(p.id)));
+            setSelectedIds(new Set());
+            return;
+          }
+          case "v": {
+            e.preventDefault();
+            if (clipboardRef.current.length === 0) return;
+            const pasted = clipboardRef.current.map(entry => ({
+              id: crypto.randomUUID(),
+              time: now + entry.relTime,
+              pos: entry.pos,
+            }));
+            setPoints(prev => [...prev, ...pasted]);
+            setSelectedIds(new Set(pasted.map(p => p.id)));
+            return;
+          }
+        }
+        return; // don't fall through to digit shortcuts when Ctrl/Cmd held
+      }
 
       switch (e.key) {
+        // ── Delete / Backspace: remove selected points ──
+        case "Delete":
+        case "Backspace":
+          if (selIds.size > 0) {
+            e.preventDefault();
+            setPoints(prev => prev.filter(p => !selIds.has(p.id)));
+            setSelectedIds(new Set());
+          }
+          break;
+
         // ── Place marker at current time ──
         case "`": e.preventDefault(); addMarker(0);   break;
         case "1": e.preventDefault(); addMarker(10);  break;
@@ -1309,17 +1509,34 @@ export default function Scripter() {
                 <ZoomOut className="h-3 w-3" />
               </Button>
             </div>
-            {/* Delete selected button */}
-            {selectedPointId && (
-              <div className="absolute top-2 left-2 flex gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="destructive" size="icon" className="h-6 w-6" onClick={deleteSelected} title="Delete selected point (or press Delete)">
+            {/* Multi-select action toolbar */}
+            {selectedIds.size > 0 && (
+              <div className="absolute top-2 left-2 flex items-center gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-[10px] text-primary font-bold font-mono bg-black/70 px-1.5 py-0.5 rounded mr-1 select-none">
+                  {selectedIds.size} selected
+                </span>
+                <Button variant="outline" size="icon" className="h-6 w-6 bg-black/70 border-border/50" onClick={copySelected} title="Copy (Ctrl+C)">
+                  <Copy className="h-3 w-3" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-6 w-6 bg-black/70 border-border/50" onClick={cutSelected} title="Cut (Ctrl+X)">
+                  <Scissors className="h-3 w-3" />
+                </Button>
+                <Button variant="destructive" size="icon" className="h-6 w-6" onClick={deleteSelected} title="Delete (Del)">
                   <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+            {/* Paste button — visible when clipboard has content */}
+            {clipboardRef.current.length > 0 && (
+              <div className="absolute bottom-6 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="outline" size="sm" className="h-6 text-[10px] bg-black/70 border-border/50 gap-1" onClick={pasteClipboard} title="Paste at playhead (Ctrl+V)">
+                  <Clipboard className="h-3 w-3" /> Paste {clipboardRef.current.length}
                 </Button>
               </div>
             )}
             {points.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-muted-foreground/50 text-xs text-center px-4 select-none">
-                Click to place markers · <span className="font-mono">` 1–9 0</span> = add at pos · <span className="font-mono">← →</span> frame step · <span className="font-mono">↑ ↓</span> jump markers
+                Click to place · drag to select area · <span className="font-mono">Shift+click</span> multi-select · <span className="font-mono">Ctrl+C/X/V</span> copy/cut/paste
               </div>
             )}
           </Card>
