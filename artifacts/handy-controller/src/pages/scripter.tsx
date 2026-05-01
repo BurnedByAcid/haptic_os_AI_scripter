@@ -563,7 +563,7 @@ export default function Scripter() {
 
       switch (e.key) {
         // ── Place marker at current time ──
-        case "'": e.preventDefault(); addMarker(0);   break;
+        case "`": e.preventDefault(); addMarker(0);   break;
         case "1": e.preventDefault(); addMarker(10);  break;
         case "2": e.preventDefault(); addMarker(20);  break;
         case "3": e.preventDefault(); addMarker(30);  break;
@@ -1140,14 +1140,14 @@ export default function Scripter() {
             )}
             {points.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-muted-foreground/50 text-xs text-center px-4 select-none">
-                Click to place markers · <span className="font-mono">1–9 / 0 / '</span> = add at pos · <span className="font-mono">← →</span> frame step · <span className="font-mono">↑ ↓</span> jump markers
+                Click to place markers · <span className="font-mono">` 1–9 0</span> = add at pos · <span className="font-mono">← →</span> frame step · <span className="font-mono">↑ ↓</span> jump markers
               </div>
             )}
           </Card>
           <div className="flex justify-between items-center text-xs text-muted-foreground px-1 flex-shrink-0">
             <span>Points: {points.length}</span>
             <span className="hidden sm:inline font-mono opacity-50 text-[10px]">
-              1–9/0/' add · ←→ frame · ↑↓ jump
+              ` 1–9 0 add · ←→ frame · ↑↓ jump
             </span>
             <Button variant="ghost" size="sm" onClick={() => setPoints([])} className="text-destructive hover:text-destructive h-7 text-xs">Clear All</Button>
           </div>
