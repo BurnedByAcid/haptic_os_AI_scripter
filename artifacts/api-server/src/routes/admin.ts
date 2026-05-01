@@ -20,7 +20,7 @@ router.post("/admin/bootstrap", async (req: Request, res: Response) => {
     return;
   }
 
-  const client = await clerkClient();
+  const client = clerkClient;
 
   // Check if any admin already exists by scanning users
   // (Clerk doesn't support metadata filtering, so we page through users)
@@ -70,7 +70,7 @@ router.post("/admin/set-plan", async (req: Request, res: Response) => {
     return;
   }
 
-  const client = await clerkClient();
+  const client = clerkClient;
 
   // Verify the caller is an admin
   const caller = await client.users.getUser(auth.userId);
