@@ -875,14 +875,26 @@ export default function Scripter() {
 
         await new Promise<void>((resolve) => {
           let lastAnalyzed = startMs - stepMs;
-          let aborted = false;
+          let done = false;
+
+          const finish = () => {
+            if (done) return;
+            done = true;
+            video.pause();
+            video.removeEventListener("ended", finish);
+            resolve();
+          };
+
+          // Safety net: if the video hits its natural end the rVFC stops firing —
+          // without this the Promise would hang forever.
+          video.addEventListener("ended", finish, { once: true });
 
           const processFrame = (_now: number, meta: { mediaTime: number }) => {
+            if (done) return;
             const frameMs = meta.mediaTime * 1000;
 
-            if (frameMs >= endMs || aborted) {
-              video.pause();
-              resolve();
+            if (frameMs >= endMs) {
+              finish();
               return;
             }
 
@@ -894,9 +906,9 @@ export default function Scripter() {
                   rms = gl!.computeRms(video, nx, ny, nw, nh);
                 } else {
                   // rVFC without GPU — use 2D canvas cropped to patch
-                  const off = document.createElement("canvas");
-                  off.width = w; off.height = h;
-                  const ctx2 = off.getContext("2d")!;
+                  const off2d = document.createElement("canvas");
+                  off2d.width = w; off2d.height = h;
+                  const ctx2 = off2d.getContext("2d")!;
                   ctx2.drawImage(video, x, y, w, h, 0, 0, w, h);
                   rms = patchRms(toGray(ctx2.getImageData(0, 0, w, h).data), vtSampledPatch!);
                 }
@@ -906,9 +918,7 @@ export default function Scripter() {
                 lastAnalyzed = frameMs;
               } catch (e) {
                 console.error("frame analysis error", e);
-                aborted = true;
-                video.pause();
-                resolve();
+                finish();
                 return;
               }
               setVtProgress(Math.min(99, Math.round(((frameMs - startMs) / rangeMs) * 100)));
@@ -918,7 +928,7 @@ export default function Scripter() {
           };
 
           (video as any).requestVideoFrameCallback(processFrame);
-          video.play().catch(() => { aborted = true; resolve(); });
+          video.play().catch(() => finish());
         });
 
       } else {

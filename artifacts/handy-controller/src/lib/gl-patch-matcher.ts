@@ -11,10 +11,10 @@
  *      mean-squared-diff encoded in [0,255].
  *   5. Returns √(msd) × 255 — same scale as the CPU patchRms helper.
  *
- * Y-flip convention
- *   • Video texture uploaded with UNPACK_FLIP_Y_WEBGL = true  (visual top → UV y=0).
- *   • Reference typed-array uploaded with UNPACK_FLIP_Y_WEBGL = false (row 0 → UV y=0).
- *   • getImageData row 0 = visual top, so both textures agree: UV y=0 = patch top.
+ * Y-axis convention (both textures use UNPACK_FLIP_Y_WEBGL = false)
+ *   texImage2D without flipping stores source row-0 at GL y=0, so UV y=0 = visual top
+ *   for both the video element and the Uint8Array from getImageData.  Using the same
+ *   convention for both means the diff shader compares corresponding pixels correctly.
  */
 
 const VERT = `
@@ -167,8 +167,13 @@ export class GlPatchMatcher {
     const gl = this.gl;
     if (this.chain.length === 0) throw new Error("call setReference first");
 
-    // Upload video frame (FLIP_Y=true: visual top → UV y=0)
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    // Upload video frame — no Y-flip.
+    // texImage2D without UNPACK_FLIP_Y stores row-0 of the source at GL y=0,
+    // so UV y=0 = visual top of the video, matching CSS / canvas coordinates.
+    // The reference patch (from getImageData, also no flip) shares the same
+    // convention: UV y=0 = visual top of the sampled patch.  Keeping both
+    // consistent means the diff shader compares corresponding pixels correctly.
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     gl.bindTexture(gl.TEXTURE_2D, this.videoTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
 
