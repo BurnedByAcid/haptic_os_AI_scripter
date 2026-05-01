@@ -101,6 +101,16 @@ export default function AI() {
   );
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [keyDraft, setKeyDraft] = useState("");
+  const [backend, setBackend] = useState<"openai" | "ollama">(() =>
+    (localStorage.getItem("handy_ai_backend") as "openai" | "ollama") || "openai"
+  );
+  const [ollamaModel, setOllamaModel] = useState(() =>
+    localStorage.getItem("handy_ollama_model") || "llama3"
+  );
+  const [ollamaUrl, setOllamaUrl] = useState(() =>
+    localStorage.getItem("handy_ollama_url") || "http://localhost:11434"
+  );
+  const [showOllamaSettings, setShowOllamaSettings] = useState(false);
   const [transcriptBuffer, setTranscriptBuffer] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -183,6 +193,17 @@ export default function AI() {
 
   // ── Realtime WebSocket ───────────────────────────────────────────────────
   const startRealtimeSession = useCallback(async () => {
+    // Ollama doesn't support the Realtime WebSocket protocol — use text mode instead
+    if (backend === "ollama") {
+      if (credits <= 0) {
+        toast({ title: "No Credits", description: "Trial credits exhausted.", variant: "destructive" });
+        return;
+      }
+      if (!deductCreditsStart()) return;
+      setSessionActive(true);
+      toast({ title: "Ollama session started", description: `Using ${ollamaModel} — type below to chat.` });
+      return;
+    }
     if (!apiKey) {
       toast({ title: "No API Key", description: "Set your OpenAI API key first.", variant: "destructive" });
       setShowKeyInput(true);
@@ -238,7 +259,7 @@ export default function AI() {
       toast({ title: "Connection Failed", description: "Could not connect to OpenAI Realtime API. Check your API key.", variant: "destructive" });
       stopSession();
     };
-  }, [apiKey, activePersona, credits, playPCM16Chunk]);
+  }, [apiKey, activePersona, credits, playPCM16Chunk, backend, ollamaModel]);
 
   const handleRealtimeEvent = useCallback((msg: { type: string; [k: string]: unknown }) => {
     switch (msg.type) {
@@ -342,28 +363,36 @@ export default function AI() {
       return;
     }
 
-    // Fallback: Chat Completions or simulation
+    // Text chat — route through API server to avoid CORS (works for both OpenAI and Ollama)
     if (!sessionActive) { if (!deductCreditsStart()) return; setSessionActive(true); }
     setIsLoading(true);
     try {
       let rawReply: string;
-      if (apiKey) {
-        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      const isOllama = backend === "ollama";
+      const hasKey = !!apiKey;
+
+      if (isOllama || hasKey) {
+        const res = await fetch("/api/ai/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "gpt-4o-mini",
+            backend,
+            apiKey: hasKey ? apiKey : undefined,
+            model: isOllama ? ollamaModel : "gpt-4o-mini",
+            ollamaUrl: isOllama ? ollamaUrl : undefined,
+            systemPrompt: activePersona.prompt,
             messages: [
-              { role: "system", content: activePersona.prompt },
               ...messages.slice(-10),
               { role: "user", content: text }
             ],
-            max_tokens: 200, temperature: 0.9
-          })
+          }),
         });
-        if (!res.ok) throw new Error(`OpenAI ${res.status}`);
-        const data = await res.json() as { choices: { message: { content: string } }[] };
-        rawReply = data.choices[0].message.content;
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` })) as { error?: string };
+          throw new Error(err.error ?? `HTTP ${res.status}`);
+        }
+        const data = await res.json() as { reply: string };
+        rawReply = data.reply;
       } else {
         rawReply = await simulateResponse(text);
       }
@@ -372,8 +401,9 @@ export default function AI() {
       const u = new SpeechSynthesisUtterance(clean);
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(u);
-    } catch {
-      setMessages(prev => [...prev, { role: "assistant", content: "Sorry, I had trouble responding." }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Sorry, I had trouble responding.";
+      setMessages(prev => [...prev, { role: "assistant", content: msg }]);
     } finally {
       setIsLoading(false);
     }
@@ -414,7 +444,9 @@ export default function AI() {
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">AI Control</h1>
-          <p className="text-muted-foreground">OpenAI Realtime voice sessions with device sync.</p>
+          <p className="text-muted-foreground">
+            {backend === "ollama" ? "Local Ollama text sessions with device sync." : "OpenAI Realtime voice sessions with device sync."}
+          </p>
         </div>
         <div className="text-right flex items-center gap-6">
           {sessionActive && (
@@ -434,24 +466,70 @@ export default function AI() {
             </Button>
           ) : (
             <Button size="sm" onClick={startRealtimeSession} disabled={credits <= 0} className="gap-2">
-              <Radio className="h-4 w-4" /> Start Realtime
+              <Radio className="h-4 w-4" /> {backend === "ollama" ? "Start Session" : "Start Realtime"}
             </Button>
           )}
         </div>
       </div>
 
-      {/* API Key bar */}
-      <div className="flex items-center gap-3 bg-card/50 border border-border/50 rounded-lg px-4 py-2">
-        <span className={`text-xs font-bold px-2 py-1 rounded ${rtConnected ? "bg-green-500/20 text-green-400" : apiKey ? "bg-blue-500/20 text-blue-400" : "bg-yellow-500/20 text-yellow-400"}`}>
-          {rtConnected ? "Realtime Connected" : apiKey ? "API Key Set" : "Simulation Mode"}
-        </span>
-        {isMicStreaming && (
-          <span className="flex items-center gap-1 text-xs text-green-400 font-bold animate-pulse">
-            <Mic className="h-3 w-3" /> Mic Streaming
+      {/* Backend selector + settings bar */}
+      <div className="flex flex-col gap-2 bg-card/50 border border-border/50 rounded-lg px-4 py-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Status badge */}
+          <span className={`text-xs font-bold px-2 py-1 rounded flex-shrink-0 ${
+            backend === "ollama"
+              ? "bg-purple-500/20 text-purple-400"
+              : rtConnected ? "bg-green-500/20 text-green-400"
+              : apiKey ? "bg-blue-500/20 text-blue-400"
+              : "bg-yellow-500/20 text-yellow-400"
+          }`}>
+            {backend === "ollama"
+              ? `Ollama · ${ollamaModel}`
+              : rtConnected ? "Realtime Connected"
+              : apiKey ? "API Key Set"
+              : "Simulation Mode"}
           </span>
-        )}
-        {showKeyInput ? (
-          <>
+
+          {isMicStreaming && (
+            <span className="flex items-center gap-1 text-xs text-green-400 font-bold animate-pulse">
+              <Mic className="h-3 w-3" /> Mic Streaming
+            </span>
+          )}
+
+          {/* Backend toggle */}
+          <div className="flex rounded-md border border-border/50 overflow-hidden text-xs ml-auto flex-shrink-0">
+            <button
+              className={`px-3 py-1 transition-colors ${backend === "openai" ? "bg-primary text-primary-foreground font-bold" : "hover:bg-card/80 text-muted-foreground"}`}
+              onClick={() => { if (!sessionActive) { setBackend("openai"); localStorage.setItem("handy_ai_backend", "openai"); setShowOllamaSettings(false); } }}
+              disabled={sessionActive}
+            >OpenAI</button>
+            <button
+              className={`px-3 py-1 transition-colors border-l border-border/50 ${backend === "ollama" ? "bg-primary text-primary-foreground font-bold" : "hover:bg-card/80 text-muted-foreground"}`}
+              onClick={() => { if (!sessionActive) { setBackend("ollama"); localStorage.setItem("handy_ai_backend", "ollama"); } }}
+              disabled={sessionActive}
+            >Ollama</button>
+          </div>
+
+          {/* OpenAI key controls */}
+          {backend === "openai" && !showKeyInput && (
+            <Button size="sm" variant="outline" className="h-7 text-xs px-3 flex-shrink-0"
+              onClick={() => { setShowKeyInput(true); setKeyDraft(""); }}>
+              {apiKey ? "Change Key" : "Set API Key"}
+            </Button>
+          )}
+
+          {/* Ollama settings toggle */}
+          {backend === "ollama" && (
+            <Button size="sm" variant="outline" className="h-7 text-xs px-3 flex-shrink-0"
+              onClick={() => setShowOllamaSettings(s => !s)}>
+              {showOllamaSettings ? "Done" : "Configure"}
+            </Button>
+          )}
+        </div>
+
+        {/* OpenAI key input row */}
+        {backend === "openai" && showKeyInput && (
+          <div className="flex items-center gap-2">
             <Input type="password" placeholder="sk-..." value={keyDraft}
               onChange={e => setKeyDraft(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") saveApiKey(keyDraft); if (e.key === "Escape") setShowKeyInput(false); }}
@@ -460,16 +538,52 @@ export default function AI() {
             <Button size="sm" className="h-7 text-xs px-3" onClick={() => saveApiKey(keyDraft)}>Save</Button>
             {apiKey && <Button size="sm" variant="destructive" className="h-7 text-xs px-3" onClick={() => saveApiKey("")}>Clear</Button>}
             <Button size="sm" variant="ghost" className="h-7 text-xs px-3" onClick={() => setShowKeyInput(false)}>Cancel</Button>
-          </>
-        ) : (
-          <>
-            <span className="text-xs text-muted-foreground flex-1">
-              {apiKey ? "OpenAI key set — voice sessions use the Realtime API." : "Enter your OpenAI key to enable real-time AI voice."}
-            </span>
-            <Button size="sm" variant="outline" className="h-7 text-xs px-3" onClick={() => { setShowKeyInput(true); setKeyDraft(""); }}>
-              {apiKey ? "Change Key" : "Set API Key"}
-            </Button>
-          </>
+          </div>
+        )}
+
+        {/* OpenAI status hint */}
+        {backend === "openai" && !showKeyInput && (
+          <p className="text-xs text-muted-foreground">
+            {apiKey ? "OpenAI key set — voice sessions use the Realtime API." : "Enter your OpenAI key to enable real-time AI voice."}
+          </p>
+        )}
+
+        {/* Ollama settings row */}
+        {backend === "ollama" && showOllamaSettings && (
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex-1">
+              <label className="text-xs text-muted-foreground block mb-1">Model name</label>
+              <Input
+                value={ollamaModel}
+                onChange={e => {
+                  setOllamaModel(e.target.value);
+                  localStorage.setItem("handy_ollama_model", e.target.value);
+                }}
+                placeholder="llama3"
+                className="h-7 text-xs bg-background"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-muted-foreground block mb-1">Ollama URL</label>
+              <Input
+                value={ollamaUrl}
+                onChange={e => {
+                  setOllamaUrl(e.target.value);
+                  localStorage.setItem("handy_ollama_url", e.target.value);
+                }}
+                placeholder="http://localhost:11434"
+                className="h-7 text-xs bg-background"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Ollama hint */}
+        {backend === "ollama" && !showOllamaSettings && (
+          <p className="text-xs text-muted-foreground">
+            Requests proxy through the API server — Ollama must be reachable from the server (not the browser).
+            {" "}Voice sessions are text-only with Ollama.
+          </p>
         )}
       </div>
 
