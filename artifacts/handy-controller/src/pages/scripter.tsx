@@ -6,10 +6,29 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut } from "lucide-react";
 import { VideoControlBar } from "@/components/video-control-bar";
 
 const STORAGE_KEY = "scripter_session_v1";
+
+/** 10 zoom levels: half-window in seconds (2 s → 60 s). Index 0 = max zoom. */
+const TL_ZOOM_LEVELS = Array.from({ length: 10 }, (_, i) => 2 + (58 * i) / 9);
+
+/** Pick the smallest "nice" tick interval (ms) that puts ≈ 6 ticks in view. */
+function niceTickMs(halfWindowMs: number): number {
+  const target = (halfWindowMs * 2) / 6;
+  for (const n of [100, 200, 250, 500, 1000, 2000, 5000, 10000, 15000, 30000, 60000]) {
+    if (n >= target) return n;
+  }
+  return 60000;
+}
+
+/** Format milliseconds as a short time label. */
+function fmtMs(ms: number): string {
+  const s = ms / 1000;
+  if (s >= 60) return `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+  return `${s.toFixed(s < 10 ? 2 : 1)}s`;
+}
 
 interface Point {
   id: string;
@@ -50,6 +69,14 @@ export default function Scripter() {
   // ─── Layout state ───
   const [tabsOpen, setTabsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"beat" | "timeline" | "visual">("beat");
+
+  // ─── Timeline Editor state ───
+  const [tlZoomLevel, setTlZoomLevel] = useState(3); // 0 = max zoom (2 s), 9 = min (60 s)
+  // Stable refs so keyboard handler always sees latest values without re-subscribing
+  const currentTimeRef = useRef(0);
+  const pointsRef = useRef<Point[]>([]);
+  useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
+  useEffect(() => { pointsRef.current = points; }, [points]);
 
   // ─── Video rect (for VT overlay alignment) ───
   const videoBlockRef = useRef<HTMLDivElement>(null);
@@ -243,65 +270,83 @@ export default function Scripter() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    const W = canvas.width;
+    const H = canvas.height;
+    const centerX = W / 2;
+    const halfWindowMs = TL_ZOOM_LEVELS[tlZoomLevel] * 1000;
+
+    // Coordinate helper: time → canvas X
+    const timeToX = (t: number) => centerX + ((t - currentTime) / halfWindowMs) * centerX;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // ── Horizontal position-axis grid ──
+    ctx.strokeStyle = "rgba(255,255,255,0.06)";
     ctx.lineWidth = 1;
     for (let i = 0; i <= 10; i++) {
-      ctx.beginPath();
-      ctx.moveTo(0, (canvas.height / 10) * i);
-      ctx.lineTo(canvas.width, (canvas.height / 10) * i);
-      ctx.stroke();
+      const y = (H / 10) * i;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     }
 
-    const allTimes = [...points, ...vtPreviewPoints].map(p => p.time);
-    const duration = videoRef.current?.duration ? videoRef.current.duration * 1000 : 10000;
-    const maxTime = Math.max(duration, allTimes.length ? Math.max(...allTimes) + 1000 : 10000);
+    // ── Time ruler ticks ──
+    const tickMs = niceTickMs(halfWindowMs);
+    const startTick = Math.ceil((currentTime - halfWindowMs) / tickMs) * tickMs;
+    ctx.font = "10px monospace";
+    ctx.textAlign = "center";
+    for (let t = startTick; t <= currentTime + halfWindowMs; t += tickMs) {
+      const x = timeToX(t);
+      if (x < 0 || x > W) continue;
+      ctx.strokeStyle = "rgba(255,255,255,0.10)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H - 18); ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fillText(fmtMs(t), x, H - 4);
+    }
 
-    // Draw committed points in cyan
-    if (points.length > 0) {
-      const sorted = [...points].sort((a, b) => a.time - b.time);
-      ctx.strokeStyle = "hsl(186, 100%, 50%)";
+    // ── Committed points (cyan) ──
+    const sorted = [...points].sort((a, b) => a.time - b.time);
+    if (sorted.length > 0) {
+      ctx.strokeStyle = "hsl(186,100%,50%)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       sorted.forEach((p, i) => {
-        const x = (p.time / maxTime) * canvas.width;
-        const y = canvas.height - (p.pos / 100) * canvas.height;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        const x = timeToX(p.time);
+        const y = H - (p.pos / 100) * H;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       });
       ctx.stroke();
+
       sorted.forEach(p => {
-        const x = (p.time / maxTime) * canvas.width;
-        const y = canvas.height - (p.pos / 100) * canvas.height;
-        ctx.fillStyle = p.id === selectedPointId ? "hsl(186, 100%, 50%)" : "white";
+        const x = timeToX(p.time);
+        if (x < -12 || x > W + 12) return;
+        const y = H - (p.pos / 100) * H;
+        const sel = p.id === selectedPointId;
+        ctx.fillStyle = sel ? "hsl(186,100%,50%)" : "#fff";
         ctx.beginPath();
-        ctx.arc(x, y, p.id === selectedPointId ? 6 : 4, 0, Math.PI * 2);
+        ctx.arc(x, y, sel ? 6 : 4, 0, Math.PI * 2);
         ctx.fill();
-        if (p.id === selectedPointId) {
-          ctx.strokeStyle = "white";
-          ctx.stroke();
-        }
+        if (sel) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke(); }
       });
     }
 
-    // Draw preview points (vtPreviewPoints) as amber overlay before commit
+    // ── Preview points (amber, dashed) ──
     if (vtPreviewPoints.length > 0) {
-      const sorted = [...vtPreviewPoints].sort((a, b) => a.time - b.time);
+      const vsorted = [...vtPreviewPoints].sort((a, b) => a.time - b.time);
       ctx.strokeStyle = "rgba(251,191,36,0.8)";
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 3]);
       ctx.beginPath();
-      sorted.forEach((p, i) => {
-        const x = (p.time / maxTime) * canvas.width;
-        const y = canvas.height - (p.pos / 100) * canvas.height;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+      vsorted.forEach((p, i) => {
+        const x = timeToX(p.time);
+        const y = H - (p.pos / 100) * H;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       });
       ctx.stroke();
       ctx.setLineDash([]);
-      sorted.forEach(p => {
-        const x = (p.time / maxTime) * canvas.width;
-        const y = canvas.height - (p.pos / 100) * canvas.height;
+      vsorted.forEach(p => {
+        const x = timeToX(p.time);
+        if (x < -12 || x > W + 12) return;
+        const y = H - (p.pos / 100) * H;
         ctx.fillStyle = "rgba(251,191,36,0.9)";
         ctx.beginPath();
         ctx.arc(x, y, 4, 0, Math.PI * 2);
@@ -309,16 +354,31 @@ export default function Scripter() {
       });
     }
 
-    if (videoRef.current) {
-      const x = (currentTime / maxTime) * canvas.width;
-      ctx.strokeStyle = "rgba(255,255,255,0.5)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-  }, [points, vtPreviewPoints, selectedPointId, currentTime]);
+    // ── Center playhead ──
+    ctx.strokeStyle = "rgba(255,255,255,0.90)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(centerX, 0);
+    ctx.lineTo(centerX, H);
+    ctx.stroke();
+
+    // Downward triangle at top to mark playhead
+    ctx.fillStyle = "rgba(255,255,255,0.90)";
+    ctx.beginPath();
+    ctx.moveTo(centerX - 7, 0);
+    ctx.lineTo(centerX + 7, 0);
+    ctx.lineTo(centerX, 10);
+    ctx.closePath();
+    ctx.fill();
+
+    // Current-time label just below the triangle
+    ctx.fillStyle = "rgba(255,255,255,0.90)";
+    ctx.font = "bold 11px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(fmtMs(currentTime), centerX, 26);
+
+  }, [points, vtPreviewPoints, selectedPointId, currentTime, tlZoomLevel]);
 
   useEffect(() => {
     drawTimeline();
@@ -332,12 +392,29 @@ export default function Scripter() {
     }
   }, [points]);
 
+  // Map canvas-pixel coords ↔ time using current zoom & currentTime
+  const tlCoordsForCanvas = (canvas: HTMLCanvasElement) => {
+    const centerX = canvas.width / 2;
+    const halfWindowMs = TL_ZOOM_LEVELS[tlZoomLevel] * 1000;
+    const timeToX = (t: number) => centerX + ((t - currentTime) / halfWindowMs) * centerX;
+    const xToTime = (x: number) => currentTime + ((x - centerX) / centerX) * halfWindowMs;
+    return { centerX, halfWindowMs, timeToX, xToTime };
+  };
+
+  const canvasClientToCanvas = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * canvas.width,
+      y: ((e.clientY - rect.top) / rect.height) * canvas.height,
+    };
+  };
+
   const getPointAtCursor = (x: number, y: number, canvas: HTMLCanvasElement) => {
-    const duration = videoRef.current?.duration ? videoRef.current.duration * 1000 : 10000;
-    const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p => p.time)) + 1000 : 10000);
+    const { timeToX } = tlCoordsForCanvas(canvas);
     for (let i = points.length - 1; i >= 0; i--) {
       const p = points[i];
-      const px = (p.time / maxTime) * canvas.width;
+      const px = timeToX(p.time);
       const py = canvas.height - (p.pos / 100) * canvas.height;
       if (Math.hypot(x - px, y - py) < 10) return p;
     }
@@ -347,19 +424,16 @@ export default function Scripter() {
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const { x, y } = canvasClientToCanvas(e);
     const clickedPoint = getPointAtCursor(x, y, canvas);
     if (clickedPoint) {
       setSelectedPointId(clickedPoint.id);
       isDragging.current = true;
     } else {
       setSelectedPointId(null);
-      const duration = videoRef.current?.duration ? videoRef.current.duration * 1000 : 10000;
-      const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p => p.time)) + 1000 : 10000);
-      const time = (x / canvas.width) * maxTime;
-      const pos = Math.round(100 - (y / canvas.height) * 100);
+      const { xToTime } = tlCoordsForCanvas(canvas);
+      const time = Math.max(0, xToTime(x));
+      const pos = Math.max(0, Math.min(100, Math.round(100 - (y / canvas.height) * 100)));
       const newPoint = { id: crypto.randomUUID(), time, pos };
       setPoints(prev => [...prev, newPoint]);
       setSelectedPointId(newPoint.id);
@@ -370,17 +444,12 @@ export default function Scripter() {
     if (!isDragging.current || !selectedPointId) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const duration = videoRef.current?.duration ? videoRef.current.duration * 1000 : 10000;
-    const maxTime = Math.max(duration, points.length ? Math.max(...points.map(p => p.time)) + 1000 : 10000);
-    const newTime = Math.max(0, (x / canvas.width) * maxTime);
+    const { x, y } = canvasClientToCanvas(e);
+    const { xToTime } = tlCoordsForCanvas(canvas);
+    const newTime = Math.max(0, xToTime(x));
     const newPos = Math.max(0, Math.min(100, Math.round(100 - (y / canvas.height) * 100)));
     setPoints(pts => pts.map(p => p.id === selectedPointId ? { ...p, time: newTime, pos: newPos } : p));
-    if (realtimeTest && connected && key) {
-      setHDSP(key, newPos, 87);
-    }
+    if (realtimeTest && connected && key) setHDSP(key, newPos, 87);
   };
 
   const handleCanvasMouseUp = () => { isDragging.current = false; };
@@ -461,6 +530,76 @@ export default function Scripter() {
     video.addEventListener("timeupdate", updateTime);
     return () => video.removeEventListener("timeupdate", updateTime);
   }, [videoUrl]);
+
+  // ─── Timeline Editor keyboard shortcuts ───
+  // Active only when Timeline tab is open. Uses stable refs so the listener
+  // is registered only once (no re-subscriptions on every time/point change).
+  useEffect(() => {
+    if (activeTab !== "timeline" || !tabsOpen) return;
+
+    const FRAME_MS = 1000 / 30; // ≈ 33.33 ms per frame
+
+    const addMarker = (pos: number) => {
+      const t = currentTimeRef.current;
+      setPoints(prev => [...prev, { id: crypto.randomUUID(), time: t, pos }]);
+    };
+
+    const seekTo = (ms: number) => {
+      const video = videoRef.current;
+      if (!video) return;
+      video.currentTime = Math.max(0, Math.min(ms / 1000, video.duration || Infinity));
+    };
+
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) return;
+
+      const pts = pointsRef.current;
+      const now = currentTimeRef.current;
+
+      switch (e.key) {
+        // ── Place marker at current time ──
+        case "'": e.preventDefault(); addMarker(0);   break;
+        case "1": e.preventDefault(); addMarker(10);  break;
+        case "2": e.preventDefault(); addMarker(20);  break;
+        case "3": e.preventDefault(); addMarker(30);  break;
+        case "4": e.preventDefault(); addMarker(40);  break;
+        case "5": e.preventDefault(); addMarker(50);  break;
+        case "6": e.preventDefault(); addMarker(60);  break;
+        case "7": e.preventDefault(); addMarker(70);  break;
+        case "8": e.preventDefault(); addMarker(80);  break;
+        case "9": e.preventDefault(); addMarker(90);  break;
+        case "0": e.preventDefault(); addMarker(100); break;
+
+        // ── Frame step ──
+        case "ArrowLeft":  e.preventDefault(); seekTo(now - FRAME_MS); break;
+        case "ArrowRight": e.preventDefault(); seekTo(now + FRAME_MS); break;
+
+        // ── Jump between markers ──
+        case "ArrowDown": {
+          e.preventDefault();
+          const sorted = [...pts].sort((a, b) => a.time - b.time);
+          const prev = [...sorted].reverse().find(p => p.time < now - 10);
+          if (prev) seekTo(prev.time);
+          break;
+        }
+        case "ArrowUp": {
+          e.preventDefault();
+          const sorted = [...pts].sort((a, b) => a.time - b.time);
+          const next = sorted.find(p => p.time > now + 10);
+          if (next) seekTo(next.time);
+          break;
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [activeTab, tabsOpen]); // stable: refs handle currentTime + points
 
   // Render reference patch to preview canvas
   useEffect(() => {
@@ -963,21 +1102,53 @@ export default function Scripter() {
               onMouseUp={handleCanvasMouseUp}
               onMouseLeave={handleCanvasMouseUp}
             />
-            {points.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-muted-foreground text-sm">
-                Click anywhere to add control points
-              </div>
-            )}
+            {/* Zoom controls — fixed upper-right */}
+            <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+              <span className="text-[10px] text-muted-foreground font-mono mr-1 select-none">
+                ±{TL_ZOOM_LEVELS[tlZoomLevel] < 10
+                  ? TL_ZOOM_LEVELS[tlZoomLevel].toFixed(1)
+                  : Math.round(TL_ZOOM_LEVELS[tlZoomLevel])}s
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-6 w-6 bg-black/70 border-border/50 hover:bg-black"
+                onClick={() => setTlZoomLevel(l => Math.max(0, l - 1))}
+                disabled={tlZoomLevel === 0}
+                title="Zoom in (smaller window)"
+              >
+                <ZoomIn className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-6 w-6 bg-black/70 border-border/50 hover:bg-black"
+                onClick={() => setTlZoomLevel(l => Math.min(9, l + 1))}
+                disabled={tlZoomLevel === 9}
+                title="Zoom out (larger window)"
+              >
+                <ZoomOut className="h-3 w-3" />
+              </Button>
+            </div>
+            {/* Delete selected button */}
             {selectedPointId && (
-              <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="destructive" size="icon" className="h-7 w-7" onClick={deleteSelected} title="Delete selected point">
-                  <Trash2 className="h-3.5 w-3.5" />
+              <div className="absolute top-2 left-2 flex gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="destructive" size="icon" className="h-6 w-6" onClick={deleteSelected} title="Delete selected point (or press Delete)">
+                  <Trash2 className="h-3 w-3" />
                 </Button>
               </div>
             )}
+            {points.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-muted-foreground/50 text-xs text-center px-4 select-none">
+                Click to place markers · <span className="font-mono">1–9 / 0 / '</span> = add at pos · <span className="font-mono">← →</span> frame step · <span className="font-mono">↑ ↓</span> jump markers
+              </div>
+            )}
           </Card>
-          <div className="flex justify-between text-xs text-muted-foreground px-1 flex-shrink-0">
+          <div className="flex justify-between items-center text-xs text-muted-foreground px-1 flex-shrink-0">
             <span>Points: {points.length}</span>
+            <span className="hidden sm:inline font-mono opacity-50 text-[10px]">
+              1–9/0/' add · ←→ frame · ↑↓ jump
+            </span>
             <Button variant="ghost" size="sm" onClick={() => setPoints([])} className="text-destructive hover:text-destructive h-7 text-xs">Clear All</Button>
           </div>
         </TabsContent>
