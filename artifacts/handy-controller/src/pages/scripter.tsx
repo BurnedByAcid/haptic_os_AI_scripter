@@ -1532,7 +1532,7 @@ export default function Scripter() {
             onClick={() => {
               if (points.length === 0 || window.confirm("Start a new script? All unsaved points will be cleared.")) {
                 setPoints([]);
-                setSelectedPointId(null);
+                setSelectedIds(new Set());
                 try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
               }
             }}
