@@ -97,6 +97,7 @@ export default function Scripter() {
   const [vtSampledPatch, setVtSampledPatch] = useState<Uint8Array | null>(null);
   const vtPatchPreviewRef = useRef<HTMLCanvasElement>(null);
   const [vtTolerance, setVtTolerance] = useState(20); // RMS threshold 0-255
+  const [vtMinDelay, setVtMinDelay] = useState(200);   // ms cooldown between triggers
   const [vtMovementLimit, setVtMovementLimit] = useState(300);
   const [vtChosenRange, setVtChosenRange] = useState<[number, number]>([0, 100]);
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
@@ -843,6 +844,7 @@ export default function Scripter() {
     const rangeMs = endMs - startMs;
     const triggerTimes: number[] = [];
     let lastState = false;
+    let lastTriggerMs = startMs - vtMinDelay; // ensures first trigger is never suppressed
 
     const gl = glRef.current;
     // Ensure the GPU matcher has the current reference (in case vtSampledPatch changed)
@@ -913,7 +915,10 @@ export default function Scripter() {
                   rms = patchRms(toGray(ctx2.getImageData(0, 0, w, h).data), vtSampledPatch!);
                 }
                 const matched = rms < vtTolerance;
-                if (matched && !lastState) triggerTimes.push(frameMs);
+                if (matched && !lastState && frameMs - lastTriggerMs >= vtMinDelay) {
+                  triggerTimes.push(frameMs);
+                  lastTriggerMs = frameMs;
+                }
                 lastState = matched;
                 lastAnalyzed = frameMs;
               } catch (e) {
@@ -954,7 +959,10 @@ export default function Scripter() {
           }
 
           const matched = rms < vtTolerance;
-          if (matched && !lastState) triggerTimes.push(t);
+          if (matched && !lastState && t - lastTriggerMs >= vtMinDelay) {
+            triggerTimes.push(t);
+            lastTriggerMs = t;
+          }
           lastState = matched;
           t += stepMs;
           setVtProgress(Math.round(((t - startMs) / rangeMs) * 100));
@@ -1360,6 +1368,15 @@ export default function Scripter() {
                     </div>
                     <Slider min={2} max={80} step={1} value={[vtTolerance]} onValueChange={v => setVtTolerance(v[0])} />
                     <p className="text-[10px] text-muted-foreground mt-1">Lower = stricter match (2=exact, 80=loose)</p>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm font-medium">Min Trigger Delay</span>
+                      <span className="text-xs font-mono text-primary">{vtMinDelay} ms</span>
+                    </div>
+                    <Slider min={0} max={2000} step={50} value={[vtMinDelay]} onValueChange={v => setVtMinDelay(v[0])} />
+                    <p className="text-[10px] text-muted-foreground mt-1">Cooldown between triggers — suppresses duplicate detections on held frames (default 200 ms)</p>
                   </div>
 
                   <div>
