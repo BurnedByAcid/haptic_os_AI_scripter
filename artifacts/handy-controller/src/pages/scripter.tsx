@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useHandy } from "@/hooks/use-handy";
 import { setHDSP } from "@/lib/handyApi";
+import { GlPatchMatcher } from "@/lib/gl-patch-matcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -103,6 +104,20 @@ export default function Scripter() {
   const [vtStartTime, setVtStartTime] = useState(0);
   const [vtEndTime, setVtEndTime] = useState(0);
   const [vtPreviewPoints, setVtPreviewPoints] = useState<Point[]>([]);
+
+  // ─── GPU patch matcher ───
+  const glRef = useRef<GlPatchMatcher | null>(null);
+  const [gpuAvail, setGpuAvail] = useState(false);
+  useEffect(() => {
+    try {
+      glRef.current = new GlPatchMatcher();
+      setGpuAvail(true);
+    } catch {
+      glRef.current = null;
+      setGpuAvail(false);
+    }
+    return () => { glRef.current?.destroy(); glRef.current = null; };
+  }, []);
 
   // ─── Beat Detector state ───
   const bdCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -771,7 +786,10 @@ export default function Scripter() {
     ctx.drawImage(video, 0, 0);
     const { x, y, w, h } = vtZone;
     const rgba = ctx.getImageData(x, y, w, h).data;
-    setVtSampledPatch(toGray(rgba));
+    const gray = toGray(rgba);
+    setVtSampledPatch(gray);
+    // Feed the reference into the GPU matcher so it's ready for analysis
+    try { glRef.current?.setReference(gray, w, h); } catch { /* ignore */ }
   };
 
   /**
@@ -804,6 +822,8 @@ export default function Scripter() {
     [50, 50], //   0 — last resort
   ];
 
+  const [analyzeMode, setAnalyzeMode] = useState<"gpu" | "cpu">("cpu");
+
   const runAnalysis = async () => {
     const video = videoRef.current;
     if (!video || !vtZone || !vtSampledPatch) return;
@@ -813,35 +833,129 @@ export default function Scripter() {
     setVtPreviewPoints([]);
 
     const { x, y, w, h } = vtZone;
+    const VW = video.videoWidth || 640;
+    const VH = video.videoHeight || 360;
+    const nx = x / VW, ny = y / VH, nw = w / VW, nh = h / VH;
+
     const startMs = vtStartTime * 1000;
     const endMs = vtEndTime > 0 ? vtEndTime * 1000 : video.duration * 1000;
-    const stepMs = Math.round(1000 / 30);
+    const stepMs = 1000 / 30;           // 30 fps analysis resolution
+    const rangeMs = endMs - startMs;
     const triggerTimes: number[] = [];
     let lastState = false;
-    let t = startMs;
-    const rangeMs = endMs - startMs;
 
-    // Offscreen canvas for frame sampling — never draws the overlay
-    const off = document.createElement("canvas");
-    off.width = video.videoWidth || 640;
-    off.height = video.videoHeight || 360;
-    const ctx = off.getContext("2d")!;
+    const gl = glRef.current;
+    // Ensure the GPU matcher has the current reference (in case vtSampledPatch changed)
+    if (gl) {
+      try { gl.setReference(vtSampledPatch, w, h); } catch { /* ignore */ }
+    }
 
-    // Pass 1 — detect rising edges, record each hit at pos=50 (neutral placeholder).
-    //          Using a flat number array keeps memory minimal during the scan.
-    while (t <= endMs) {
-      video.currentTime = t / 1000;
-      await new Promise<void>(res => {
-        const onSeeked = () => { video.removeEventListener("seeked", onSeeked); res(); };
-        video.addEventListener("seeked", onSeeked);
-      });
-      ctx.drawImage(video, 0, 0);
-      const frameGray = toGray(ctx.getImageData(x, y, w, h).data);
-      const matched = patchRms(frameGray, vtSampledPatch) < vtTolerance;
-      if (matched && !lastState) triggerTimes.push(t);
-      lastState = matched;
-      t += stepMs;
-      setVtProgress(Math.round(((t - startMs) / rangeMs) * 100));
+    const useGpu = gl !== null;
+    const hasRvfc = "requestVideoFrameCallback" in HTMLVideoElement.prototype;
+    setAnalyzeMode(useGpu ? "gpu" : "cpu");
+
+    // Save video state so we can restore it after analysis
+    const savedRate    = video.playbackRate;
+    const savedMuted   = video.muted;
+    const savedTime    = video.currentTime;
+    const savedPaused  = video.paused;
+
+    try {
+      if (hasRvfc) {
+        // ─── FAST PATH: play at high speed, catch frames via rVFC ───────────
+        // Seek to start
+        video.currentTime = startMs / 1000;
+        await new Promise<void>(res => {
+          const fn = () => { video.removeEventListener("seeked", fn); res(); };
+          video.addEventListener("seeked", fn);
+        });
+
+        video.muted = true;
+        video.playbackRate = 16;
+
+        await new Promise<void>((resolve) => {
+          let lastAnalyzed = startMs - stepMs;
+          let aborted = false;
+
+          const processFrame = (_now: number, meta: { mediaTime: number }) => {
+            const frameMs = meta.mediaTime * 1000;
+
+            if (frameMs >= endMs || aborted) {
+              video.pause();
+              resolve();
+              return;
+            }
+
+            // Only analyse if we've advanced at least one step
+            if (frameMs - lastAnalyzed >= stepMs) {
+              try {
+                let rms: number;
+                if (useGpu) {
+                  rms = gl!.computeRms(video, nx, ny, nw, nh);
+                } else {
+                  // rVFC without GPU — use 2D canvas cropped to patch
+                  const off = document.createElement("canvas");
+                  off.width = w; off.height = h;
+                  const ctx2 = off.getContext("2d")!;
+                  ctx2.drawImage(video, x, y, w, h, 0, 0, w, h);
+                  rms = patchRms(toGray(ctx2.getImageData(0, 0, w, h).data), vtSampledPatch!);
+                }
+                const matched = rms < vtTolerance;
+                if (matched && !lastState) triggerTimes.push(frameMs);
+                lastState = matched;
+                lastAnalyzed = frameMs;
+              } catch (e) {
+                console.error("frame analysis error", e);
+                aborted = true;
+                video.pause();
+                resolve();
+                return;
+              }
+              setVtProgress(Math.min(99, Math.round(((frameMs - startMs) / rangeMs) * 100)));
+            }
+
+            (video as any).requestVideoFrameCallback(processFrame);
+          };
+
+          (video as any).requestVideoFrameCallback(processFrame);
+          video.play().catch(() => { aborted = true; resolve(); });
+        });
+
+      } else {
+        // ─── FALLBACK: seek-based loop (works in all browsers) ──────────────
+        const off = document.createElement("canvas");
+        off.width = VW; off.height = VH;
+        const ctx = off.getContext("2d")!;
+
+        let t = startMs;
+        while (t <= endMs) {
+          video.currentTime = t / 1000;
+          await new Promise<void>(res => {
+            const fn = () => { video.removeEventListener("seeked", fn); res(); };
+            video.addEventListener("seeked", fn);
+          });
+
+          let rms: number;
+          if (useGpu) {
+            rms = gl!.computeRms(video, nx, ny, nw, nh);
+          } else {
+            ctx.drawImage(video, 0, 0);
+            rms = patchRms(toGray(ctx.getImageData(x, y, w, h).data), vtSampledPatch!);
+          }
+
+          const matched = rms < vtTolerance;
+          if (matched && !lastState) triggerTimes.push(t);
+          lastState = matched;
+          t += stepMs;
+          setVtProgress(Math.round(((t - startMs) / rangeMs) * 100));
+        }
+      }
+    } finally {
+      // Restore video to its previous state
+      video.muted        = savedMuted;
+      video.playbackRate = savedRate;
+      video.currentTime  = savedTime;
+      if (!savedPaused) video.play().catch(() => {});
     }
 
     // Commit all detections at the neutral midpoint — cheap, one pos value for every hit.
@@ -1158,11 +1272,19 @@ export default function Scripter() {
           {/* ── Analysis in progress: just show progress bar ── */}
           {vtAnalyzing && (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8">
-              <p className="text-sm text-muted-foreground">Scanning video for pattern matches…</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground">Scanning video for pattern matches…</p>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${analyzeMode === "gpu" ? "border-primary/60 text-primary bg-primary/10" : "border-muted-foreground/40 text-muted-foreground"}`}>
+                  {analyzeMode === "gpu" ? "⚡ GPU" : "CPU"}
+                </span>
+              </div>
               <div className="w-full max-w-md">
                 <Progress value={vtProgress} className="h-3" />
               </div>
               <p className="text-2xl font-mono font-bold text-primary">{vtProgress}%</p>
+              {analyzeMode === "gpu" && (
+                <p className="text-[10px] text-muted-foreground">WebGL shader + fast playback — up to 16× faster than seek-based CPU</p>
+              )}
             </div>
           )}
 
@@ -1278,14 +1400,21 @@ export default function Scripter() {
                     </div>
                   </div>
 
-                  <Button
-                    className="w-full"
-                    disabled={!vtZone || !vtSampledPatch || vtAnalyzing}
-                    onClick={runAnalysis}
-                    data-testid="button-vt-analyze"
-                  >
-                    {vtAnalyzing ? `Analyzing... ${vtProgress}%` : "Analyze Video"}
-                  </Button>
+                  <div className="flex flex-col gap-1">
+                    <Button
+                      className="w-full"
+                      disabled={!vtZone || !vtSampledPatch || vtAnalyzing}
+                      onClick={runAnalysis}
+                      data-testid="button-vt-analyze"
+                    >
+                      {vtAnalyzing ? `Analyzing... ${vtProgress}%` : "Analyze Video"}
+                    </Button>
+                    <div className="flex justify-end">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${gpuAvail ? "border-primary/50 text-primary bg-primary/10" : "border-muted-foreground/30 text-muted-foreground"}`}>
+                        {gpuAvail ? "⚡ GPU-accelerated" : "CPU mode"}
+                      </span>
+                    </div>
+                  </div>
 
                   {vtPreviewPoints.length > 0 && (
                     <div className="space-y-2 p-3 bg-primary/10 border border-primary/30 rounded-lg">
