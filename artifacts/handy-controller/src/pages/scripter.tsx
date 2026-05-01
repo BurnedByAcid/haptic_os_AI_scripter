@@ -64,6 +64,7 @@ export default function Scripter() {
   });
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoFileName, setVideoFileName] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [realtimeTest, setRealtimeTest] = useState(false);
 
@@ -470,14 +471,48 @@ export default function Scripter() {
 
   const handleCanvasMouseUp = () => { isDragging.current = false; };
 
-  const exportScript = () => {
+  const exportScript = async () => {
     const sorted = [...points].sort((a, b) => a.time - b.time);
     const script = { actions: sorted.map(p => ({ at: Math.round(p.time), pos: p.pos })) };
-    const blob = new Blob([JSON.stringify(script, null, 2)], { type: "application/json" });
+    const json = JSON.stringify(script, null, 2);
+
+    // Derive filename from the loaded video (strip its extension, add .funscript)
+    const baseName = videoFileName
+      ? videoFileName.replace(/\.[^/.]+$/, "")
+      : "script";
+    const fileName = `${baseName}.funscript`;
+
+    // Try the File System Access API (Chrome / Edge) so the save dialog opens
+    // pre-filled with the right name and in the same folder as the video.
+    const fsa = (window as unknown as Record<string, unknown>).showSaveFilePicker;
+    if (typeof fsa === "function") {
+      try {
+        const handle = await (fsa as (opts: unknown) => Promise<FileSystemFileHandle>)({
+          suggestedName: fileName,
+          types: [
+            {
+              description: "Funscript",
+              accept: { "application/json": [".funscript"] },
+            },
+          ],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(json);
+        await writable.close();
+        return;
+      } catch (err) {
+        // User cancelled the picker — do nothing
+        if ((err as { name?: string }).name === "AbortError") return;
+        // Other error — fall through to anchor download
+      }
+    }
+
+    // Fallback: classic anchor download (Firefox, Safari, etc.)
+    const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "script.funscript";
+    a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -491,7 +526,10 @@ export default function Scripter() {
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setVideoUrl(URL.createObjectURL(file));
+    if (file) {
+      setVideoUrl(URL.createObjectURL(file));
+      setVideoFileName(file.name);
+    }
   };
 
   const handleImportFunscript = (e: React.ChangeEvent<HTMLInputElement>) => {
