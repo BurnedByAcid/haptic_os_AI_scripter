@@ -163,6 +163,9 @@ export default function Scripter() {
   const bdAnalyserRef = useRef<AnalyserNode | null>(null);
   const bdSourceRef = useRef<MediaStreamAudioSourceNode | AudioBufferSourceNode | MediaElementAudioSourceNode | null>(null);
   const bdUsingVideoRef = useRef(false); // true = timing comes from videoRef.currentTime
+  // Persistent across stop/start — createMediaElementSource can only be called ONCE per element
+  const bdVideoCtxRef  = useRef<AudioContext | null>(null);
+  const bdVideoSrcRef  = useRef<MediaElementAudioSourceNode | null>(null);
   const bdRafRef = useRef<number | null>(null);
   const bdLastBeatRef = useRef(0);
   const bdEnergyHistoryRef = useRef<number[]>([]);
@@ -175,10 +178,19 @@ export default function Scripter() {
 
   const [bdBandEnabled, setBdBandEnabled] = useState<boolean[]>(() => Array(7).fill(true));
   const bdBandEnabledRef = useRef<boolean[]>(Array(7).fill(true));
+  const bdFilterGainsRef = useRef<GainNode[]>([]); // one GainNode per band, gates audio to destination
 
   useEffect(() => { bdSensitivityRef.current = bdSensitivity; }, [bdSensitivity]);
   useEffect(() => { bdIsRecordingRef.current = bdIsRecording; }, [bdIsRecording]);
   useEffect(() => { bdBandEnabledRef.current = bdBandEnabled; }, [bdBandEnabled]);
+
+  // Sync band enables → gain nodes so the user hears only active bands
+  useEffect(() => {
+    bdBandEnabled.forEach((on, i) => {
+      const g = bdFilterGainsRef.current[i];
+      if (g) g.gain.setTargetAtTime(on ? 1 : 0, g.context.currentTime, 0.02);
+    });
+  }, [bdBandEnabled]);
 
   const bdLoop = useCallback(() => {
     if (!bdAnalyserRef.current || !bdCanvasRef.current) return;
@@ -295,6 +307,44 @@ export default function Scripter() {
     bdLoop();
   }, [bdLoop]);
 
+  /**
+   * Build 7 bandpass filter chains (HP→LP→Gain→destination) so the user
+   * can HEAR only the selected frequency bands.  The analyser is kept on the
+   * raw source so the spectrum display shows all bands regardless of selection.
+   */
+  const bdBuildFilters = useCallback((ctx: AudioContext, source: AudioNode) => {
+    // Raw analyser for spectrum display + beat detection
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    bdAnalyserRef.current = analyser;
+
+    // One HP→LP→Gain chain per band → destination
+    const gains: GainNode[] = BD_BANDS.map((band, b) => {
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = Math.max(20, band.range[0]);
+      hp.Q.value = 0.5;
+
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = Math.min(ctx.sampleRate / 2 - 1, band.range[1]);
+      lp.Q.value = 0.5;
+
+      const gain = ctx.createGain();
+      gain.gain.value = bdBandEnabledRef.current[b] ? 1 : 0;
+
+      source.connect(hp);
+      hp.connect(lp);
+      lp.connect(gain);
+      gain.connect(ctx.destination);
+
+      return gain;
+    });
+
+    bdFilterGainsRef.current = gains;
+  }, []);
+
   const bdStartMic = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -313,41 +363,60 @@ export default function Scripter() {
       const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 2048;
-      source.connect(analyser);
-      bdAnalyserRef.current = analyser;
       bdSourceRef.current = source;
+      bdBuildFilters(ctx, source); // filtered audio → destination
       source.start(0);
       setBdIsActive(true);
       bdLoop();
     } catch (err) { console.error(err); }
-  }, [bdLoop]);
+  }, [bdLoop, bdBuildFilters]);
 
   const bdStop = useCallback(() => {
     setBdIsActive(false);
     setBdIsRecording(false);
     bdIsRecordingRef.current = false;
     if (bdRafRef.current) cancelAnimationFrame(bdRafRef.current);
+
+    const isVideo = bdUsingVideoRef.current;
     if (bdSourceRef.current instanceof AudioBufferSourceNode) {
       try { bdSourceRef.current.stop(); } catch { /* ignore */ }
     } else if (bdSourceRef.current instanceof MediaStreamAudioSourceNode) {
       bdSourceRef.current.mediaStream.getTracks().forEach(t => t.stop());
-    } else if (bdSourceRef.current instanceof MediaElementAudioSourceNode) {
-      // Just disconnect — the video element keeps playing normally
-      try { bdSourceRef.current.disconnect(); } catch { /* ignore */ }
     }
+    // For video mode: disconnect filter gains so audio goes silent, but
+    // keep the AudioContext + MediaElementAudioSourceNode alive for reuse
+    if (isVideo) {
+      bdFilterGainsRef.current.forEach(g => { try { g.disconnect(); } catch { /* ignore */ } });
+      try { bdAnalyserRef.current?.disconnect(); } catch { /* ignore */ }
+    }
+
     bdSourceRef.current = null;
+    bdFilterGainsRef.current = [];
     bdUsingVideoRef.current = false;
-    if (bdAudioCtxRef.current) { bdAudioCtxRef.current.close(); bdAudioCtxRef.current = null; }
+    bdAnalyserRef.current = null;
+
+    // Only close the AudioContext for non-video sessions
+    if (!isVideo && bdAudioCtxRef.current) {
+      bdAudioCtxRef.current.close();
+    }
+    bdAudioCtxRef.current = null;
+
     bdEnergyHistoryRef.current = [];
     bdBeatIntervalHistoryRef.current = [];
     bdLastBeatRef.current = 0;
     setBdBpm(0);
   }, []);
 
-  useEffect(() => { return bdStop; }, [bdStop]);
+  useEffect(() => {
+    return () => {
+      bdStop();
+      // Also close the persistent video AudioContext on unmount
+      bdVideoCtxRef.current?.close();
+      bdVideoCtxRef.current = null;
+      bdVideoSrcRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const bdToggleRecord = useCallback(() => {
     if (!bdIsRecordingRef.current) {
@@ -360,27 +429,39 @@ export default function Scripter() {
     }
   }, []);
 
-  /** Route the already-loaded video element's audio through the band analyser for live preview. */
+  /** Route the already-loaded video element's audio through the band analyser for live preview.
+   *  createMediaElementSource() can only be called once per element, so we persist the context
+   *  and source node across stop/start cycles — only the filter graph gets rebuilt each time. */
   const bdStartVideo = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    bdStop(); // clean up any previous session
+    // Stop any mic/file session first (but don't destroy the video ctx)
+    if (!bdUsingVideoRef.current) bdStop();
+    if (bdRafRef.current) cancelAnimationFrame(bdRafRef.current);
     try {
-      const ctx = new AudioContext();
+      // Reuse or create the persistent video AudioContext
+      let ctx = bdVideoCtxRef.current;
+      if (!ctx || ctx.state === "closed") {
+        ctx = new AudioContext();
+        bdVideoCtxRef.current = ctx;
+        bdVideoSrcRef.current = null; // source must be recreated with a new context
+      }
+      // Reuse or create the persistent MediaElementAudioSourceNode
+      let source = bdVideoSrcRef.current;
+      if (!source) {
+        source = ctx.createMediaElementSource(video);
+        bdVideoSrcRef.current = source;
+      }
+      // Resume context if suspended (browser autoplay policy)
+      if (ctx.state === "suspended") ctx.resume();
       bdAudioCtxRef.current = ctx;
-      const source = ctx.createMediaElementSource(video);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 2048;
-      // Connect to analyser for detection AND to destination so audio still plays
-      source.connect(analyser);
-      source.connect(ctx.destination);
-      bdAnalyserRef.current = analyser;
       bdSourceRef.current = source;
+      bdBuildFilters(ctx, source); // filtered audio → destination (user hears selected bands only)
       bdUsingVideoRef.current = true;
       setBdIsActive(true);
       bdLoop();
     } catch (err) { console.error("bdStartVideo:", err); }
-  }, [bdLoop, bdStop]);
+  }, [bdLoop, bdStop, bdBuildFilters]);
 
   // ─────────────── Timeline drawing ───────────────
 
@@ -1582,11 +1663,12 @@ export default function Scripter() {
                       color: on ? band.color : "rgba(255,255,255,0.25)",
                     }}
                     onClick={() => setBdBandEnabled(prev => {
-                      const next = [...prev];
-                      next[i] = !next[i];
-                      return next;
+                      const activeCount = prev.filter(Boolean).length;
+                      const isSoloed = activeCount === 1 && prev[i];
+                      if (isSoloed) return Array(7).fill(true); // already solo → reset to all
+                      return prev.map((_, j) => j === i);       // solo this band
                     })}
-                    title={`${band.range[0]}–${band.range[1]} Hz (click to ${on ? "mute" : "enable"})`}
+                    title={`${band.label}: ${band.range[0]}–${band.range[1]} Hz · click to solo`}
                   >
                     <div>{band.label}</div>
                     <div className="font-mono font-normal text-[8px] opacity-70 leading-tight">
@@ -1598,17 +1680,18 @@ export default function Scripter() {
             </div>
 
             {/* Quick-select helpers */}
-            <div className="flex gap-2 flex-shrink-0 text-[10px]">
+            <div className="flex gap-2 flex-shrink-0 text-[10px] flex-wrap">
+              <span className="text-muted-foreground/40 italic">Click band to solo · click again to reset</span>
+              <span className="text-border">·</span>
               <button
                 className="text-muted-foreground hover:text-primary transition-colors"
                 onClick={() => setBdBandEnabled(Array(7).fill(true))}
-              >All on</button>
+              >All</button>
               <span className="text-border">|</span>
-              {/* Common presets */}
               {[
-                { label: "Kick (sub+bass)", mask: [true,true,false,false,false,false,false] },
-                { label: "Snare (lo+mid)", mask: [false,false,true,true,false,false,false] },
-                { label: "Hi-hat (presence+air)", mask: [false,false,false,false,false,true,true] },
+                { label: "Kick", mask: [true,true,false,false,false,false,false] },
+                { label: "Snare", mask: [false,false,true,true,false,false,false] },
+                { label: "Hi-hat", mask: [false,false,false,false,false,true,true] },
               ].map(preset => (
                 <button
                   key={preset.label}
