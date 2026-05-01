@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useSubscription, type Plan } from "@/hooks/use-subscription";
-import { useUser } from "@clerk/react";
+import { useAuth } from "@clerk/react";
 import { useToast } from "@/hooks/use-toast";
 
 const PLAN_OPTIONS: { plan: Plan; label: string; icon: typeof Crown; desc: string; classes: string }[] = [
@@ -35,7 +35,7 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 export default function Admin() {
   const { isAdmin, isLoaded } = useSubscription();
-  const { user } = useUser();
+  const { getToken } = useAuth();
   const { toast } = useToast();
 
   const [targetEmail, setTargetEmail] = useState("");
@@ -64,7 +64,7 @@ export default function Admin() {
     setLoading(true);
     setResult(null);
     try {
-      const token = await user?.getToken();
+      const token = await getToken();
       const res = await fetch(`${API_BASE}/api/admin/set-plan`, {
         method: "POST",
         headers: {

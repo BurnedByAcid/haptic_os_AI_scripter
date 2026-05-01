@@ -3,7 +3,7 @@ import { Crown, Check, Zap, Lock, ShieldCheck, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useSubscription } from "@/hooks/use-subscription";
-import { useUser } from "@clerk/react";
+import { useAuth } from "@clerk/react";
 import { useToast } from "@/hooks/use-toast";
 
 const FREE_FEATURES = [
@@ -27,14 +27,14 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 export default function Upgrade() {
   const { plan } = useSubscription();
-  const { user } = useUser();
+  const { getToken } = useAuth();
   const { toast } = useToast();
   const [bootstrapping, setBootstrapping] = useState(false);
 
   const claimAdmin = async () => {
     setBootstrapping(true);
     try {
-      const token = await user?.getToken();
+      const token = await getToken();
       const res = await fetch(`${API_BASE}/api/admin/bootstrap`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -42,8 +42,7 @@ export default function Upgrade() {
       const data = await res.json() as { message?: string; error?: string };
       if (res.ok) {
         toast({ title: "Admin access granted!", description: "Reloading your session…" });
-        // Reload user to pull fresh publicMetadata from Clerk
-        await user?.reload();
+        // Hard reload so Clerk fetches fresh publicMetadata from the server
         window.location.href = "/";
       } else {
         toast({
