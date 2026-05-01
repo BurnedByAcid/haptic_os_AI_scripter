@@ -1,12 +1,74 @@
 import { Link, useLocation } from "wouter";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, ChevronLeft, ChevronRight, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Sparkles, LogIn, LogOut, User, Users, Heart, Pencil, ShieldCheck } from "lucide-react";
+import { Activity, ChevronLeft, ChevronRight, ExternalLink, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Sparkles, LogIn, LogOut, User, Users, Heart, Pencil, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useClerk, Show } from "@clerk/react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+
+// ─── Supported devices ────────────────────────────────────────────────────────
+// "native" devices work directly via this app's API.
+// "intiface" devices need Intiface Central running locally as a WebSocket bridge.
+const DEVICES = [
+  {
+    id: "handy",
+    label: "The Handy",
+    keyLabel: "Connection Key",
+    placeholder: "Paste your Handy key…",
+    hint: "Find your key at handyfeeling.com/my-handy",
+    siteUrl: "https://www.thehandy.com",
+    mode: "native" as const,
+  },
+  {
+    id: "lovense",
+    label: "Lovense",
+    keyLabel: "Intiface WS URL",
+    placeholder: "ws://localhost:12345",
+    hint: "Requires Intiface Central + Lovense Connect",
+    siteUrl: "https://www.lovense.com",
+    mode: "intiface" as const,
+  },
+  {
+    id: "kiiroo",
+    label: "Kiiroo",
+    keyLabel: "Intiface WS URL",
+    placeholder: "ws://localhost:12345",
+    hint: "Requires Intiface Central",
+    siteUrl: "https://www.kiiroo.com",
+    mode: "intiface" as const,
+  },
+  {
+    id: "osr2",
+    label: "OSR2 / SR6",
+    keyLabel: "Intiface WS URL",
+    placeholder: "ws://localhost:12345",
+    hint: "Requires Intiface Central + serial port setup",
+    siteUrl: "https://github.com/tyrm/osr2",
+    mode: "intiface" as const,
+  },
+  {
+    id: "keon",
+    label: "Kiiroo Keon",
+    keyLabel: "Intiface WS URL",
+    placeholder: "ws://localhost:12345",
+    hint: "Requires Intiface Central",
+    siteUrl: "https://www.kiiroo.com/products/keon",
+    mode: "intiface" as const,
+  },
+  {
+    id: "intiface",
+    label: "Other (Intiface)",
+    keyLabel: "Intiface WS URL",
+    placeholder: "ws://localhost:12345",
+    hint: "Any device supported by Intiface Central",
+    siteUrl: "https://intiface.com/central",
+    mode: "intiface" as const,
+  },
+] as const;
+
+type DeviceId = typeof DEVICES[number]["id"];
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: Home },
@@ -31,6 +93,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
   const { signOut, openSignIn } = useClerk();
   const [collapsed, setCollapsed] = useState(false);
+
+  // ─── Device selector ──────────────────────────────────────────────────────
+  const [deviceId, setDeviceId] = useState<DeviceId>(() =>
+    (localStorage.getItem("hc_device_id") as DeviceId) ?? "handy"
+  );
+  const device = DEVICES.find(d => d.id === deviceId) ?? DEVICES[0];
+
+  const handleDeviceChange = (id: string) => {
+    setDeviceId(id as DeviceId);
+    localStorage.setItem("hc_device_id", id);
+  };
 
   // ─── Privacy handle ───────────────────────────────────────────────────────
   // Stored per user in localStorage. null = never asked; "" = skipped; "x" = chosen.
@@ -134,13 +207,39 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Connection Key</label>
+                {/* Device selector */}
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Device</label>
+                  <a
+                    href={device.siteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-0.5 text-[10px] text-primary/70 hover:text-primary transition-colors"
+                    title={`${device.label} website`}
+                  >
+                    <ExternalLink size={10} />
+                    <span>site</span>
+                  </a>
+                </div>
+                <select
+                  value={deviceId}
+                  onChange={e => handleDeviceChange(e.target.value)}
+                  className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  data-testid="select-device"
+                >
+                  {DEVICES.map(d => (
+                    <option key={d.id} value={d.id}>{d.label}</option>
+                  ))}
+                </select>
+
+                {/* Dynamic connection key label + input */}
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{device.keyLabel}</label>
                 <div className="flex gap-2">
                   <Input
                     type="password"
                     value={inputKey}
                     onChange={e => setInputKey(e.target.value)}
-                    placeholder="Key..."
+                    placeholder={device.placeholder}
                     className="h-8 text-xs font-mono"
                     data-testid="input-connection-key"
                   />
@@ -148,6 +247,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     Save
                   </Button>
                 </div>
+                <p className="text-[10px] text-muted-foreground leading-snug">{device.hint}</p>
+                {device.mode === "intiface" && (
+                  <a
+                    href="https://intiface.com/central"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-[10px] text-primary/80 hover:text-primary transition-colors"
+                  >
+                    <ExternalLink size={10} />
+                    Download Intiface Central
+                  </a>
+                )}
               </div>
             </>
           )}
