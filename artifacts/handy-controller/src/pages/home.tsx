@@ -3,18 +3,15 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Link } from "wouter";
 import { Activity, Gamepad2, Library, Mic, PlaySquare, Settings2, Sparkles, Users } from "lucide-react";
 
-const ACTIVE_CARDS = [
-  { href: "/player", label: "Video Player", desc: "Sync local videos with scripts", icon: PlaySquare },
-  { href: "/control", label: "Manual Control", desc: "Direct slider control", icon: Settings2 },
-  { href: "/library", label: "Library", desc: "Manage your local files", icon: Library },
-  { href: "/scripter", label: "Scripter", desc: "Create and edit Funscripts", icon: Mic },
-];
-
-const COMING_SOON_CARDS = [
-  { href: "/games", label: "Games", desc: "Play games with haptic feedback", icon: Gamepad2 },
-  { href: "/beat", label: "Beat 2 Beat", desc: "Audio-reactive haptics", icon: Activity },
-  { href: "/ai", label: "AI Control", desc: "Voice-controlled interactive sessions", icon: Sparkles },
-  { href: "/community", label: "Community", desc: "Share and discover Funscripts", icon: Users },
+const ALL_CARDS = [
+  { href: "/player",    label: "Video Player",   desc: "Sync local videos with scripts",        icon: PlaySquare },
+  { href: "/control",   label: "Manual Control", desc: "Direct slider control",                  icon: Settings2  },
+  { href: "/library",   label: "Library",        desc: "Manage your local files",                icon: Library    },
+  { href: "/scripter",  label: "Scripter",       desc: "Create and edit Funscripts",             icon: Mic        },
+  { href: "/games",     label: "Games",          desc: "Play games with haptic feedback",        icon: Gamepad2   },
+  { href: "/beat",      label: "Beat 2 Beat",    desc: "Audio-reactive haptics",                 icon: Activity   },
+  { href: "/ai",        label: "AI Control",     desc: "Voice-controlled interactive sessions",  icon: Sparkles   },
+  { href: "/community", label: "Community",      desc: "Share and discover Funscripts",          icon: Users      },
 ];
 
 export default function Home() {
@@ -73,9 +70,9 @@ export default function Home() {
         </Card>
       </div>
 
-      {/* Active feature cards */}
+      {/* All feature cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {ACTIVE_CARDS.map(item => {
+        {ALL_CARDS.map(item => {
           const Icon = item.icon;
           return (
             <Link key={item.href} href={item.href}>
@@ -87,27 +84,6 @@ export default function Home() {
                 </CardHeader>
               </Card>
             </Link>
-          );
-        })}
-      </div>
-
-      {/* Coming soon cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {COMING_SOON_CARDS.map(item => {
-          const Icon = item.icon;
-          return (
-            <div key={item.href} className="group/soon relative">
-              <Card className="cursor-not-allowed select-none opacity-50 bg-card/30 h-full">
-                <CardHeader>
-                  <Icon className="h-8 w-8 text-muted-foreground mb-2" />
-                  <CardTitle className="text-lg text-muted-foreground">{item.label}</CardTitle>
-                  <CardDescription>{item.desc}</CardDescription>
-                </CardHeader>
-              </Card>
-              <div className="absolute inset-0 flex items-center justify-center rounded-xl opacity-0 group-hover/soon:opacity-100 transition-opacity bg-muted/70 backdrop-blur-[2px]">
-                <span className="text-sm font-semibold text-foreground/80 tracking-wide">Coming soon!</span>
-              </div>
-            </div>
           );
         })}
       </div>

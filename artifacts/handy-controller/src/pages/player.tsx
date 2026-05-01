@@ -368,9 +368,11 @@ export default function Player() {
               </Button>
             )}
           </div>
-          <p className="text-[11px] text-muted-foreground mt-1.5 ml-1">
-            Supports YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo, or any direct .mp4/.webm URL
-          </p>
+          {videoMode !== "file" && (
+            <p className="text-[11px] text-muted-foreground mt-1.5 ml-1">
+              Supports YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo, or any direct .mp4/.webm URL
+            </p>
+          )}
         </CardContent>
       </Card>
 
