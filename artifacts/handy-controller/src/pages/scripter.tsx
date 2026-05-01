@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight } from "lucide-react";
 import { VideoControlBar } from "@/components/video-control-bar";
 
 const STORAGE_KEY = "scripter_session_v1";
@@ -103,6 +103,12 @@ export default function Scripter() {
     mouseY: number;
     items: { id: string; origTime: number; origPos: number }[];
   } | null>(null);
+
+  // ─── Tools menu / Presets popup state ───
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const [showPresetsPopup, setShowPresetsPopup] = useState(false);
+  const [customPatternText, setCustomPatternText] = useState("");
+  const toolsMenuRef = useRef<HTMLDivElement>(null);
 
   // ─── Visual Trigger state ───
   const vtCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -678,6 +684,78 @@ export default function Scripter() {
     }));
     setPoints(prev => [...prev, ...pasted]);
     setSelectedIds(new Set(pasted.map(p => p.id)));
+  };
+
+  // ─── Preset pattern data ────────────────────────────────────────────────────
+  const TEETH_PATTERN    = [0,75,0,75,0,75,0,75,0,100,0,100,0,100,0,100,25,100,25,100,25,100,25,100,0,100,0,100,0,100,0,100];
+  const STEPS_PATTERN    = [0,65,5,70,10,75,15,80,20,85,25,90,30,95,35,100,40,100,35,95,30,90,25,85,20,80,15,75,10,70,5,65];
+  const BOUNDS_PATTERN   = [0,65,10,75,20,85,30,95,40,100,40,95,30,85,20,75,10,65];
+  const PULSE_PATTERN    = [100,0,100,100,0,100];
+  const ALT_PATTERN      = [0,100];
+  const DYNAMIC_PATTERN  = [0,100];
+  const SM_TRI_PATTERN   = [0,60];
+  const MED_TRI_PATTERN  = [0,80];
+
+  /** Apply a repeating array of pos values to selected markers (sorted by time). */
+  const applyPattern = (values: number[]) => {
+    if (values.length === 0) return;
+    const sel = [...pointsRef.current]
+      .filter(p => selectedIdsRef.current.has(p.id))
+      .sort((a, b) => a.time - b.time);
+    if (sel.length === 0) return;
+    const idxMap = new Map(sel.map((s, i) => [s.id, i]));
+    setPoints(prev => prev.map(p => {
+      const i = idxMap.get(p.id);
+      if (i === undefined) return p;
+      return { ...p, pos: values[i % values.length] };
+    }));
+    setShowToolsMenu(false);
+    setShowPresetsPopup(false);
+  };
+
+  /** Wave: alternating 0 / smooth sine arch (range 60–100) */
+  const applyWavePattern = () => {
+    const sel = [...pointsRef.current]
+      .filter(p => selectedIdsRef.current.has(p.id))
+      .sort((a, b) => a.time - b.time);
+    if (sel.length === 0) return;
+    const oddCount = Math.ceil(sel.length / 2);
+    const values = sel.map((_, i) => {
+      if (i % 2 === 0) return 0;
+      const oi = Math.floor(i / 2);
+      return Math.round(80 + 20 * Math.cos(2 * Math.PI * oi / Math.max(oddCount, 1)));
+    });
+    const idxMap = new Map(sel.map((s, i) => [s.id, i]));
+    setPoints(prev => prev.map(p => {
+      const i = idxMap.get(p.id);
+      if (i === undefined) return p;
+      return { ...p, pos: values[i] };
+    }));
+    setShowToolsMenu(false);
+    setShowPresetsPopup(false);
+  };
+
+  /** Custom: parse user text as comma-separated numbers */
+  const applyCustomPattern = () => {
+    const values = customPatternText
+      .split(',')
+      .map(v => Math.max(0, Math.min(100, Math.round(Number(v.trim())))))
+      .filter(v => !isNaN(v));
+    applyPattern(values);
+  };
+
+  /** Set all selected markers to pos=50 */
+  const normalizeSelected = () => {
+    if (selectedIds.size === 0) return;
+    setPoints(prev => prev.map(p => selectedIds.has(p.id) ? { ...p, pos: 50 } : p));
+    setShowToolsMenu(false);
+  };
+
+  /** Invert pos: 0→100, 100→0, etc. */
+  const flipSelected = () => {
+    if (selectedIds.size === 0) return;
+    setPoints(prev => prev.map(p => selectedIds.has(p.id) ? { ...p, pos: 100 - p.pos } : p));
+    setShowToolsMenu(false);
   };
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1469,6 +1547,272 @@ export default function Scripter() {
 
         {/* Timeline Tab */}
         <TabsContent value="timeline" className="flex-1 flex flex-col gap-2 mt-3 min-h-0">
+          {/* ── Tools toolbar ── */}
+          <div className="flex items-center gap-2 flex-shrink-0 relative" ref={toolsMenuRef}>
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1.5 border-border/50"
+                onClick={() => setShowToolsMenu(m => !m)}
+              >
+                <Wrench className="h-3 w-3" />
+                Tools
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </Button>
+
+              {/* Dropdown menu */}
+              {showToolsMenu && (
+                <div
+                  className="absolute top-full left-0 mt-1 z-50 min-w-[180px] rounded-md border border-border bg-popover shadow-xl py-1 text-sm"
+                  onMouseLeave={() => {}}
+                >
+                  {/* 1. Normalize */}
+                  <button
+                    className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 disabled:opacity-40"
+                    disabled={selectedIds.size === 0}
+                    onClick={normalizeSelected}
+                  >
+                    <span className="text-primary font-mono text-[10px] w-4">50</span>
+                    Normalize
+                    {selectedIds.size > 0 && <span className="ml-auto text-[10px] text-muted-foreground">{selectedIds.size} pts</span>}
+                  </button>
+
+                  {/* 2. Preset Patterns */}
+                  <button
+                    className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2"
+                    onClick={() => { setShowPresetsPopup(true); setShowToolsMenu(false); }}
+                  >
+                    <ChevronRight className="h-3 w-3 text-primary" />
+                    Preset Patterns…
+                  </button>
+
+                  <div className="my-1 border-t border-border/50" />
+
+                  {/* 3. Flip */}
+                  <button
+                    className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2 disabled:opacity-40"
+                    disabled={selectedIds.size === 0}
+                    onClick={flipSelected}
+                  >
+                    <span className="text-primary font-mono text-[10px] w-4">↕</span>
+                    Flip
+                    {selectedIds.size > 0 && <span className="ml-auto text-[10px] text-muted-foreground">{selectedIds.size} pts</span>}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {selectedIds.size === 0 && (
+              <span className="text-[10px] text-muted-foreground/50 select-none">
+                Select markers first to use tools
+              </span>
+            )}
+
+            {/* Click-outside closer */}
+            {showToolsMenu && (
+              <div className="fixed inset-0 z-40" onClick={() => setShowToolsMenu(false)} />
+            )}
+          </div>
+
+          {/* ── Preset Patterns Popup ── */}
+          {showPresetsPopup && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowPresetsPopup(false)} />
+              <div className="relative bg-card border border-border rounded-xl shadow-2xl w-[480px] max-w-[95vw] max-h-[80vh] overflow-y-auto p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-sm tracking-wide">Preset Patterns</h3>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowPresetsPopup(false)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                {selectedIds.size === 0 && (
+                  <p className="text-xs text-amber-400 mb-3 bg-amber-400/10 border border-amber-400/30 rounded px-2 py-1.5">
+                    No markers selected — select some first, then apply a pattern.
+                  </p>
+                )}
+                <div className="grid grid-cols-2 gap-2 text-xs">
+
+                  {/* Wave */}
+                  <div className="col-span-2 border border-border/50 rounded-lg p-3 hover:border-primary/40 transition-colors">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div>
+                        <span className="font-medium">Wave</span>
+                        <span className="ml-2 text-muted-foreground text-[10px]">0, 95, 0, 100, 0, 95, 0, 80 …</span>
+                      </div>
+                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={applyWavePattern}>Apply</Button>
+                    </div>
+                    <div className="flex gap-0.5 h-6">
+                      {[0,95,0,100,0,95,0,80,0,70,0,65,0,70,0,80,0,90].map((v,i) => (
+                        <div key={i} className="flex-1 bg-border/30 rounded-sm flex items-end overflow-hidden">
+                          <div className="w-full bg-primary/70 rounded-sm" style={{ height: `${v}%` }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Teeth */}
+                  <div className="border border-border/50 rounded-lg p-3 hover:border-primary/40 transition-colors">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-medium">Teeth</span>
+                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={() => applyPattern(TEETH_PATTERN)}>Apply</Button>
+                    </div>
+                    <div className="flex gap-0.5 h-6">
+                      {TEETH_PATTERN.slice(0,16).map((v,i) => (
+                        <div key={i} className="flex-1 bg-border/30 rounded-sm flex items-end overflow-hidden">
+                          <div className="w-full bg-primary/70 rounded-sm" style={{ height: `${v}%` }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Alternate */}
+                  <div className="border border-border/50 rounded-lg p-3 hover:border-primary/40 transition-colors">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div>
+                        <span className="font-medium">Alternate</span>
+                        <span className="ml-1 text-muted-foreground text-[10px]">0, 100</span>
+                      </div>
+                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={() => applyPattern(ALT_PATTERN)}>Apply</Button>
+                    </div>
+                    <div className="flex gap-0.5 h-6">
+                      {[0,100,0,100,0,100,0,100].map((v,i) => (
+                        <div key={i} className="flex-1 bg-border/30 rounded-sm flex items-end overflow-hidden">
+                          <div className="w-full bg-primary/70 rounded-sm" style={{ height: `${v}%` }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Steps */}
+                  <div className="border border-border/50 rounded-lg p-3 hover:border-primary/40 transition-colors">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div>
+                        <span className="font-medium">Steps</span>
+                        <span className="ml-1 text-muted-foreground text-[10px]">5-unit stairs</span>
+                      </div>
+                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={() => applyPattern(STEPS_PATTERN)}>Apply</Button>
+                    </div>
+                    <div className="flex gap-0.5 h-6">
+                      {STEPS_PATTERN.slice(0,16).map((v,i) => (
+                        <div key={i} className="flex-1 bg-border/30 rounded-sm flex items-end overflow-hidden">
+                          <div className="w-full bg-primary/70 rounded-sm" style={{ height: `${v}%` }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Bounds */}
+                  <div className="border border-border/50 rounded-lg p-3 hover:border-primary/40 transition-colors">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div>
+                        <span className="font-medium">Bounds</span>
+                        <span className="ml-1 text-muted-foreground text-[10px]">10-unit stairs</span>
+                      </div>
+                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={() => applyPattern(BOUNDS_PATTERN)}>Apply</Button>
+                    </div>
+                    <div className="flex gap-0.5 h-6">
+                      {BOUNDS_PATTERN.map((v,i) => (
+                        <div key={i} className="flex-1 bg-border/30 rounded-sm flex items-end overflow-hidden">
+                          <div className="w-full bg-primary/70 rounded-sm" style={{ height: `${v}%` }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Pulse */}
+                  <div className="border border-border/50 rounded-lg p-3 hover:border-primary/40 transition-colors">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div>
+                        <span className="font-medium">Pulse</span>
+                        <span className="ml-1 text-muted-foreground text-[10px]">100, 0, 100, 100, 0, 100</span>
+                      </div>
+                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={() => applyPattern(PULSE_PATTERN)}>Apply</Button>
+                    </div>
+                    <div className="flex gap-0.5 h-6">
+                      {[100,0,100,100,0,100,100,0,100,100,0,100].map((v,i) => (
+                        <div key={i} className="flex-1 bg-border/30 rounded-sm flex items-end overflow-hidden">
+                          <div className="w-full bg-primary/70 rounded-sm" style={{ height: `${v}%` }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Dynamic */}
+                  <div className="border border-border/50 rounded-lg p-3 hover:border-primary/40 transition-colors">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div>
+                        <span className="font-medium">Dynamic</span>
+                        <span className="ml-1 text-muted-foreground text-[10px]">max travel</span>
+                      </div>
+                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={() => applyPattern(DYNAMIC_PATTERN)}>Apply</Button>
+                    </div>
+                    <div className="flex gap-0.5 h-6">
+                      {[0,100,0,100,0,100,0,100].map((v,i) => (
+                        <div key={i} className="flex-1 bg-border/30 rounded-sm flex items-end overflow-hidden">
+                          <div className="w-full bg-cyan-400/70 rounded-sm" style={{ height: `${v}%` }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Small Triangle */}
+                  <div className="border border-border/50 rounded-lg p-3 hover:border-primary/40 transition-colors">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div>
+                        <span className="font-medium">Small △</span>
+                        <span className="ml-1 text-muted-foreground text-[10px]">0, 60</span>
+                      </div>
+                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={() => applyPattern(SM_TRI_PATTERN)}>Apply</Button>
+                    </div>
+                    <div className="flex gap-0.5 h-6">
+                      {[0,60,0,60,0,60,0,60].map((v,i) => (
+                        <div key={i} className="flex-1 bg-border/30 rounded-sm flex items-end overflow-hidden">
+                          <div className="w-full bg-primary/70 rounded-sm" style={{ height: `${v}%` }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Med Triangle */}
+                  <div className="border border-border/50 rounded-lg p-3 hover:border-primary/40 transition-colors">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div>
+                        <span className="font-medium">Med △</span>
+                        <span className="ml-1 text-muted-foreground text-[10px]">0, 80</span>
+                      </div>
+                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={() => applyPattern(MED_TRI_PATTERN)}>Apply</Button>
+                    </div>
+                    <div className="flex gap-0.5 h-6">
+                      {[0,80,0,80,0,80,0,80].map((v,i) => (
+                        <div key={i} className="flex-1 bg-border/30 rounded-sm flex items-end overflow-hidden">
+                          <div className="w-full bg-primary/70 rounded-sm" style={{ height: `${v}%` }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Custom */}
+                  <div className="col-span-2 border border-primary/30 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-primary">Custom</span>
+                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0 || !customPatternText.trim()} onClick={applyCustomPattern}>Apply</Button>
+                    </div>
+                    <input
+                      type="text"
+                      value={customPatternText}
+                      onChange={e => setCustomPatternText(e.target.value)}
+                      placeholder="e.g.  0, 75, 50, 100, 25"
+                      className="w-full bg-background border border-border rounded px-2 py-1 text-xs font-mono placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/60"
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">Comma-separated values 0–100. Pattern repeats over all selected markers.</p>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Timeline canvas fills the space */}
           <Card className="bg-black border-border/50 relative overflow-hidden flex-1 min-h-0 group">
             <canvas
