@@ -66,6 +66,8 @@ export default function Scripter() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoFileName, setVideoFileName] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  // Tracks how many times each base filename has been exported this session
+  const exportCountsRef = useRef<Map<string, number>>(new Map());
   const [realtimeTest, setRealtimeTest] = useState(false);
 
   // ─── Layout state ───
@@ -476,11 +478,18 @@ export default function Scripter() {
     const script = { actions: sorted.map(p => ({ at: Math.round(p.time), pos: p.pos })) };
     const json = JSON.stringify(script, null, 2);
 
-    // Derive filename from the loaded video (strip its extension, add .funscript)
+    // Derive base name from the loaded video (strip its extension)
     const baseName = videoFileName
       ? videoFileName.replace(/\.[^/.]+$/, "")
       : "script";
-    const fileName = `${baseName}.funscript`;
+
+    // Build versioned filename: first export = baseName.funscript,
+    // subsequent exports = baseName (01).funscript, baseName (02).funscript …
+    const counts = exportCountsRef.current;
+    const count = counts.get(baseName) ?? 0;
+    const suffix = count === 0 ? "" : ` (${String(count).padStart(2, "0")})`;
+    const fileName = `${baseName}${suffix}.funscript`;
+    counts.set(baseName, count + 1);
 
     // Try the File System Access API (Chrome / Edge) so the save dialog opens
     // pre-filled with the right name and in the same folder as the video.
