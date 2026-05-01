@@ -18,7 +18,7 @@ const NAV_ITEMS = [
 
 const COMING_SOON_ITEMS = [
   { href: "/games", label: "Games", icon: Gamepad2 },
-  { href: "/beat", label: "Beat 2 Beat", icon: Activity },
+  { href: "/beat", label: "Live Audio", icon: Activity },
   { href: "/ai", label: "AI Control", icon: Sparkles },
   { href: "/community", label: "Community", icon: Users },
 ];

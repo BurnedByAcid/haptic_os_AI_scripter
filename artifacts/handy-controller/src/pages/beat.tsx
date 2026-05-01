@@ -153,7 +153,7 @@ export default function Beat() {
     <div className="p-8 max-w-4xl mx-auto h-full flex flex-col gap-6">
       <div className="flex justify-between items-end">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Beat 2 Beat</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Live Audio</h1>
           <p className="text-muted-foreground">Audio-reactive haptic feedback.</p>
         </div>
         {!connected && <div className="text-destructive font-medium text-sm">Device Not Connected</div>}
