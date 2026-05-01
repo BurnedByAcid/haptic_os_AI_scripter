@@ -319,24 +319,37 @@ export default function Scripter() {
     source.connect(analyser);
     bdAnalyserRef.current = analyser;
 
-    // One HP→LP→Gain chain per band → destination
+    // 3× cascaded HP + 3× cascaded LP per band → Gain → destination
+    // 6th-order roll-off (~−120 dB/oct) for tight inter-band isolation.
+    // Q = 0.7071 (Butterworth) keeps the passband flat while the skirts drop fast.
+    const STAGES = 3;
+    const FILT_Q = 0.7071;
     const gains: GainNode[] = BD_BANDS.map((band, b) => {
-      const hp = ctx.createBiquadFilter();
-      hp.type = "highpass";
-      hp.frequency.value = Math.max(20, band.range[0]);
-      hp.Q.value = 0.5;
+      const lo = Math.max(20, band.range[0]);
+      const hi = Math.min(ctx.sampleRate / 2 - 1, band.range[1]);
 
-      const lp = ctx.createBiquadFilter();
-      lp.type = "lowpass";
-      lp.frequency.value = Math.min(ctx.sampleRate / 2 - 1, band.range[1]);
-      lp.Q.value = 0.5;
+      let node: AudioNode = source;
+
+      for (let s = 0; s < STAGES; s++) {
+        const hp = ctx.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = lo;
+        hp.Q.value = FILT_Q;
+        node.connect(hp);
+        node = hp;
+      }
+      for (let s = 0; s < STAGES; s++) {
+        const lp = ctx.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.value = hi;
+        lp.Q.value = FILT_Q;
+        node.connect(lp);
+        node = lp;
+      }
 
       const gain = ctx.createGain();
       gain.gain.value = bdBandEnabledRef.current[b] ? 1 : 0;
-
-      source.connect(hp);
-      hp.connect(lp);
-      lp.connect(gain);
+      node.connect(gain);
       gain.connect(ctx.destination);
 
       return gain;
