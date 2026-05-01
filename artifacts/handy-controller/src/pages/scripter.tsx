@@ -12,6 +12,17 @@ import { VideoControlBar } from "@/components/video-control-bar";
 
 const STORAGE_KEY = "scripter_session_v1";
 
+/** 7 EQ bands — label, Hz range, display colour */
+const BD_BANDS: { label: string; range: [number, number]; color: string }[] = [
+  { label: "Sub",      range: [20,    60],   color: "#6366f1" },
+  { label: "Bass",     range: [60,    250],  color: "#8b5cf6" },
+  { label: "Lo-Mid",   range: [250,   500],  color: "#0ea5e9" },
+  { label: "Mid",      range: [500,   2000], color: "#00e5ff" },
+  { label: "Hi-Mid",   range: [2000,  4000], color: "#10b981" },
+  { label: "Presence", range: [4000,  6000], color: "#f59e0b" },
+  { label: "Air",      range: [6000, 20000], color: "#ef4444" },
+];
+
 /** 10 zoom levels: half-window in seconds (2 s → 60 s). Index 0 = max zoom. */
 const TL_ZOOM_LEVELS = Array.from({ length: 10 }, (_, i) => 2 + (58 * i) / 9);
 
@@ -161,8 +172,12 @@ export default function Scripter() {
   const bdBeatPosRef = useRef(0); // alternates 0 ↔ 100
   const [bdPointsAdded, setBdPointsAdded] = useState(0);
 
+  const [bdBandEnabled, setBdBandEnabled] = useState<boolean[]>(() => Array(7).fill(true));
+  const bdBandEnabledRef = useRef<boolean[]>(Array(7).fill(true));
+
   useEffect(() => { bdSensitivityRef.current = bdSensitivity; }, [bdSensitivity]);
   useEffect(() => { bdIsRecordingRef.current = bdIsRecording; }, [bdIsRecording]);
+  useEffect(() => { bdBandEnabledRef.current = bdBandEnabled; }, [bdBandEnabled]);
 
   const bdLoop = useCallback(() => {
     if (!bdAnalyserRef.current || !bdCanvasRef.current) return;
@@ -171,14 +186,28 @@ export default function Scripter() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteTimeDomainData(dataArray);
+    const binCount = analyser.frequencyBinCount; // fftSize/2 = 1024
+    const freqData = new Uint8Array(binCount);
+    analyser.getByteFrequencyData(freqData);
 
+    const hzPerBin = analyser.context.sampleRate / analyser.fftSize;
+    const enabled = bdBandEnabledRef.current;
+
+    // ── Compute energy only from enabled bands ──
     let energy = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-      const val = (dataArray[i] - 128) / 128;
-      energy += val * val;
+    let totalBins = 0;
+    for (let b = 0; b < BD_BANDS.length; b++) {
+      if (!enabled[b]) continue;
+      const startBin = Math.max(0, Math.round(BD_BANDS[b].range[0] / hzPerBin));
+      const endBin   = Math.min(binCount - 1, Math.round(BD_BANDS[b].range[1] / hzPerBin));
+      for (let i = startBin; i <= endBin; i++) {
+        const v = freqData[i] / 255;
+        energy += v * v;
+        totalBins++;
+      }
     }
+    if (totalBins > 0) energy /= totalBins; // normalise so scale doesn't shift as bands toggle
+
     const history = bdEnergyHistoryRef.current;
     history.push(energy);
     if (history.length > 43) history.shift();
@@ -203,27 +232,49 @@ export default function Scripter() {
         setPoints(prev => [...prev, { id: crypto.randomUUID(), time: beatMs, pos }]);
         setBdPointsAdded(c => c + 1);
       }
-
-      ctx.fillStyle = "rgba(0, 229, 255, 0.25)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    } else {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "hsl(186, 100%, 50%)";
-    ctx.beginPath();
-    const sliceWidth = canvas.width / dataArray.length;
-    let x = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-      const v = dataArray[i] / 128.0;
-      const y = (v * canvas.height) / 2;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-      x += sliceWidth;
+    // ── Draw per-band spectrum ──────────────────────────────────────────────
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const bandW = canvas.width / BD_BANDS.length;
+    for (let b = 0; b < BD_BANDS.length; b++) {
+      const startBin = Math.max(0, Math.round(BD_BANDS[b].range[0] / hzPerBin));
+      const endBin   = Math.min(binCount - 1, Math.round(BD_BANDS[b].range[1] / hzPerBin));
+      const numBins  = Math.max(1, endBin - startBin + 1);
+
+      // Average amplitude in this band (0-255)
+      let sum = 0;
+      for (let i = startBin; i <= endBin; i++) sum += freqData[i];
+      const avg = sum / numBins;
+
+      // Draw sub-bar columns within each band section
+      const subBarW = Math.max(1, (bandW - 2) / numBins);
+      for (let i = startBin; i <= endBin; i++) {
+        const barH = (freqData[i] / 255) * canvas.height;
+        const bx = b * bandW + (i - startBin) * subBarW;
+        ctx.fillStyle = enabled[b] ? BD_BANDS[b].color + "cc" : "#1a1a1a";
+        ctx.fillRect(bx, canvas.height - barH, subBarW - 0.5, barH);
+      }
+
+      // Band average level indicator (bright top bar)
+      if (enabled[b]) {
+        const levelH = (avg / 255) * canvas.height;
+        ctx.fillStyle = BD_BANDS[b].color;
+        ctx.fillRect(b * bandW + 1, canvas.height - levelH - 2, bandW - 4, 3);
+      }
+
+      // Divider
+      ctx.fillStyle = "rgba(255,255,255,0.06)";
+      ctx.fillRect(b * bandW, 0, 1, canvas.height);
     }
-    ctx.stroke();
+
+    // Beat flash overlay
+    if (isBeat) {
+      ctx.fillStyle = "rgba(0,229,255,0.18)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
     bdRafRef.current = requestAnimationFrame(bdLoop);
   }, [setPoints]);
@@ -1470,19 +1521,71 @@ export default function Scripter() {
         {tabsOpen && <>
         {/* Beat Detector Tab */}
         <TabsContent value="beat" className="flex-1 flex gap-3 mt-3 min-h-0 overflow-hidden">
-          {/* Waveform canvas */}
-          <div className="flex-1 bg-black rounded-lg border border-border/50 overflow-hidden relative min-h-0">
-            <canvas ref={bdCanvasRef} className="w-full h-full absolute inset-0" width={800} height={300} />
-            {!bdIsActive && (
-              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-                Select an input source to begin
-              </div>
-            )}
-            {bdIsRecording && (
-              <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-xs font-bold px-3 py-1.5 rounded-full">
-                <span className="h-2 w-2 rounded-full bg-white animate-pulse inline-block" /> REC · {bdPointsAdded} points
-              </div>
-            )}
+          {/* Spectrum canvas + band toggles */}
+          <div className="flex-1 flex flex-col gap-2 min-h-0">
+            <div className="flex-1 bg-black rounded-lg border border-border/50 overflow-hidden relative min-h-0">
+              <canvas ref={bdCanvasRef} className="w-full h-full absolute inset-0" width={800} height={300} />
+              {!bdIsActive && (
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                  Select an input source to begin
+                </div>
+              )}
+              {bdIsRecording && (
+                <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-xs font-bold px-3 py-1.5 rounded-full">
+                  <span className="h-2 w-2 rounded-full bg-white animate-pulse inline-block" /> REC · {bdPointsAdded} points
+                </div>
+              )}
+            </div>
+
+            {/* 7-band EQ toggles */}
+            <div className="flex gap-1.5 flex-shrink-0">
+              {BD_BANDS.map((band, i) => {
+                const on = bdBandEnabled[i];
+                return (
+                  <button
+                    key={band.label}
+                    className="flex-1 rounded-md border text-[10px] font-bold tracking-wide py-1.5 transition-all select-none"
+                    style={{
+                      borderColor: on ? band.color : "rgba(255,255,255,0.08)",
+                      background: on ? band.color + "22" : "rgba(0,0,0,0.4)",
+                      color: on ? band.color : "rgba(255,255,255,0.25)",
+                    }}
+                    onClick={() => setBdBandEnabled(prev => {
+                      const next = [...prev];
+                      next[i] = !next[i];
+                      return next;
+                    })}
+                    title={`${band.range[0]}–${band.range[1]} Hz (click to ${on ? "mute" : "enable"})`}
+                  >
+                    <div>{band.label}</div>
+                    <div className="font-mono font-normal text-[8px] opacity-70 leading-tight">
+                      {band.range[0] >= 1000 ? `${band.range[0]/1000}k` : band.range[0]}–{band.range[1] >= 1000 ? `${band.range[1]/1000}k` : band.range[1]}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quick-select helpers */}
+            <div className="flex gap-2 flex-shrink-0 text-[10px]">
+              <button
+                className="text-muted-foreground hover:text-primary transition-colors"
+                onClick={() => setBdBandEnabled(Array(7).fill(true))}
+              >All on</button>
+              <span className="text-border">|</span>
+              {/* Common presets */}
+              {[
+                { label: "Kick (sub+bass)", mask: [true,true,false,false,false,false,false] },
+                { label: "Snare (lo+mid)", mask: [false,false,true,true,false,false,false] },
+                { label: "Hi-hat (presence+air)", mask: [false,false,false,false,false,true,true] },
+              ].map(preset => (
+                <button
+                  key={preset.label}
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                  onClick={() => setBdBandEnabled(preset.mask)}
+                >{preset.label}</button>
+              ))}
+            </div>
           </div>
 
           {/* Controls panel */}
