@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { ClerkProvider } from "@clerk/react";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
+import { ClerkProvider, useAuth } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { dark } from "@clerk/themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -90,20 +90,34 @@ const clerkAppearance = {
   },
 };
 
+/** Redirects unauthenticated users to /sign-in. Renders nothing while Clerk loads. */
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  if (!isLoaded) return null;
+  if (!isSignedIn) return <Redirect to="/sign-in" />;
+  return <Component />;
+}
+
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      {/* Public: player works without an account */}
       <Route path="/player" component={Player} />
-      <Route path="/control" component={Control} />
-      <Route path="/library" component={Library} />
-      <Route path="/games" component={Games} />
-      <Route path="/beat" component={Beat} />
-      <Route path="/scripter" component={Scripter} />
-      <Route path="/ai" component={AI} />
-      <Route path="/community" component={Community} />
+
+      {/* Auth pages */}
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
+
+      {/* Everything else requires login */}
+      <Route path="/"          component={() => <ProtectedRoute component={Home} />} />
+      <Route path="/control"   component={() => <ProtectedRoute component={Control} />} />
+      <Route path="/library"   component={() => <ProtectedRoute component={Library} />} />
+      <Route path="/games"     component={() => <ProtectedRoute component={Games} />} />
+      <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
+      <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
+      <Route path="/ai"        component={() => <ProtectedRoute component={AI} />} />
+      <Route path="/community" component={() => <ProtectedRoute component={Community} />} />
+
       <Route component={NotFound} />
     </Switch>
   );
