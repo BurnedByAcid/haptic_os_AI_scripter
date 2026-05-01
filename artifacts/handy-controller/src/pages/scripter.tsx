@@ -161,7 +161,8 @@ export default function Scripter() {
   const [bdIsRecording, setBdIsRecording] = useState(false);
   const bdAudioCtxRef = useRef<AudioContext | null>(null);
   const bdAnalyserRef = useRef<AnalyserNode | null>(null);
-  const bdSourceRef = useRef<MediaStreamAudioSourceNode | AudioBufferSourceNode | null>(null);
+  const bdSourceRef = useRef<MediaStreamAudioSourceNode | AudioBufferSourceNode | MediaElementAudioSourceNode | null>(null);
+  const bdUsingVideoRef = useRef(false); // true = timing comes from videoRef.currentTime
   const bdRafRef = useRef<number | null>(null);
   const bdLastBeatRef = useRef(0);
   const bdEnergyHistoryRef = useRef<number[]>([]);
@@ -226,7 +227,10 @@ export default function Scripter() {
       bdLastBeatRef.current = now;
 
       if (bdIsRecordingRef.current) {
-        const beatMs = Math.round(now - bdRecordStartRef.current);
+        // When analysing video audio, stamp the actual video position for perfect sync
+        const beatMs = bdUsingVideoRef.current
+          ? Math.round((videoRef.current?.currentTime ?? 0) * 1000)
+          : Math.round(now - bdRecordStartRef.current);
         const pos = bdBeatPosRef.current;
         bdBeatPosRef.current = pos === 0 ? 100 : 0;
         setPoints(prev => [...prev, { id: crypto.randomUUID(), time: beatMs, pos }]);
@@ -330,8 +334,13 @@ export default function Scripter() {
       try { bdSourceRef.current.stop(); } catch { /* ignore */ }
     } else if (bdSourceRef.current instanceof MediaStreamAudioSourceNode) {
       bdSourceRef.current.mediaStream.getTracks().forEach(t => t.stop());
+    } else if (bdSourceRef.current instanceof MediaElementAudioSourceNode) {
+      // Just disconnect — the video element keeps playing normally
+      try { bdSourceRef.current.disconnect(); } catch { /* ignore */ }
     }
-    if (bdAudioCtxRef.current) bdAudioCtxRef.current.close();
+    bdSourceRef.current = null;
+    bdUsingVideoRef.current = false;
+    if (bdAudioCtxRef.current) { bdAudioCtxRef.current.close(); bdAudioCtxRef.current = null; }
     bdEnergyHistoryRef.current = [];
     bdBeatIntervalHistoryRef.current = [];
     bdLastBeatRef.current = 0;
@@ -350,6 +359,28 @@ export default function Scripter() {
       setBdIsRecording(false);
     }
   }, []);
+
+  /** Route the already-loaded video element's audio through the band analyser for live preview. */
+  const bdStartVideo = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    bdStop(); // clean up any previous session
+    try {
+      const ctx = new AudioContext();
+      bdAudioCtxRef.current = ctx;
+      const source = ctx.createMediaElementSource(video);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      // Connect to analyser for detection AND to destination so audio still plays
+      source.connect(analyser);
+      source.connect(ctx.destination);
+      bdAnalyserRef.current = analyser;
+      bdSourceRef.current = source;
+      bdUsingVideoRef.current = true;
+      setBdIsActive(true);
+      bdLoop();
+    } catch (err) { console.error("bdStartVideo:", err); }
+  }, [bdLoop, bdStop]);
 
   // ─────────────── Timeline drawing ───────────────
 
@@ -1594,18 +1625,41 @@ export default function Scripter() {
               <CardContent className="pt-3 pb-3 space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Input Source</p>
                 {bdIsActive ? (
-                  <Button variant="destructive" size="sm" className="w-full" onClick={bdStop}>
-                    <Square className="mr-2 h-3.5 w-3.5" /> Stop Audio
-                  </Button>
+                  <div className="space-y-2">
+                    <Button variant="destructive" size="sm" className="w-full" onClick={bdStop}>
+                      <Square className="mr-2 h-3.5 w-3.5" /> Stop Audio
+                    </Button>
+                    {bdUsingVideoRef.current && (
+                      <p className="text-[10px] text-center text-primary/70">
+                        Analysing video audio · play the video to see spectrum
+                      </p>
+                    )}
+                  </div>
                 ) : (
                   <>
+                    {/* Video audio — only show when a video is loaded */}
+                    {videoUrl && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="w-full bg-primary/20 border border-primary/40 text-primary hover:bg-primary/30"
+                        onClick={bdStartVideo}
+                      >
+                        <span className="mr-2 text-base leading-none">▶</span>Use Video Audio
+                      </Button>
+                    )}
                     <Button variant="secondary" size="sm" className="w-full" onClick={bdStartMic}>
                       <Mic className="mr-2 h-3.5 w-3.5" /> Use Microphone
                     </Button>
                     <Button variant="secondary" size="sm" className="w-full relative cursor-pointer">
-                      <Upload className="mr-2 h-3.5 w-3.5" /><span>Upload Audio</span>
+                      <Upload className="mr-2 h-3.5 w-3.5" /><span>Upload Audio File</span>
                       <input type="file" accept="audio/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={bdStartFile} />
                     </Button>
+                    {!videoUrl && (
+                      <p className="text-[10px] text-muted-foreground/50 text-center">
+                        Load a video in the Player to use video audio
+                      </p>
+                    )}
                   </>
                 )}
               </CardContent>
