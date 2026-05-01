@@ -21,6 +21,8 @@ import AI from "@/pages/ai";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
 import Community from "@/pages/community";
+import Upgrade from "@/pages/upgrade";
+import Admin from "@/pages/admin";
 
 const queryClient = new QueryClient();
 
@@ -117,6 +119,8 @@ function Router() {
       <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
       <Route path="/ai"        component={() => <ProtectedRoute component={AI} />} />
       <Route path="/community" component={() => <ProtectedRoute component={Community} />} />
+      <Route path="/upgrade"   component={() => <ProtectedRoute component={Upgrade} />} />
+      <Route path="/admin"     component={() => <ProtectedRoute component={Admin} />} />
 
       <Route component={NotFound} />
     </Switch>

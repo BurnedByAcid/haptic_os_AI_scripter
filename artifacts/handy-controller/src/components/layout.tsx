@@ -1,12 +1,14 @@
 import { Link, useLocation } from "wouter";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, ChevronLeft, ChevronRight, ExternalLink, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Sparkles, LogIn, LogOut, User, Users, Heart, Pencil, ShieldCheck } from "lucide-react";
+import { Activity, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Shield, Sparkles, LogIn, LogOut, User, Users, Heart, Pencil, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useClerk, Show } from "@clerk/react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { PlanBadge } from "@/components/plan-badge";
+import { useSubscription } from "@/hooks/use-subscription";
 
 // ─── Supported devices ────────────────────────────────────────────────────────
 // "native" devices work directly via this app's API.
@@ -93,6 +95,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { user } = useUser();
   const { signOut, openSignIn } = useClerk();
   const [collapsed, setCollapsed] = useState(false);
+  const { isAdmin, isPro, plan } = useSubscription();
 
   // ─── Device selector ──────────────────────────────────────────────────────
   const [deviceId, setDeviceId] = useState<DeviceId>(() =>
@@ -290,6 +293,46 @@ export function Layout({ children }: { children: React.ReactNode }) {
               );
             })}
 
+            {/* Upgrade + Admin links */}
+            {user && (
+              <>
+                {!isPro && (
+                  <Link href="/upgrade">
+                    <div
+                      className={`flex items-center gap-3 rounded-md cursor-pointer transition-colors mt-1 ${
+                        collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
+                      } ${
+                        location === "/upgrade"
+                          ? "bg-primary/10 text-primary font-medium"
+                          : "text-primary/70 hover:bg-primary/10 hover:text-primary"
+                      }`}
+                      title={collapsed ? "Upgrade to Pro" : undefined}
+                    >
+                      <Crown size={18} className="flex-shrink-0" />
+                      {!collapsed && <span className="text-sm font-medium">Upgrade to Pro</span>}
+                    </div>
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link href="/admin">
+                    <div
+                      className={`flex items-center gap-3 rounded-md cursor-pointer transition-colors ${
+                        collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
+                      } ${
+                        location === "/admin"
+                          ? "bg-yellow-500/10 text-yellow-400 font-medium"
+                          : "text-yellow-500/60 hover:bg-yellow-500/10 hover:text-yellow-400"
+                      }`}
+                      title={collapsed ? "Admin Panel" : undefined}
+                    >
+                      <Shield size={18} className="flex-shrink-0" />
+                      {!collapsed && <span className="text-sm">Admin Panel</span>}
+                    </div>
+                  </Link>
+                )}
+              </>
+            )}
+
             {/* Coming Soon group */}
             <div className={`mt-2 rounded-lg border border-border/40 bg-white/[0.04] space-y-0.5 ${collapsed ? "p-1" : "p-1.5"}`}>
               {COMING_SOON_ITEMS.map((item) => {
@@ -363,6 +406,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <User className="h-4 w-4 text-primary" />
                   </div>
                 )}
+                <PlanBadge collapsed />
                 <button
                   onClick={() => { setHandleInput(handle); setHandleDialogOpen(true); }}
                   className="h-5 w-5 flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
@@ -381,7 +425,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">{displayName}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-medium text-foreground truncate">{displayName}</p>
+                    <PlanBadge />
+                  </div>
                   <p className="text-[10px] text-muted-foreground truncate">{displaySub}</p>
                 </div>
                 <Button

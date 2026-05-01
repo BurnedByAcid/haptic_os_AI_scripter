@@ -30,20 +30,35 @@ Full-featured browser-based controller for The Handy device. Entirely client-sid
 - `/beat` — Beat 2 Beat (mic/MP3 beat detection → Handy strokes)
 - `/scripter` — Funscript editor (timeline + Visual Trigger 5×5 pixel color matching)
 - `/ai` — AI Control (text/voice chat with personas that control Handy)
+- `/upgrade` — Plan comparison page (Free vs Pro, CTA to upgrade)
+- `/admin` — Admin panel (admin-only: set user plan by email via Clerk backend API)
 
 **Key files:**
 - `src/lib/handyApi.ts` — Handy v2 REST API client (getStatus, setHAMP, setHDSP, stopDevice)
 - `src/lib/scriptSync.ts` — rAF-based funscript sync engine
 - `src/lib/db.ts` — IndexedDB wrapper via `idb`
 - `src/hooks/use-handy.ts` — Connection key state + device polling hook
-- `src/components/layout.tsx` — Persistent sidebar with nav + connection key input
+- `src/hooks/use-subscription.ts` — Reads plan from Clerk publicMetadata ("free"|"pro"|"admin")
+- `src/components/layout.tsx` — Persistent sidebar with nav + connection key input + plan badge
+- `src/components/plan-badge.tsx` — Inline plan tier badge (Free/Pro/Admin)
+- `src/components/premium-gate.tsx` — Locked overlay for Pro-gated content
+
+**Subscription tiers:** Stored in `user.publicMetadata.plan` (Clerk). Set server-side via `/api/admin/set-plan`. Three tiers: `free` (default), `pro`, `admin`. Payment processor (Stripe/PayPal) to be wired up later via webhooks.
+
+**Device selector:** Supports The Handy (native), Lovense, Kiiroo, OSR2/SR6, Kiiroo Keon, Other (Intiface). Stored in `localStorage("hc_device_id")`. Intiface devices show WS URL input + download link.
+
+**Important:** Do NOT use `@radix-ui/react-select` — causes duplicate-React "invalid hook call" in this Vite setup. Use native `<select>` instead.
 
 **Dependencies:** `idb` (IndexedDB), standard shadcn/ui + Tailwind v4, wouter routing
 
 **Theme:** Dark-only, neon cyan (#00E5FF) accent, no light mode
 
 ### API Server (`artifacts/api-server`, preview path: `/api`)
-Express 5 backend. Currently only has a health check endpoint. No routes needed by Handy Controller (all Handy API calls go directly to handyfeeling.com from the browser).
+Express 5 backend with Clerk auth middleware.
+
+**Routes:**
+- `GET /healthz` — health check
+- `POST /api/admin/set-plan` — admin-only: set a user's plan by email (requires admin JWT + admin plan in publicMetadata)
 
 ## Key Commands
 
