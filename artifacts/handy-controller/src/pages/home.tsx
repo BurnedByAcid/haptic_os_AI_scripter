@@ -4,7 +4,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Activity, Crown, Gamepad2, Library, Lock, Mic, PlaySquare, Settings2, Sparkles, Users } from "lucide-react";
+import { Activity, Crown, Gamepad2, Library, Lock, MessageSquare, Mic, PlaySquare, Settings2, Sparkles, Users } from "lucide-react";
 import { useAuth } from "@clerk/react";
 import { useState, useEffect } from "react";
 
@@ -17,10 +17,11 @@ const ALL_CARDS: { href: string; label: string; desc: string; icon: typeof PlayS
   { href: "/control",   label: "Manual Control", desc: "Direct slider control",                 icon: Settings2,  state: "available"    },
   { href: "/library",   label: "Library",        desc: "Manage your local files",               icon: Library,    state: "available"    },
   { href: "/scripter",  label: "Scripter",       desc: "Create and edit Funscripts",            icon: Mic,        state: "available"    },
-  { href: "/games",     label: "Games",          desc: "Play games with haptic feedback",       icon: Gamepad2,   state: "premium"      },
-  { href: "/beat",      label: "Live Audio",     desc: "Audio-reactive haptics",                icon: Activity,   state: "premium"      },
-  { href: "/ai",        label: "AI Control",     desc: "Voice-controlled interactive sessions", icon: Sparkles,   state: "premium"      },
-  { href: "/community", label: "Community",      desc: "Share and discover Funscripts",         icon: Users,      state: "premium"      },
+  { href: "/games",     label: "Games",          desc: "Play games with haptic feedback",       icon: Gamepad2,      state: "premium"      },
+  { href: "/beat",      label: "Live Audio",     desc: "Audio-reactive haptics",                icon: Activity,      state: "premium"      },
+  { href: "/ai",        label: "AI Control",     desc: "Voice-controlled interactive sessions", icon: Sparkles,      state: "premium"      },
+  { href: "/chat",      label: "AI Chat",        desc: "Ollama-powered chat with personas",     icon: MessageSquare, state: "premium"      },
+  { href: "/community", label: "Community",      desc: "Share and discover Funscripts",         icon: Users,         state: "premium"      },
 ];
 
 export default function Home() {
@@ -208,7 +209,7 @@ export default function Home() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold">Unlock the full experience</p>
-              <p className="text-xs text-muted-foreground">Games, Live Audio, AI Control, Community sharing, and unlimited Scripter sessions.</p>
+              <p className="text-xs text-muted-foreground">Games, Live Audio, AI Control, AI Chat with personas, Community sharing, and unlimited Scripter sessions.</p>
             </div>
             <Link href="/upgrade">
               <Button size="sm" className="gap-1.5 flex-shrink-0">
