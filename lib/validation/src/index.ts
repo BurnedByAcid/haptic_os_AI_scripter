@@ -131,7 +131,9 @@ export function validateVideoUrl(raw: string): UrlValidationError | null {
     };
   }
 
-  const host = url.hostname.toLowerCase();
+  // URL parses bracketed IPv6 hostnames (e.g. "[::1]") with brackets attached.
+  // Strip them so the PRIVATE_IP_RE patterns for ::1 / fc00: / fd..: actually match.
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (PRIVATE_IP_RE.test(host)) {
     return {
       code: "PRIVATE_IP",
