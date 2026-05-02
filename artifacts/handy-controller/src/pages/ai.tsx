@@ -4,7 +4,7 @@ import { setHDSP, setHAMP } from "@/lib/handyApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Mic, MicOff, Send, MessageSquare, Plus, Clock, Radio, StopCircle } from "lucide-react";
+import { Mic, MicOff, Send, MessageSquare, Plus, Clock, Radio, StopCircle, Copy, Check, ChevronDown, ChevronUp, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -111,6 +111,9 @@ export default function AI() {
     localStorage.getItem("handy_ollama_url") || "http://localhost:11434"
   );
   const [showOllamaSettings, setShowOllamaSettings] = useState(false);
+  const [showOllamaGuide, setShowOllamaGuide] = useState(false);
+  const [ollamaGuideOs, setOllamaGuideOs] = useState<"mac" | "windows" | "linux">("mac");
+  const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const [transcriptBuffer, setTranscriptBuffer] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -429,6 +432,28 @@ export default function AI() {
     setIsListening(true);
   };
 
+  const copyCmd = (cmd: string) => {
+    navigator.clipboard.writeText(cmd).then(() => {
+      setCopiedCmd(cmd);
+      setTimeout(() => setCopiedCmd(null), 2000);
+    }).catch(() => {
+      toast({ title: "Copy failed", description: "Could not access clipboard. Copy the command manually.", variant: "destructive" });
+    });
+  };
+
+  const CopyBlock = ({ cmd }: { cmd: string }) => (
+    <div className="flex items-center gap-2 bg-black/40 border border-border/40 rounded px-3 py-2 font-mono text-xs text-green-300">
+      <span className="flex-1 break-all">{cmd}</span>
+      <button
+        onClick={() => copyCmd(cmd)}
+        className="flex-shrink-0 text-muted-foreground hover:text-white transition-colors"
+        title="Copy command"
+      >
+        {copiedCmd === cmd ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  );
+
   const saveApiKey = (k: string) => {
     const trimmed = k.trim();
     setApiKey(trimmed);
@@ -437,6 +462,20 @@ export default function AI() {
     setShowKeyInput(false);
     setKeyDraft("");
     toast({ title: trimmed ? "API Key Saved" : "API Key Cleared", description: trimmed ? "Real-time voice AI enabled." : "Switched to simulation." });
+  };
+
+  const installCmds: Record<string, { label: string; cmds: string[] }[]> = {
+    mac: [
+      { label: "Option A — Homebrew", cmds: ["brew install ollama"] },
+      { label: "Option B — Installer", cmds: ["# Visit https://ollama.com/download and run the .dmg"] },
+    ],
+    windows: [
+      { label: "Installer (recommended)", cmds: ["# Visit https://ollama.com/download and run OllamaSetup.exe"] },
+      { label: "Or via winget", cmds: ["winget install Ollama.Ollama"] },
+    ],
+    linux: [
+      { label: "One-line install script", cmds: ["curl -fsSL https://ollama.com/install.sh | sh"] },
+    ],
   };
 
   return (
@@ -518,12 +557,20 @@ export default function AI() {
             </Button>
           )}
 
-          {/* Ollama settings toggle */}
+          {/* Ollama settings toggle + guide trigger */}
           {backend === "ollama" && (
-            <Button size="sm" variant="outline" className="h-7 text-xs px-3 flex-shrink-0"
-              onClick={() => setShowOllamaSettings(s => !s)}>
-              {showOllamaSettings ? "Done" : "Configure"}
-            </Button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button size="sm" variant="outline" className="h-7 text-xs px-3"
+                onClick={() => setShowOllamaSettings(s => !s)}>
+                {showOllamaSettings ? "Done" : "Configure"}
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs px-3 gap-1 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                onClick={() => setShowOllamaGuide(s => !s)}>
+                <BookOpen className="h-3 w-3" />
+                {showOllamaGuide ? "Hide guide" : "How to connect Ollama"}
+                {showOllamaGuide ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -579,13 +626,109 @@ export default function AI() {
         )}
 
         {/* Ollama hint */}
-        {backend === "ollama" && !showOllamaSettings && (
+        {backend === "ollama" && !showOllamaSettings && !showOllamaGuide && (
           <p className="text-xs text-muted-foreground">
-            Requests proxy through the API server — Ollama must be reachable from the server (not the browser).
-            {" "}Voice sessions are text-only with Ollama.
+            Ollama must be reachable from the HapticOS server — <span className="text-purple-400 cursor-pointer hover:underline" onClick={() => setShowOllamaGuide(true)}>see the setup guide</span> if you're not sure how.
           </p>
         )}
       </div>
+
+      {/* Ollama setup guide panel */}
+      {backend === "ollama" && showOllamaGuide && (
+          <div className="border border-purple-500/30 rounded-lg bg-purple-950/20 p-4 flex flex-col gap-5 text-sm">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-purple-300 flex items-center gap-2">
+                <BookOpen className="h-4 w-4" /> Connect local Ollama — step-by-step
+              </h3>
+              <button onClick={() => setShowOllamaGuide(false)} className="text-muted-foreground hover:text-white text-xs">✕ close</button>
+            </div>
+
+            {/* Step 1 — Install */}
+            <div className="flex flex-col gap-2">
+              <p className="font-medium text-white/90"><span className="text-purple-400 font-bold mr-2">1.</span>Install Ollama</p>
+              <p className="text-xs text-muted-foreground">Download from <a href="https://ollama.com/download" target="_blank" rel="noreferrer" className="text-purple-400 hover:underline">ollama.com/download</a>, or use the command for your OS:</p>
+              {/* OS tabs */}
+              <div className="flex rounded-md border border-border/50 overflow-hidden text-xs w-fit">
+                {(["mac", "windows", "linux"] as const).map(os => (
+                  <button
+                    key={os}
+                    className={`px-3 py-1 capitalize transition-colors ${ollamaGuideOs === os ? "bg-purple-600 text-white font-bold" : "hover:bg-card/80 text-muted-foreground"} ${os !== "mac" ? "border-l border-border/50" : ""}`}
+                    onClick={() => setOllamaGuideOs(os)}
+                  >
+                    {os === "mac" ? "macOS" : os === "windows" ? "Windows" : "Linux"}
+                  </button>
+                ))}
+              </div>
+              {installCmds[ollamaGuideOs].map(({ label, cmds }) => (
+                <div key={label} className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground">{label}</span>
+                  {cmds.map(c => <CopyBlock key={c} cmd={c} />)}
+                </div>
+              ))}
+            </div>
+
+            {/* Step 2 — Pull a model */}
+            <div className="flex flex-col gap-2">
+              <p className="font-medium text-white/90"><span className="text-purple-400 font-bold mr-2">2.</span>Pull a model</p>
+              <p className="text-xs text-muted-foreground">Download a model — llama3 is a good starting point (4 GB):</p>
+              <CopyBlock cmd="ollama pull llama3" />
+              <p className="text-xs text-muted-foreground">Other popular models: <code className="bg-black/30 px-1 rounded">mistral</code>, <code className="bg-black/30 px-1 rounded">gemma2</code>, <code className="bg-black/30 px-1 rounded">phi3</code>.</p>
+            </div>
+
+            {/* Step 3 — Start / verify */}
+            <div className="flex flex-col gap-2">
+              <p className="font-medium text-white/90"><span className="text-purple-400 font-bold mr-2">3.</span>Start Ollama and verify</p>
+              <p className="text-xs text-muted-foreground">Ollama usually starts automatically. To start it manually:</p>
+              <CopyBlock cmd="ollama serve" />
+              <p className="text-xs text-muted-foreground">Confirm it's running (in a new terminal):</p>
+              <CopyBlock cmd="curl http://localhost:11434/api/tags" />
+              <p className="text-xs text-muted-foreground">You should see a JSON list of installed models.</p>
+            </div>
+
+            {/* Step 4 — Make it reachable */}
+            <div className="flex flex-col gap-2">
+              <p className="font-medium text-white/90"><span className="text-purple-400 font-bold mr-2">4.</span>Make Ollama reachable by HapticOS</p>
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded px-3 py-2 text-xs text-yellow-300">
+                <strong>Important:</strong> HapticOS's API server runs in the cloud, so it cannot reach <code className="bg-black/20 px-1 rounded">http://localhost:11434</code> on your machine. You need to expose Ollama with a public or LAN-reachable URL.
+              </div>
+
+              <p className="text-xs font-medium text-white/80 mt-1">Option A — Cloudflare Tunnel (free, secure, recommended)</p>
+              <p className="text-xs text-muted-foreground">Install <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/" target="_blank" rel="noreferrer" className="text-purple-400 hover:underline">cloudflared</a>, then run:</p>
+              <CopyBlock cmd="cloudflared tunnel --url http://localhost:11434" />
+              <p className="text-xs text-muted-foreground">Copy the <code className="bg-black/30 px-1 rounded">https://…trycloudflare.com</code> URL it prints and paste it into the Ollama URL field below.</p>
+
+              <p className="text-xs font-medium text-white/80 mt-1">Option B — ngrok</p>
+              <p className="text-xs text-muted-foreground">Install <a href="https://ngrok.com/download" target="_blank" rel="noreferrer" className="text-purple-400 hover:underline">ngrok</a>, then run:</p>
+              <CopyBlock cmd="ngrok http 11434" />
+              <p className="text-xs text-muted-foreground">Copy the <code className="bg-black/30 px-1 rounded">https://…ngrok-free.app</code> URL and paste it into the Ollama URL field.</p>
+
+              <p className="text-xs font-medium text-white/80 mt-1">Option C — Bind to all interfaces (LAN/public IP, advanced)</p>
+              <CopyBlock cmd="OLLAMA_HOST=0.0.0.0:11434 ollama serve" />
+              <p className="text-xs text-muted-foreground text-yellow-400/80">⚠ This exposes Ollama to your entire network (and potentially the internet if your firewall allows it). Only use this on a trusted network.</p>
+              <p className="text-xs text-muted-foreground">Then enter your public or LAN IP, e.g. <code className="bg-black/30 px-1 rounded">http://192.168.1.42:11434</code>.</p>
+            </div>
+
+            {/* Step 5 — Configure and start */}
+            <div className="flex flex-col gap-2">
+              <p className="font-medium text-white/90"><span className="text-purple-400 font-bold mr-2">5.</span>Configure and start your session</p>
+              <p className="text-xs text-muted-foreground">
+                Click <strong>Configure</strong> above, enter the public URL from step 4 in the <em>Ollama URL</em> field, and make sure the <em>Model name</em> matches what you pulled. Then click <strong>Start Session</strong>.
+              </p>
+            </div>
+
+            {/* Troubleshooting */}
+            <div className="border-t border-border/30 pt-4 flex flex-col gap-2">
+              <p className="font-semibold text-white/80 text-xs uppercase tracking-wider">Troubleshooting</p>
+              <ul className="text-xs text-muted-foreground space-y-1.5 list-none">
+                <li><span className="text-red-400 font-mono mr-1">Connection refused</span> — Ollama isn't running, or the URL is wrong. Check step 3 and confirm your tunnel/IP is correct.</li>
+                <li><span className="text-red-400 font-mono mr-1">Model not found</span> — The model name in Configure must exactly match what you pulled. Run <code className="bg-black/30 px-1 rounded">ollama list</code> to see your installed models.</li>
+                <li><span className="text-red-400 font-mono mr-1">Slow responses</span> — Large models need a capable CPU/GPU. Try <code className="bg-black/30 px-1 rounded">phi3</code> or <code className="bg-black/30 px-1 rounded">gemma2:2b</code> for faster replies.</li>
+                <li><span className="text-yellow-400 font-mono mr-1">CORS errors</span> — Not an issue here: requests go through the HapticOS API server, not directly from your browser.</li>
+                <li><span className="text-blue-400 font-mono mr-1">List installed models</span> — <code className="bg-black/30 px-1 rounded">ollama list</code></li>
+              </ul>
+            </div>
+          </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 flex-1 min-h-0">
         {/* Persona selector */}
