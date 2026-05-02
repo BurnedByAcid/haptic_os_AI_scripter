@@ -221,9 +221,23 @@ export default function Library() {
           { description: "Funscripts", accept: { "application/json": [".funscript", ".json"] } }
         ]
       });
+      let hadError = false;
       for (const handle of handles) {
         const file = await handle.getFile();
         const isVideo = file.type.startsWith("video/");
+        if (!isVideo) {
+          try {
+            await validateAndParseFunscriptFile(file);
+          } catch (err) {
+            hadError = true;
+            toast({
+              title: `Invalid funscript: ${file.name}`,
+              description: err instanceof Error ? err.message : "Could not validate file.",
+              variant: "destructive",
+            });
+            continue;
+          }
+        }
         const thumbnail = isVideo ? await generateThumbnail(file) : undefined;
         const entry: LibraryEntry = {
           id: crypto.randomUUID(),
@@ -235,7 +249,7 @@ export default function Library() {
         };
         await addEntry(entry);
       }
-      loadEntries();
+      if (!hadError || handles.length > 1) loadEntries();
     } catch {
       // user cancelled or permission denied — no-op
     }
@@ -248,6 +262,18 @@ export default function Library() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const isVideo = file.type.startsWith("video/");
+      if (!isVideo) {
+        try {
+          await validateAndParseFunscriptFile(file);
+        } catch (err) {
+          toast({
+            title: `Invalid funscript: ${file.name}`,
+            description: err instanceof Error ? err.message : "Could not validate file.",
+            variant: "destructive",
+          });
+          continue;
+        }
+      }
       const thumbnail = isVideo ? await generateThumbnail(file) : undefined;
       const entry: LibraryEntry = {
         id: crypto.randomUUID(),
