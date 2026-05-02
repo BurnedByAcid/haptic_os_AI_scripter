@@ -14,6 +14,9 @@ import { handleBillingWebhook } from "./routes/billing";
 
 const app: Express = express();
 
+// Trust the Replit proxy so req.ip reflects the real client IP for rate limiting.
+app.set("trust proxy", 1);
+
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 app.use(

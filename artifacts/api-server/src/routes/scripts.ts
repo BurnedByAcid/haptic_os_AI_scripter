@@ -6,6 +6,7 @@ import {
   validateUrl,
   validateFunscriptJson,
 } from "../lib/validation";
+import { scriptUploadLimiter, writeLimiter } from "../middlewares/rateLimiters";
 
 const router = Router();
 
@@ -37,7 +38,7 @@ router.get("/scripts/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/scripts", async (req: Request, res: Response) => {
+router.post("/scripts", writeLimiter, scriptUploadLimiter, async (req: Request, res: Response) => {
   // Payload size guard (10 MB — express.json() limit set in app.ts)
   try {
     const {
@@ -110,7 +111,7 @@ router.post("/scripts", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/scripts/:id", async (req: Request, res: Response) => {
+router.delete("/scripts/:id", writeLimiter, async (req: Request, res: Response) => {
   try {
     const { author_id } = req.body as { author_id?: string };
     if (!author_id) { res.status(401).json({ error: "Unauthorized" }); return; }

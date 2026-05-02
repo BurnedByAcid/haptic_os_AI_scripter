@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
 import sanitizeHtml from "sanitize-html";
+import { scriptUploadLimiter, writeLimiter } from "../middlewares/rateLimiters";
 
 const router = Router();
 
@@ -130,7 +131,7 @@ router.get("/community/:id", async (req: Request, res: Response) => {
  * POST /api/community
  * Share a script. Subscriber-only.
  */
-router.post("/community", async (req: Request, res: Response) => {
+router.post("/community", writeLimiter, scriptUploadLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
@@ -193,7 +194,7 @@ router.post("/community", async (req: Request, res: Response) => {
  * DELETE /api/community/:id
  * Delete own shared entry. Subscriber who owns the entry.
  */
-router.delete("/community/:id", async (req: Request, res: Response) => {
+router.delete("/community/:id", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
@@ -216,7 +217,7 @@ router.delete("/community/:id", async (req: Request, res: Response) => {
  * POST /api/community/:id/favorite
  * Toggle favorite for the calling user.
  */
-router.post("/community/:id/favorite", async (req: Request, res: Response) => {
+router.post("/community/:id/favorite", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
@@ -247,7 +248,7 @@ router.post("/community/:id/favorite", async (req: Request, res: Response) => {
  * POST /api/community/:id/rate
  * Upsert a 1–5 rating for the calling user.
  */
-router.post("/community/:id/rate", async (req: Request, res: Response) => {
+router.post("/community/:id/rate", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
 

@@ -171,6 +171,13 @@ export default function Community() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({})) as { error?: string; details?: string[] | string };
         const detailsMsg = Array.isArray(data.details) ? data.details.join(" ") : data.details;
+        if (res.status === 429) {
+          const retryAfter = res.headers.get("Retry-After");
+          const waitHint = retryAfter ? ` Try again in ${retryAfter}s.` : "";
+          throw new Error(
+            (data.error ?? "You're sharing scripts too quickly. Please slow down.") + waitHint,
+          );
+        }
         throw new Error(detailsMsg ?? data.error ?? "Failed to submit script.");
       }
       return res.json();
