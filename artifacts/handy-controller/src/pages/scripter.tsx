@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useHandy } from "@/hooks/use-handy";
+import { useSubscription } from "@/hooks/use-subscription";
+import { useAuth } from "@clerk/react";
+import { Link } from "wouter";
 import { setHDSP } from "@/lib/handyApi";
 import { GlPatchMatcher } from "@/lib/gl-patch-matcher";
 import { Button } from "@/components/ui/button";
@@ -7,8 +10,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2 } from "lucide-react";
 import { VideoControlBar } from "@/components/video-control-bar";
+
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 const STORAGE_KEY = "scripter_session_v1";
 
@@ -50,6 +55,48 @@ interface Point {
 
 export default function Scripter() {
   const { key, connected } = useHandy();
+  const { isFree, isLoaded: planLoaded } = useSubscription();
+  const { getToken } = useAuth();
+
+  // ─── Daily usage gate (free tier only) ───
+  const [usageState, setUsageState] = useState<"checking" | "allowed" | "blocked">("checking");
+  const usageRecordedRef = useRef(false);
+
+  useEffect(() => {
+    if (!planLoaded) return;
+    if (!isFree) {
+      setUsageState("allowed");
+      return;
+    }
+    if (usageRecordedRef.current) return;
+    usageRecordedRef.current = true;
+
+    (async () => {
+      try {
+        const token = await getToken();
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        // Single atomic call: checks limit AND records usage in one DB transaction.
+        // Returns { allowed: boolean }. Fail-closed: block on any error.
+        const res = await fetch(`${API_BASE}/api/usage/scripter/start`, {
+          method: "POST",
+          headers,
+        });
+        if (!res.ok) {
+          // Server error — block access to prevent limit bypass
+          setUsageState("blocked");
+          return;
+        }
+        const { allowed } = await res.json() as { allowed: boolean };
+        setUsageState(allowed ? "allowed" : "blocked");
+      } catch {
+        // Network error — fail closed for free users to enforce the billing gate
+        setUsageState("blocked");
+      }
+    })();
+  }, [planLoaded, isFree, getToken]);
+
   const [points, setPoints] = useState<Point[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -1516,6 +1563,40 @@ export default function Scripter() {
     setPoints(prev => [...prev, ...vtPreviewPoints]);
     setVtPreviewPoints([]);
   };
+
+  if (usageState === "checking") {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (usageState === "blocked") {
+    return (
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+          <div className="h-16 w-16 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
+            <Lock className="h-7 w-7 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">Daily limit reached</h2>
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+              Free accounts can open <strong>2 Scripter sessions per day</strong>. You've used both for today.
+              Come back tomorrow or upgrade for unlimited access.
+            </p>
+          </div>
+          <Link href="/upgrade">
+            <Button className="gap-2">
+              <Crown className="h-4 w-4" />
+              Upgrade for unlimited access
+            </Button>
+          </Link>
+          <p className="text-xs text-muted-foreground">Resets daily at midnight UTC</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 h-full flex flex-col max-w-[1600px] mx-auto gap-3">

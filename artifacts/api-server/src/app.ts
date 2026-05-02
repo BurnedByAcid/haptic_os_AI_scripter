@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -10,6 +10,7 @@ import {
 } from "./middlewares/clerkProxyMiddleware";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { handleBillingWebhook } from "./routes/billing";
 
 const app: Express = express();
 
@@ -34,6 +35,19 @@ app.use(
     },
   }),
 );
+
+// ── Stripe webhook must receive raw Buffer — register BEFORE express.json() ──
+app.post(
+  "/api/billing/webhook",
+  express.raw({ type: "application/json" }),
+  (req: Request, res: Response) => {
+    handleBillingWebhook(req, res).catch((err) => {
+      logger.error({ err }, "Unhandled billing webhook error");
+      if (!res.headersSent) res.status(500).json({ error: "Internal error" });
+    });
+  }
+);
+
 app.use(cors({ credentials: true, origin: true }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));

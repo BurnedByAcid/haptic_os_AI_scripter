@@ -3,7 +3,7 @@ import { getAuth, clerkClient } from "@clerk/express";
 
 const router: IRouter = Router();
 
-const VALID_PLANS = ["free", "pro", "admin"] as const;
+const VALID_PLANS = ["free", "pro", "subscriber", "admin"] as const;
 type Plan = typeof VALID_PLANS[number];
 
 /**

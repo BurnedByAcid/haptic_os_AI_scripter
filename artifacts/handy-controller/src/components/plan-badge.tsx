@@ -12,6 +12,11 @@ const BADGE_CONFIG: Record<Plan, { label: string; icon: typeof Crown; classes: s
     icon: Crown,
     classes: "bg-primary/10 text-primary border-primary/30",
   },
+  subscriber: {
+    label: "Subscriber",
+    icon: Crown,
+    classes: "bg-primary/10 text-primary border-primary/30",
+  },
   admin: {
     label: "Admin",
     icon: ShieldCheck,

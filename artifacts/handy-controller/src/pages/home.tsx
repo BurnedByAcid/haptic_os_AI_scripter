@@ -5,6 +5,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Activity, Crown, Gamepad2, Library, Lock, Mic, PlaySquare, Settings2, Sparkles, Users } from "lucide-react";
+import { useAuth } from "@clerk/react";
+import { useState, useEffect } from "react";
+
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 type CardState = "available" | "premium" | "coming-soon";
 
@@ -21,7 +25,26 @@ const ALL_CARDS: { href: string; label: string; desc: string; icon: typeof PlayS
 
 export default function Home() {
   const { connected, checking } = useHandy();
-  const { isPro, plan } = useSubscription();
+  const { isPro, isFree, plan, isLoaded } = useSubscription();
+  const { getToken } = useAuth();
+  const [scripterUsed, setScripterUsed] = useState<number | null>(null);
+  const SCRIPTER_LIMIT = 2;
+
+  useEffect(() => {
+    if (!isLoaded || !isFree) return;
+    (async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(`${API_BASE}/api/usage/scripter/today`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) {
+          const data = await res.json() as { count: number };
+          setScripterUsed(data.count);
+        }
+      } catch { /* non-fatal */ }
+    })();
+  }, [isLoaded, isFree, getToken]);
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -76,14 +99,39 @@ export default function Home() {
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground text-sm">Plan</span>
                 <span className={`font-mono font-bold text-xs capitalize ${
-                  plan === "admin" ? "text-yellow-400" :
-                  plan === "pro"   ? "text-primary" :
-                                     "text-muted-foreground"
+                  plan === "admin"      ? "text-yellow-400" :
+                  plan === "pro"        ? "text-primary" :
+                  plan === "subscriber" ? "text-primary" :
+                                          "text-muted-foreground"
                 }`}>{plan}</span>
               </div>
+              {isFree && scripterUsed !== null && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground text-sm">Scripter today</span>
+                  <span className={`font-mono font-bold text-xs ${scripterUsed >= SCRIPTER_LIMIT ? "text-destructive" : "text-primary"}`}>
+                    {scripterUsed}/{SCRIPTER_LIMIT}
+                  </span>
+                </div>
+              )}
             </div>
           </Card>
         </div>
+
+        {/* Scripter limit warning for free users */}
+        {isFree && scripterUsed !== null && scripterUsed >= SCRIPTER_LIMIT && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 flex items-center gap-3">
+            <Lock className="h-5 w-5 text-destructive flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-destructive">Scripter limit reached</p>
+              <p className="text-xs text-muted-foreground">You've used all {SCRIPTER_LIMIT} free Scripter sessions today. Upgrade to get unlimited access.</p>
+            </div>
+            <Link href="/upgrade">
+              <Button size="sm" variant="destructive" className="gap-1.5 flex-shrink-0">
+                <Crown className="h-4 w-4" /> Upgrade
+              </Button>
+            </Link>
+          </div>
+        )}
 
         {/* All feature cards */}
         <div>
@@ -130,9 +178,9 @@ export default function Home() {
                     <TooltipContent side="top" className="flex flex-col gap-1.5 p-3">
                       <p className="font-semibold text-xs flex items-center gap-1.5">
                         <Crown className="h-3.5 w-3.5 text-primary" />
-                        Pro feature
+                        Subscriber feature
                       </p>
-                      <p className="text-[11px] text-muted-foreground">Upgrade to Pro to unlock {item.label}.</p>
+                      <p className="text-[11px] text-muted-foreground">Subscribe to unlock {item.label}.</p>
                       <Link href="/upgrade">
                         <Button size="sm" className="h-6 text-[10px] px-2 gap-1 mt-0.5 w-full">
                           <Crown className="h-3 w-3" /> Upgrade
@@ -160,7 +208,7 @@ export default function Home() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold">Unlock the full experience</p>
-              <p className="text-xs text-muted-foreground">Games, Live Audio, AI Control, and Community sharing are Pro features.</p>
+              <p className="text-xs text-muted-foreground">Games, Live Audio, AI Control, Community sharing, and unlimited Scripter sessions.</p>
             </div>
             <Link href="/upgrade">
               <Button size="sm" className="gap-1.5 flex-shrink-0">
