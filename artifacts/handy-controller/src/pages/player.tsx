@@ -128,7 +128,29 @@ export default function Player() {
     const pendingVideoUrl = localStorage.getItem("handy_pending_video_url");
     const pendingScript = localStorage.getItem("handy_pending_script");
     if (pendingVideoUrl) {
-      setVideoUrl(pendingVideoUrl);
+      // blob: and file: URLs are always local video sources — skip embed detection
+      if (pendingVideoUrl.startsWith("blob:") || pendingVideoUrl.startsWith("file:")) {
+        setVideoUrl(pendingVideoUrl);
+        setEmbedUrl(null);
+        setVideoMode("file");
+      } else {
+        const detected = detectEmbedUrl(pendingVideoUrl);
+        if (detected) {
+          if (detected.mode === "url") {
+            setVideoUrl(detected.embedUrl);
+            setEmbedUrl(null);
+            setVideoMode("url");
+          } else {
+            setEmbedUrl(detected.embedUrl);
+            setVideoUrl(null);
+            setVideoMode("embed");
+          }
+        } else {
+          setVideoUrl(pendingVideoUrl);
+          setEmbedUrl(null);
+          setVideoMode("file");
+        }
+      }
       localStorage.removeItem("handy_pending_video_url");
       localStorage.removeItem("handy_pending_video_name");
     }

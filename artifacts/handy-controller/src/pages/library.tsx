@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getAllEntries, addEntry, deleteEntry, LibraryEntry } from "@/lib/db";
 import { Card, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Film, FileJson, Trash2, Play, Upload, FolderOpen } from "lucide-react";
+import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check } from "lucide-react";
 import { useLocation } from "wouter";
 
 // File System Access API types (Chrome/Edge, not yet in standard TS lib)
@@ -20,10 +20,102 @@ interface FSAWindow {
 
 const hasFSA = typeof window !== "undefined" && "showOpenFilePicker" in window;
 
+function getYouTubeId(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const h = u.hostname.replace(/^(www\.|m\.)/, "");
+    if (h === "youtu.be") return u.pathname.slice(1).split("?")[0];
+    if (h === "youtube.com") return u.searchParams.get("v");
+  } catch { /* ignore */ }
+  return null;
+}
+
+function isDirectVideoUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(u.pathname);
+  } catch { return false; }
+}
+
+
+function getEmbedPlatformThumbnail(url: string): string | null {
+  try {
+    const h = new URL(url).hostname.replace("www.", "");
+    const platforms: Record<string, { label: string; bg: string; fg: string }> = {
+      "pornhub.com": { label: "PH", bg: "#1b1b1b", fg: "#f90" },
+      "xvideos.com": { label: "XV", bg: "#d40000", fg: "#fff" },
+      "redtube.com": { label: "RT", bg: "#cc0000", fg: "#fff" },
+      "vimeo.com": { label: "Vi", bg: "#1ab7ea", fg: "#fff" },
+    };
+    const xhamster = h.includes("xhamster");
+    if (xhamster) {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#ff6000"/><text x="160" y="105" font-family="Arial,sans-serif" font-size="52" font-weight="bold" fill="#fff" text-anchor="middle">xH</text></svg>`;
+      return `data:image/svg+xml;base64,${btoa(svg)}`;
+    }
+    const p = platforms[h];
+    if (p) {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="${p.bg}"/><text x="160" y="105" font-family="Arial,sans-serif" font-size="52" font-weight="bold" fill="${p.fg}" text-anchor="middle">${p.label}</text></svg>`;
+      return `data:image/svg+xml;base64,${btoa(svg)}`;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function getThumbnailForUrl(url: string): Promise<string> {
+  const ytId = getYouTubeId(url);
+  if (ytId) {
+    return Promise.resolve(`https://img.youtube.com/vi/${ytId}/mqdefault.jpg`);
+  }
+  if (isDirectVideoUrl(url)) {
+    return new Promise(resolve => {
+      const video = document.createElement("video");
+      video.crossOrigin = "anonymous";
+      video.preload = "metadata";
+      video.muted = true;
+      video.src = url;
+      const timeout = setTimeout(() => {
+        video.src = "";
+        resolve("");
+      }, 8000);
+      video.onloadeddata = () => {
+        video.currentTime = Math.min(5, video.duration * 0.1);
+      };
+      video.onseeked = () => {
+        clearTimeout(timeout);
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = 320;
+          canvas.height = 180;
+          const ctx = canvas.getContext("2d");
+          if (ctx) ctx.drawImage(video, 0, 0, 320, 180);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+          video.src = "";
+          resolve(dataUrl);
+        } catch {
+          video.src = "";
+          resolve("");
+        }
+      };
+      video.onerror = () => {
+        clearTimeout(timeout);
+        video.src = "";
+        resolve("");
+      };
+    });
+  }
+  return Promise.resolve(getEmbedPlatformThumbnail(url) ?? "");
+}
+
 export default function Library() {
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
   const [search, setSearch] = useState("");
   const [, setLocation] = useLocation();
+
+  const [showUrlForm, setShowUrlForm] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [addingUrl, setAddingUrl] = useState(false);
+  const urlInputRef = useRef<HTMLInputElement>(null);
 
   const loadEntries = async () => {
     const data = await getAllEntries();
@@ -34,12 +126,25 @@ export default function Library() {
     loadEntries();
   }, []);
 
+  useEffect(() => {
+    if (showUrlForm) {
+      setTimeout(() => urlInputRef.current?.focus(), 50);
+    }
+  }, [showUrlForm]);
+
   const handleDelete = async (id: string) => {
     await deleteEntry(id);
     loadEntries();
   };
 
   const handleOpen = async (entry: LibraryEntry) => {
+    if (entry.url) {
+      localStorage.setItem("handy_pending_video_url", entry.url);
+      localStorage.setItem("handy_pending_video_name", entry.name);
+      setLocation("/player");
+      return;
+    }
+
     let url: string | null = null;
 
     if (entry.fileHandle) {
@@ -154,6 +259,41 @@ export default function Library() {
     loadEntries();
   };
 
+  const handleAddUrl = async () => {
+    const trimmedUrl = urlInput.trim();
+    if (!trimmedUrl) return;
+    if (!trimmedUrl.startsWith("http://") && !trimmedUrl.startsWith("https://")) return;
+    setAddingUrl(true);
+    try {
+      const thumbnail = await getThumbnailForUrl(trimmedUrl);
+      const name = nameInput.trim() || trimmedUrl;
+      const entry: LibraryEntry = {
+        id: crypto.randomUUID(),
+        name,
+        type: "video",
+        url: trimmedUrl,
+        addedAt: Date.now(),
+        thumbnail: thumbnail || undefined,
+      };
+      await addEntry(entry);
+      setUrlInput("");
+      setNameInput("");
+      setShowUrlForm(false);
+      loadEntries();
+    } finally {
+      setAddingUrl(false);
+    }
+  };
+
+  const handleUrlKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleAddUrl();
+    if (e.key === "Escape") {
+      setShowUrlForm(false);
+      setUrlInput("");
+      setNameInput("");
+    }
+  };
+
   const filtered = entries.filter(e => e.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -172,6 +312,9 @@ export default function Library() {
               className="bg-card"
             />
           </div>
+          <Button variant="outline" onClick={() => setShowUrlForm(v => !v)} data-testid="button-add-url">
+            <Link className="h-4 w-4 mr-2" /> Add URL
+          </Button>
           {hasFSA ? (
             <Button variant="default" onClick={handleBrowseFSA} data-testid="button-upload-library">
               <FolderOpen className="h-4 w-4 mr-2" /> Browse Files
@@ -191,6 +334,51 @@ export default function Library() {
         </div>
       </div>
 
+      {showUrlForm && (
+        <div className="rounded-xl border border-border/60 bg-card/70 backdrop-blur p-4 flex flex-col gap-3 shadow-sm" data-testid="url-form">
+          <div className="flex items-center gap-2">
+            <Link className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="text-sm font-medium">Add video from URL</span>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              ref={urlInputRef}
+              placeholder="Paste video URL (YouTube, Pornhub, xVideos, Vimeo, or direct .mp4/.webm)…"
+              value={urlInput}
+              onChange={e => setUrlInput(e.target.value)}
+              onKeyDown={handleUrlKeyDown}
+              className="flex-1 bg-background/50"
+              data-testid="url-input"
+            />
+            <Input
+              placeholder="Name (optional)"
+              value={nameInput}
+              onChange={e => setNameInput(e.target.value)}
+              onKeyDown={handleUrlKeyDown}
+              className="w-48 bg-background/50"
+              data-testid="url-name-input"
+            />
+            <Button
+              onClick={handleAddUrl}
+              disabled={!urlInput.trim() || addingUrl}
+              data-testid="url-confirm"
+            >
+              {addingUrl ? (
+                <span className="flex items-center gap-1.5"><span className="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block" />Adding…</span>
+              ) : (
+                <><Check className="h-4 w-4 mr-1.5" />Add</>
+              )}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => { setShowUrlForm(false); setUrlInput(""); setNameInput(""); }} data-testid="url-cancel">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground ml-6">
+            Supports YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo, or any direct .mp4/.webm URL
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 content-start">
         {filtered.map(entry => (
           <Card key={entry.id} className="bg-card/50 backdrop-blur overflow-hidden group">
@@ -205,7 +393,12 @@ export default function Library() {
               <div className="absolute top-2 right-2 bg-background/80 backdrop-blur px-2 py-1 rounded text-xs font-mono">
                 {entry.type.toUpperCase()}
               </div>
-              {entry.fileHandle && (
+              {entry.url && (
+                <div className="absolute top-2 left-2 bg-primary/80 backdrop-blur px-2 py-1 rounded text-xs font-mono text-black font-semibold">
+                  URL
+                </div>
+              )}
+              {entry.fileHandle && !entry.url && (
                 <div className="absolute top-2 left-2 bg-primary/80 backdrop-blur px-2 py-1 rounded text-xs font-mono text-black font-semibold">
                   LINKED
                 </div>

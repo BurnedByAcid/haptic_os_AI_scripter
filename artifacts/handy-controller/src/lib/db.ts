@@ -6,6 +6,7 @@ export interface LibraryEntry {
   type: "video" | "funscript";
   blob?: Blob;
   fileHandle?: FileSystemFileHandle;
+  url?: string;
   addedAt: number;
   thumbnail?: string;
   linkedTo?: string;
