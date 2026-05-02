@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check } from "lucide-react";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
+import { validateVideoUrl, validateAndParseFunscriptFile } from "@/lib/validation";
 
 // File System Access API types (Chrome/Edge, not yet in standard TS lib)
 interface FSAFileHandle extends FileSystemFileHandle {
@@ -110,6 +112,7 @@ export default function Library() {
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
   const [search, setSearch] = useState("");
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const [showUrlForm, setShowUrlForm] = useState(false);
   const [urlInput, setUrlInput] = useState("");
@@ -262,7 +265,13 @@ export default function Library() {
   const handleAddUrl = async () => {
     const trimmedUrl = urlInput.trim();
     if (!trimmedUrl) return;
-    if (!trimmedUrl.startsWith("http://") && !trimmedUrl.startsWith("https://")) return;
+
+    const urlErr = validateVideoUrl(trimmedUrl);
+    if (urlErr) {
+      toast({ title: "Invalid URL", description: urlErr.message, variant: "destructive" });
+      return;
+    }
+
     setAddingUrl(true);
     try {
       const thumbnail = await getThumbnailForUrl(trimmedUrl);

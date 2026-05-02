@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Upload, Zap, Link2, Video, Circle, StopCircle, Download, Loader2, CheckCircle2, WifiOff } from "lucide-react";
 import { FunscriptWaveform } from "@/components/funscript-waveform";
 import { VideoControlBar } from "@/components/video-control-bar";
+import { useToast } from "@/hooks/use-toast";
+import { validateAndParseFunscriptFile } from "@/lib/validation";
 
 function parseFunscript(json: unknown): Funscript {
   if (typeof json !== "object" || json === null) throw new Error("Not an object");
@@ -95,6 +97,7 @@ function SyncBadge({ status }: { status: HSSPStatus }) {
 
 export default function Player() {
   const { key, connected } = useHandy();
+  const { toast } = useToast();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoMode, setVideoMode] = useState<VideoMode>("file");
   const [urlInput, setUrlInput] = useState("");
@@ -229,14 +232,19 @@ export default function Player() {
 
   const handleScriptUpload = async (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const text = await file.text();
-        const script = parseFunscript(JSON.parse(text));
-        const newScripts = [...scripts];
-        newScripts[idx] = script;
-        setScripts(newScripts);
-      } catch (err) { console.error("Failed to parse script", err); }
+    if (!file) return;
+    e.target.value = "";
+    try {
+      const script = await validateAndParseFunscriptFile(file);
+      const newScripts = [...scripts];
+      newScripts[idx] = script as Funscript;
+      setScripts(newScripts);
+    } catch (err) {
+      toast({
+        title: "Invalid funscript",
+        description: err instanceof Error ? err.message : "Could not load script.",
+        variant: "destructive",
+      });
     }
   };
 

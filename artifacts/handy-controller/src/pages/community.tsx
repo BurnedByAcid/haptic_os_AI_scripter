@@ -4,8 +4,9 @@ import { useUser } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Download, Play, Upload, Plus, X, Clock, Tag, User } from "lucide-react";
+import { Download, Play, Upload, Plus, X, Clock, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { validateVideoUrl, validateAndParseFunscriptFile } from "@/lib/validation";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 
@@ -63,12 +64,18 @@ export default function Community() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (!scriptFile) throw new Error("No script file");
-      const text = await scriptFile.text();
-      JSON.parse(text);
+      if (!scriptFile) throw new Error("No script file selected.");
+
+      // URL safety check
+      const urlErr = validateVideoUrl(form.video_url.trim());
+      if (urlErr) throw new Error(urlErr.message);
+
+      // Funscript validation
+      const script = await validateAndParseFunscriptFile(scriptFile);
+
       const body = {
         ...form,
-        script_json: text,
+        script_json: JSON.stringify(script),
         author_id: user?.id ?? null,
         author_name: user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? "Anonymous",
       };
@@ -77,7 +84,10 @@ export default function Community() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error("Failed to submit");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string; details?: string };
+        throw new Error(data.details ?? data.error ?? "Failed to submit script.");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -87,7 +97,11 @@ export default function Community() {
       setScriptFile(null);
       toast({ title: "Script shared!", description: "Your script is now live in the community." });
     },
-    onError: () => toast({ title: "Failed to share script", variant: "destructive" }),
+    onError: (err) => toast({
+      title: "Could not share script",
+      description: err instanceof Error ? err.message : "Unknown error.",
+      variant: "destructive",
+    }),
   });
 
   const handleDownload = async (s: SharedScript) => {
