@@ -147,7 +147,7 @@ router.post("/scripts", async (req: Request, res: Response) => {
     }
 
     if (errors.length > 0) {
-      res.status(400).json({ error: "Validation failed", details: errors.join(" ") });
+      res.status(400).json({ error: "Validation failed", details: errors });
       return;
     }
 

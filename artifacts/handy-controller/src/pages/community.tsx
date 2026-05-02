@@ -85,8 +85,9 @@ export default function Community() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({})) as { error?: string; details?: string };
-        throw new Error(data.details ?? data.error ?? "Failed to submit script.");
+        const data = await res.json().catch(() => ({})) as { error?: string; details?: string[] | string };
+        const detailsMsg = Array.isArray(data.details) ? data.details.join(" ") : data.details;
+        throw new Error(detailsMsg ?? data.error ?? "Failed to submit script.");
       }
       return res.json();
     },
