@@ -24,6 +24,7 @@ import OnboardingPage from "@/pages/onboarding";
 import Community from "@/pages/community";
 import Upgrade from "@/pages/upgrade";
 import Admin from "@/pages/admin";
+import MyLibrary from "@/pages/my-library";
 
 const queryClient = new QueryClient();
 
@@ -127,14 +128,15 @@ function Router() {
       {/* Everything else requires login + onboarding */}
       <Route path="/"          component={() => <ProtectedRoute component={Home} />} />
       <Route path="/control"   component={() => <ProtectedRoute component={Control} />} />
-      <Route path="/library"   component={() => <ProtectedRoute component={Library} />} />
+      <Route path="/local-library" component={() => <ProtectedRoute component={Library} />} />
+      <Route path="/library"       component={() => <ProtectedRoute component={MyLibrary} />} />
       <Route path="/games"     component={() => <ProtectedRoute component={Games} />} />
       <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
       <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
       <Route path="/ai"        component={() => <ProtectedRoute component={AI} />} />
-      <Route path="/community" component={() => <ProtectedRoute component={Community} />} />
-      <Route path="/upgrade"   component={() => <ProtectedRoute component={Upgrade} />} />
-      <Route path="/admin"     component={() => <ProtectedRoute component={Admin} />} />
+      <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
+      <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
+      <Route path="/admin"        component={() => <ProtectedRoute component={Admin} />} />
 
       <Route component={NotFound} />
     </Switch>

@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Shield, Sparkles, LogIn, LogOut, User, Users, Heart, Pencil, ShieldCheck } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Shield, Sparkles, LogIn, LogOut, User, Users, Heart, Pencil, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
@@ -76,15 +76,16 @@ const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/player", label: "Player", icon: PlaySquare },
   { href: "/control", label: "Control", icon: Settings2 },
-  { href: "/library", label: "Library", icon: Library },
+  { href: "/local-library", label: "Local Files", icon: Library },
   { href: "/scripter", label: "Scripter", icon: Mic },
+  { href: "/library", label: "My Library", icon: BookMarked },
+  { href: "/community", label: "Community", icon: Users },
 ];
 
 const COMING_SOON_ITEMS = [
   { href: "/games", label: "Games", icon: Gamepad2 },
   { href: "/beat", label: "Live Audio", icon: Activity },
   { href: "/ai", label: "AI Control", icon: Sparkles },
-  { href: "/community", label: "Community", icon: Users },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

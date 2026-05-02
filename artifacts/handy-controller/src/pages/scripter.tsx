@@ -10,8 +10,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2 } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2, BookmarkPlus } from "lucide-react";
 import { VideoControlBar } from "@/components/video-control-bar";
+import { SaveScriptDialog } from "@/components/save-script-dialog";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -57,6 +58,9 @@ export default function Scripter() {
   const { key, connected } = useHandy();
   const { isFree, isLoaded: planLoaded } = useSubscription();
   const { getToken } = useAuth();
+
+  // ─── Save dialog ───
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   // ─── Daily usage gate (free tier only) ───
   const [usageState, setUsageState] = useState<"checking" | "allowed" | "blocked">("checking");
@@ -1621,8 +1625,8 @@ export default function Scripter() {
           >
             <FilePlus className="mr-2 h-4 w-4" /> New Script
           </Button>
-          <Button size="sm" onClick={exportScript} disabled={points.length === 0} data-testid="button-export-script">
-            <Download className="mr-2 h-4 w-4" /> Export .funscript
+          <Button size="sm" onClick={() => setSaveDialogOpen(true)} disabled={points.length === 0} data-testid="button-export-script">
+            <BookmarkPlus className="mr-2 h-4 w-4" /> Save Script
           </Button>
         </div>
       </div>
@@ -2408,6 +2412,24 @@ export default function Scripter() {
         </TabsContent>
         </>}
       </Tabs>
+
+      {/* ── Save Script Dialog ── */}
+      {saveDialogOpen && (() => {
+        const sorted = [...points].sort((a, b) => a.time - b.time);
+        const scriptJson = JSON.stringify({ actions: sorted.map(p => ({ at: Math.round(p.time), pos: p.pos })) });
+        const baseName = videoFileName ? videoFileName.replace(/\.[^/.]+$/, "") : "script";
+        return (
+          <SaveScriptDialog
+            open={saveDialogOpen}
+            onClose={() => setSaveDialogOpen(false)}
+            scriptJson={scriptJson}
+            videoUrl={videoUrl}
+            videoFileName={videoFileName}
+            suggestedTitle={baseName}
+            onDownload={() => { exportScript(); setSaveDialogOpen(false); }}
+          />
+        );
+      })()}
     </div>
   );
 }
