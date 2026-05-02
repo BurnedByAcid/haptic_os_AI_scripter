@@ -10,7 +10,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2, BookmarkPlus } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2, BookmarkPlus, Link2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { validateVideoUrl } from "@/lib/validation";
 import { VideoControlBar } from "@/components/video-control-bar";
 import { SaveScriptDialog } from "@/components/save-script-dialog";
 
@@ -127,6 +131,10 @@ export default function Scripter() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoFileName, setVideoFileName] = useState<string | null>(null);
+  const [urlDialogOpen, setUrlDialogOpen] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const { toast } = useToast();
   const [currentTime, setCurrentTime] = useState(0);
   // Tracks how many times each base filename has been exported this session
   const exportCountsRef = useRef<Map<string, number>>(new Map());
@@ -993,6 +1001,44 @@ export default function Scripter() {
     }
   };
 
+  const handleLoadVideoUrl = () => {
+    const trimmed = urlInput.trim();
+    if (!trimmed) {
+      setUrlError("Please paste a video URL.");
+      return;
+    }
+    const err = validateVideoUrl(trimmed);
+    if (err) {
+      setUrlError(err.message);
+      return;
+    }
+    // Only direct video URLs (.mp4/.webm/.ogg/.mov) can be analyzed by the
+    // <video> element. Embed hosts like YouTube/Vimeo serve HTML pages, not
+    // raw video, so they cannot be used for funscript generation here.
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      setUrlError("That doesn't look like a valid URL.");
+      return;
+    }
+    const isDirectVideo = /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(parsed.pathname);
+    if (!isDirectVideo) {
+      setUrlError(
+        "Only direct video file URLs (.mp4, .webm, .ogg, .mov) work in the Scripter. Embed pages like YouTube or Vimeo can't be analyzed — please download the video and load the file, or paste a direct video link."
+      );
+      return;
+    }
+    // Derive a friendly file name from the URL pathname.
+    const name = decodeURIComponent(parsed.pathname.split("/").pop() || "video");
+    setVideoUrl(trimmed);
+    setVideoFileName(name);
+    setUrlDialogOpen(false);
+    setUrlInput("");
+    setUrlError(null);
+    toast({ title: "Video loaded", description: name });
+  };
+
   const handleImportFunscript = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1639,6 +1685,14 @@ export default function Scripter() {
             <span>Load Video</span>
             <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setUrlError(null); setUrlDialogOpen(true); }}
+            data-testid="button-paste-video-url"
+          >
+            <Link2 className="mr-2 h-4 w-4" /> Paste URL
+          </Button>
           <Button variant="outline" size="sm" className="relative cursor-pointer" data-testid="button-import-funscript">
             <Upload className="mr-2 h-4 w-4" /><span>Import .funscript</span>
             <input type="file" accept=".funscript,.json,application/json" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImportFunscript} />
@@ -1658,10 +1712,20 @@ export default function Scripter() {
           <video
             ref={videoRef}
             src={videoUrl ?? undefined}
+            crossOrigin="anonymous"
             className="w-full h-full object-contain"
             preload="auto"
             onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
             onLoadedMetadata={e => setVtEndTime(Math.round(e.currentTarget.duration))}
+            onError={() => {
+              if (videoUrl && /^https?:/.test(videoUrl)) {
+                toast({
+                  variant: "destructive",
+                  title: "Couldn't load video",
+                  description: "The host may not allow direct playback (CORS) or the file is unavailable. Try downloading and loading the file instead.",
+                });
+              }
+            }}
           />
           {!videoUrl && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-2">
@@ -2412,6 +2476,39 @@ export default function Scripter() {
         </TabsContent>
         </>}
       </Tabs>
+
+      {/* ── Paste Video URL Dialog ── */}
+      <Dialog open={urlDialogOpen} onOpenChange={(open) => { setUrlDialogOpen(open); if (!open) { setUrlInput(""); setUrlError(null); } }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Load video from URL</DialogTitle>
+            <DialogDescription>
+              Paste a direct video link (.mp4, .webm, .ogg, .mov). Embed pages like YouTube or Vimeo can't be analyzed for funscript generation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Input
+              type="url"
+              placeholder="https://example.com/video.mp4"
+              value={urlInput}
+              onChange={(e) => { setUrlInput(e.target.value); if (urlError) setUrlError(null); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleLoadVideoUrl(); } }}
+              autoFocus
+              data-testid="input-video-url"
+            />
+            {urlError && (
+              <p className="text-sm text-destructive" data-testid="text-url-error">{urlError}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Note: the video host must allow cross-origin playback. If loading fails, download the file and use Load Video instead.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setUrlDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleLoadVideoUrl} data-testid="button-load-video-url">Load Video</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Save Script Dialog ── */}
       {saveDialogOpen && (() => {
