@@ -64,7 +64,7 @@ export default function Upgrade() {
         <h1 className="text-3xl font-bold tracking-tight">Choose your plan</h1>
         <p className="text-muted-foreground">
           {plan === "free"
-            ? "Unlock the full Handy Controller experience with Pro."
+            ? "Unlock the full HapticOS experience with Pro."
             : plan === "pro"
             ? "You're already on Pro — enjoy all features!"
             : "Admin account — all features unlocked."}

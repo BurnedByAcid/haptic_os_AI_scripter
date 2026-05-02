@@ -185,7 +185,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h1 className="text-xl font-bold tracking-tight text-primary whitespace-nowrap">HANDY<span className="text-foreground">CTRL</span></h1>
+                <h1 className="text-xl font-bold tracking-tight text-primary whitespace-nowrap">Haptic<span className="text-foreground">OS</span></h1>
                 <div className="flex items-center gap-2">
                   {battery !== undefined && connected && (
                     <span className="text-xs font-mono text-muted-foreground">{battery}%</span>

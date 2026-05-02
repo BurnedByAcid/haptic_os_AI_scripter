@@ -28,7 +28,7 @@ export default function Home() {
       <div className="p-8 max-w-5xl mx-auto space-y-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome to the Handy Control Hub.</p>
+          <p className="text-muted-foreground">Welcome to HapticOS.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

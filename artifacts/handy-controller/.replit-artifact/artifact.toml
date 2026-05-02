@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "Handy Controller"
+title = "HapticOS"
 version = "1.0.0"
 id = "artifacts/handy-controller"
 router = "path"
