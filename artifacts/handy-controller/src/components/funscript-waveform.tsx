@@ -8,8 +8,8 @@ interface FunscriptWaveformProps {
   style?: CSSProperties;
 }
 
-const NEON_CYAN = "hsl(186, 100%, 50%)";
-const NEON_CYAN_RGBA = "rgba(0, 229, 255, ";
+const PRIMARY_PURPLE = "hsl(270,85%,60%)";
+const PRIMARY_PURPLE_RGBA = "rgba(168, 85, 247, ";
 const BG = "#080c10";
 const GRID = "rgba(255,255,255,0.04)";
 const CURSOR_COLOR = "#ffffff";
@@ -82,8 +82,8 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
 
     // Gradient fill under waveform
     const grad = ctx.createLinearGradient(0, 0, 0, ph);
-    grad.addColorStop(0, NEON_CYAN_RGBA + "0.25)");
-    grad.addColorStop(1, NEON_CYAN_RGBA + "0.0)");
+    grad.addColorStop(0, PRIMARY_PURPLE_RGBA + "0.25)");
+    grad.addColorStop(1, PRIMARY_PURPLE_RGBA + "0.0)");
 
     ctx.beginPath();
     ctx.moveTo(xOf(actions[0].at), yOf(actions[0].pos));
@@ -102,9 +102,9 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
     for (let i = 1; i < actions.length; i++) {
       ctx.lineTo(xOf(actions[i].at), yOf(actions[i].pos));
     }
-    ctx.strokeStyle = NEON_CYAN;
+    ctx.strokeStyle = PRIMARY_PURPLE;
     ctx.lineWidth = 1.5;
-    ctx.shadowColor = NEON_CYAN;
+    ctx.shadowColor = PRIMARY_PURPLE;
     ctx.shadowBlur = 6;
     ctx.stroke();
     ctx.shadowBlur = 0;
@@ -196,7 +196,7 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
     ctx.beginPath();
     ctx.arc(dotX, dotY, 4, 0, Math.PI * 2);
     ctx.fillStyle = CURSOR_COLOR;
-    ctx.shadowColor = NEON_CYAN;
+    ctx.shadowColor = PRIMARY_PURPLE;
     ctx.shadowBlur = 12;
     ctx.fill();
     ctx.shadowBlur = 0;

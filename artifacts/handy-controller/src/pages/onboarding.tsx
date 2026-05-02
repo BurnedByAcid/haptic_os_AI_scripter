@@ -114,7 +114,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md rounded-2xl border border-[#30363D] bg-[#0D1117] p-8 shadow-2xl shadow-[#00E5FF]/5 space-y-6">
+      <div className="w-full max-w-md rounded-2xl border border-[#302840] bg-[#0D0B12] p-8 shadow-2xl shadow-[#A855F7]/5 space-y-6">
         <div className="text-center space-y-1">
           <h1 className="text-2xl font-bold text-white">Welcome</h1>
           <p className="text-sm text-[#8CA9AD]">
@@ -128,7 +128,7 @@ export default function OnboardingPage() {
             <div
               key={s}
               className={`h-1 flex-1 rounded-full transition-colors ${
-                s <= step ? "bg-[#00E5FF]" : "bg-[#30363D]"
+                s <= step ? "bg-[#A855F7]" : "bg-[#302840]"
               }`}
             />
           ))}
@@ -148,14 +148,14 @@ export default function OnboardingPage() {
                 type="checkbox"
                 checked={ageChecked}
                 onChange={(e) => setAgeChecked(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded-sm accent-[#00E5FF] cursor-pointer"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded-sm accent-[#A855F7] cursor-pointer"
               />
               <span className="text-sm text-white leading-relaxed">
                 I confirm I am 18 years of age or older.
               </span>
             </label>
             <Button
-              className="w-full bg-[#00E5FF] text-black font-bold hover:bg-[#00E5FF]/90 disabled:opacity-40"
+              className="w-full bg-[#A855F7] text-white font-bold hover:bg-[#A855F7]/90 disabled:opacity-40"
               disabled={!ageChecked}
               onClick={() => setStep(2)}
             >
@@ -184,7 +184,7 @@ export default function OnboardingPage() {
                   onChange={(e) => setUsername(e.target.value.toLowerCase())}
                   placeholder="e.g. cool_user42"
                   maxLength={32}
-                  className="bg-[#161B22] border-[#30363D] text-white pr-9 focus:border-[#00E5FF] focus:ring-[#00E5FF]"
+                  className="bg-[#17131F] border-[#302840] text-white pr-9 focus:border-[#A855F7] focus:ring-[#A855F7]"
                   autoComplete="off"
                   spellCheck={false}
                 />
@@ -226,7 +226,7 @@ export default function OnboardingPage() {
                 Back
               </Button>
               <Button
-                className="flex-1 bg-[#00E5FF] text-black font-bold hover:bg-[#00E5FF]/90 disabled:opacity-40"
+                className="flex-1 bg-[#A855F7] text-white font-bold hover:bg-[#A855F7]/90 disabled:opacity-40"
                 disabled={usernameStatus !== "available" || submitting}
                 onClick={handleSubmit}
               >

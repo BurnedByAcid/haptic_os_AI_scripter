@@ -133,7 +133,7 @@ export default function Beat() {
 
     // Draw wave
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "hsl(186, 100%, 50%)";
+    ctx.strokeStyle = "hsl(270,85%,60%)";
     ctx.beginPath();
     const sliceWidth = canvas.width * 1.0 / dataArray.length;
     let x = 0;

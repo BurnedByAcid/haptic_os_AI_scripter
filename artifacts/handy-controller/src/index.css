@@ -75,49 +75,53 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  /* Deep dark professional background */
-  --background: 240 10% 4%;
+  /* Deep dark professional background — purple-tinted */
+  --background: 255 10% 4%;
   --foreground: 210 40% 98%;
 
-  --border: 240 5% 15%;
+  --border: 255 5% 15%;
   
-  --card: 240 10% 6%;
+  --card: 255 10% 6%;
   --card-foreground: 210 40% 98%;
-  --card-border: 240 5% 15%;
+  --card-border: 255 5% 15%;
 
-  --sidebar: 240 10% 5%;
+  --sidebar: 255 10% 5%;
   --sidebar-foreground: 210 40% 98%;
-  --sidebar-border: 240 5% 15%;
-  --sidebar-primary: 186 100% 50%;
-  --sidebar-primary-foreground: 0 0% 0%;
-  --sidebar-accent: 240 10% 12%;
+  --sidebar-border: 255 5% 15%;
+  --sidebar-primary: 270 85% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 255 10% 12%;
   --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-ring: 186 100% 50%;
+  --sidebar-ring: 270 85% 60%;
 
-  --popover: 240 10% 6%;
+  --popover: 255 10% 6%;
   --popover-foreground: 210 40% 98%;
-  --popover-border: 240 5% 15%;
+  --popover-border: 255 5% 15%;
 
-  /* Neon cyan accent */
-  --primary: 186 100% 50%;
-  --primary-foreground: 0 0% 0%;
+  /* Purple Fusion accent */
+  --primary: 270 85% 60%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 240 5% 12%;
+  /* Magenta secondary accent — echoes the logo gradient end */
+  --magenta: 300 80% 55%;
+  --color-magenta: hsl(var(--magenta));
+
+  --secondary: 255 5% 12%;
   --secondary-foreground: 210 40% 98%;
 
-  --muted: 240 5% 12%;
-  --muted-foreground: 240 5% 65%;
+  --muted: 255 5% 12%;
+  --muted-foreground: 255 5% 65%;
 
-  --accent: 240 5% 15%;
+  --accent: 255 5% 15%;
   --accent-foreground: 210 40% 98%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 210 40% 98%;
 
-  --input: 240 5% 15%;
-  --ring: 186 100% 50%;
+  --input: 255 5% 15%;
+  --ring: 270 85% 60%;
 
-  --chart-1: 186 100% 50%;
+  --chart-1: 270 85% 60%;
   --chart-2: 280 80% 60%;
   --chart-3: 340 80% 60%;
   --chart-4: 40 80% 60%;

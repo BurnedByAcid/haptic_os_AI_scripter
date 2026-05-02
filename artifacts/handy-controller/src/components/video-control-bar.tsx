@@ -246,7 +246,7 @@ export function VideoControlBar({
             height: active ? 14 : 10,
             opacity: duration > 0 ? 1 : 0,
             transition: scrubbing ? "none" : "width 120ms, height 120ms",
-            boxShadow: "0 0 0 2px rgba(0,229,255,0.35)",
+            boxShadow: "0 0 0 2px rgba(168,85,247,0.35)",
           }}
         />
       </div>

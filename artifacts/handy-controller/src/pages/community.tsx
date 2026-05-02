@@ -38,7 +38,7 @@ function VideoIcon({ url }: { url: string }) {
   if (h.includes("xvideos")) return <span className="text-[10px] font-bold bg-red-700 text-white px-1.5 py-0.5 rounded">XV</span>;
   if (h.includes("xhamster")) return <span className="text-[10px] font-bold bg-orange-600 text-white px-1.5 py-0.5 rounded">XH</span>;
   if (h.includes("redtube")) return <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded">RT</span>;
-  if (h.includes("vimeo")) return <span className="text-[10px] font-bold bg-cyan-600 text-white px-1.5 py-0.5 rounded">VI</span>;
+  if (h.includes("vimeo")) return <span className="text-[10px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded">VI</span>;
   return <span className="text-[10px] font-bold bg-zinc-600 text-white px-1.5 py-0.5 rounded">VID</span>;
 }
 
