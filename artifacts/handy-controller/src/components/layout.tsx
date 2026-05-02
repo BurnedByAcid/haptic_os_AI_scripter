@@ -164,6 +164,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className={`border-b border-border flex-shrink-0 ${collapsed ? "p-2" : "p-4"}`}>
           {collapsed ? (
             <div className="flex flex-col items-center gap-3">
+              {/* Purple Fusion icon */}
+              <img src="/favicon.svg" alt="HapticOS" className="h-8 w-8 flex-shrink-0" />
               {/* Connection dot */}
               <div
                 className={`h-3 w-3 rounded-full flex-shrink-0 ${
@@ -185,7 +187,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <h1 className="text-xl font-bold tracking-tight text-primary whitespace-nowrap">Haptic<span className="text-foreground">OS</span></h1>
+                <div className="flex items-center gap-2.5">
+                  <img src="/favicon.svg" alt="HapticOS" className="h-8 w-8 flex-shrink-0" />
+                  <h1 className="text-xl font-bold tracking-tight whitespace-nowrap">
+                    <span className="text-[#C850F0]">Haptic</span><span className="text-foreground">OS</span>
+                  </h1>
+                </div>
                 <div className="flex items-center gap-2">
                   {battery !== undefined && connected && (
                     <span className="text-xs font-mono text-muted-foreground">{battery}%</span>
