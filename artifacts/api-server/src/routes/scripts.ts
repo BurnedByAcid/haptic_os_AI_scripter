@@ -108,7 +108,11 @@ router.post("/scripts", async (req: Request, res: Response) => {
 
     // Required field presence
     if (!rawTitle || !rawVideoUrl || !rawScriptJson) {
-      res.status(400).json({ error: "title, video_url, and script_json are required" });
+      const missing: string[] = [];
+      if (!rawTitle) missing.push("title is required.");
+      if (!rawVideoUrl) missing.push("video_url is required.");
+      if (!rawScriptJson) missing.push("script_json is required.");
+      res.status(400).json({ error: "Validation failed", details: missing });
       return;
     }
 
