@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
-import { ClerkProvider, useAuth } from "@clerk/react";
+import { ClerkProvider, useAuth, useUser } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
 import { dark } from "@clerk/themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -20,6 +20,7 @@ import Scripter from "@/pages/scripter";
 import AI from "@/pages/ai";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
+import OnboardingPage from "@/pages/onboarding";
 import Community from "@/pages/community";
 import Upgrade from "@/pages/upgrade";
 import Admin from "@/pages/admin";
@@ -92,11 +93,21 @@ const clerkAppearance = {
   },
 };
 
-/** Redirects unauthenticated users to /sign-in. Renders nothing while Clerk loads. */
+/**
+ * Redirects unauthenticated users to /sign-in.
+ * Redirects authenticated but un-onboarded users to /onboarding.
+ * Renders nothing while Clerk loads.
+ */
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isLoaded, isSignedIn } = useAuth();
-  if (!isLoaded) return null;
+  const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
+  const { user, isLoaded: isUserLoaded } = useUser();
+
+  if (!isAuthLoaded || !isUserLoaded) return null;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
+
+  const onboarded = (user?.publicMetadata as Record<string, unknown>)?.onboarded === true;
+  if (!onboarded) return <Redirect to="/onboarding" />;
+
   return <Component />;
 }
 
@@ -110,7 +121,10 @@ function Router() {
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
 
-      {/* Everything else requires login */}
+      {/* Onboarding: only for signed-in users who haven't completed it */}
+      <Route path="/onboarding" component={OnboardingPage} />
+
+      {/* Everything else requires login + onboarding */}
       <Route path="/"          component={() => <ProtectedRoute component={Home} />} />
       <Route path="/control"   component={() => <ProtectedRoute component={Control} />} />
       <Route path="/library"   component={() => <ProtectedRoute component={Library} />} />
