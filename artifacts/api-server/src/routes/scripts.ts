@@ -1,5 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import sanitizeHtml from "sanitize-html";
+import {
+  validateVideoUrl,
+  validateFunscriptJson as validateFunscriptJsonShared,
+} from "@workspace/validation";
 import { pool } from "../lib/db";
 
 const router = Router();
@@ -21,48 +25,45 @@ function sanitizeText(raw: unknown): string {
     .trim();
 }
 
-const PRIVATE_IP_RE =
-  /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0|::1|fc00:|fd[0-9a-f]{2}:)/i;
-
-const ALLOWED_VIDEO_HOSTS = new Set([
-  "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
-  "pornhub.com", "www.pornhub.com",
-  "xvideos.com", "www.xvideos.com",
-  "xhamster.com", "www.xhamster.com", "xhamster.desi",
-  "redtube.com", "www.redtube.com",
-  "vimeo.com", "www.vimeo.com", "player.vimeo.com",
-]);
-
+/**
+ * Adapt the shared video-URL validator to the API's plain-string error format,
+ * prefixing messages with `video_url ...` for backwards-compatible responses.
+ */
 function validateUrl(raw: string): string | null {
-  let url: URL;
-  try { url = new URL(raw.trim()); } catch { return "video_url is not a valid URL."; }
-  if (url.protocol !== "https:") return "video_url must use HTTPS.";
-  const host = url.hostname.toLowerCase();
-  if (PRIVATE_IP_RE.test(host)) return "video_url points to a private or local address.";
-  const isDirectVideo = /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url.pathname);
-  if (!ALLOWED_VIDEO_HOSTS.has(host) && !isDirectVideo) {
-    return "video_url must be from an allowed platform (YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo) or a direct .mp4/.webm link.";
+  const err = validateVideoUrl(raw);
+  if (!err) return null;
+  switch (err.code) {
+    case "INVALID_URL":
+      return "video_url is not a valid URL.";
+    case "NOT_HTTPS":
+      return "video_url must use HTTPS.";
+    case "PRIVATE_IP":
+      return "video_url points to a private or local address.";
+    case "DISALLOWED_HOST":
+      return "video_url must be from an allowed platform (YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo) or a direct .mp4/.webm link.";
+    default:
+      return err.message;
   }
-  return null;
 }
 
+/**
+ * Adapt the shared funscript validator to the API's plain-string error format,
+ * prefixing messages with `script_json ...` for backwards-compatible responses.
+ */
 function validateFunscriptJson(raw: unknown): string | null {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    return "script_json must be a JSON object.";
+  const err = validateFunscriptJsonShared(raw);
+  if (!err) return null;
+  switch (err.code) {
+    case "INVALID_JSON":
+      return "script_json must be a JSON object.";
+    case "MISSING_ACTIONS":
+      return 'script_json must have an "actions" array.';
+    case "INVALID_ACTION":
+      return `script_json ${err.message}`;
+    // TOO_LARGE / WRONG_EXTENSION only apply to file uploads, not JSON payloads.
+    default:
+      return err.message;
   }
-  const obj = raw as Record<string, unknown>;
-  if (!Array.isArray(obj.actions)) return 'script_json must have an "actions" array.';
-  for (let i = 0; i < obj.actions.length; i++) {
-    const a = obj.actions[i] as Record<string, unknown>;
-    if (
-      typeof a !== "object" || a === null ||
-      typeof a.at !== "number" || typeof a.pos !== "number" ||
-      a.at < 0 || a.pos < 0 || a.pos > 100
-    ) {
-      return `script_json actions[${i}]: each action must have numeric "at" (≥0) and "pos" (0–100).`;
-    }
-  }
-  return null;
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────
