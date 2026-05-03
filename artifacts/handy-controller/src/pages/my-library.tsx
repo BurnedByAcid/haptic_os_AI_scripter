@@ -164,11 +164,39 @@ interface ScriptsDialogProps {
 function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProps) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const { reportAction } = useBlockedReport();
+  const { reportAction, upgradeAndReportAction } = useBlockedReport();
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
   const [adding, setAdding] = useState(false);
+  const [addMode, setAddMode] = useState<"file" | "library">("file");
   const [newName, setNewName] = useState("");
+  const [copySourceLibraryId, setCopySourceLibraryId] = useState<string>("");
+  const [copySourceScriptId, setCopySourceScriptId] = useState<string>("");
+
+  // For "Copy from another media" mode: list user's other library entries.
+  const { data: otherEntries = [] } = useQuery<LibraryEntry[]>({
+    queryKey: ["my-library"],
+    enabled: !!entry && adding && addMode === "library",
+    queryFn: async () => {
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/library`, { headers });
+      if (!res.ok) throw new Error("Failed to load library");
+      return res.json();
+    },
+  });
+
+  // Scripts attached to the chosen source media (for copy mode).
+  const sourceLibraryIdNum = copySourceLibraryId ? Number(copySourceLibraryId) : null;
+  const { data: sourceFunscripts } = useQuery<FunscriptListResponse>({
+    queryKey: ["media-funscripts", sourceLibraryIdNum],
+    enabled: !!sourceLibraryIdNum,
+    queryFn: async () => {
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/library/${sourceLibraryIdNum}/funscripts`, { headers });
+      if (!res.ok) throw new Error("Failed to load source scripts");
+      return res.json();
+    },
+  });
 
   const queryKey = ["media-funscripts", entry?.id];
 
@@ -282,6 +310,8 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
       qc.invalidateQueries({ queryKey });
       setAdding(false);
       setNewName("");
+      setCopySourceLibraryId("");
+      setCopySourceScriptId("");
     },
     onError: (err) => {
       const e = err as Error & { code?: string };
@@ -290,14 +320,44 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
         title: isCap ? "Script cap reached" : "Could not add script",
         description: e.message,
         variant: "destructive",
-        action: reportAction({
-          kind: "library_file",
-          item: entry?.title ?? "",
-          blockMessage: e.message,
-        }),
+        action: isCap
+          ? upgradeAndReportAction({
+              kind: "library_file",
+              item: entry?.title ?? "",
+              blockMessage: e.message,
+            })
+          : reportAction({
+              kind: "library_file",
+              item: entry?.title ?? "",
+              blockMessage: e.message,
+            }),
       });
     },
   });
+
+  async function handleCopyFromLibrary() {
+    if (!copySourceLibraryId || !copySourceScriptId || !newName.trim()) return;
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(
+        `${API}/api/library/${copySourceLibraryId}/funscripts/${copySourceScriptId}`,
+        { headers },
+      );
+      if (!res.ok) throw new Error("Failed to load source script");
+      const body = await res.json() as { funscript_json: string };
+      addMutation.mutate({
+        name: newName.trim(),
+        funscriptStr: body.funscript_json,
+        setActive: scripts.length === 0,
+      });
+    } catch (err) {
+      toast({
+        title: "Could not copy script",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }
 
   async function handleAddFile(file: File, name: string) {
     try {
@@ -440,11 +500,50 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
               </div>
             ))}
 
+            {atCap && !adding && (
+              <div className="text-xs text-muted-foreground bg-muted/40 border border-border/40 rounded-md px-3 py-2 flex items-center gap-2">
+                <Crown className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
+                {isSubscriber
+                  ? `You've reached the ${cap}-script limit for this media (${scripts.length}/${cap}).`
+                  : (
+                    <span>
+                      Free tier limit reached ({scripts.length}/{cap}).{" "}
+                      <Link href="/upgrade" className="text-primary hover:underline">
+                        Upgrade
+                      </Link>{" "}
+                      for up to 5 scripts per media.
+                    </span>
+                  )
+                }
+              </div>
+            )}
+
             {adding ? (
               <div className="border border-primary/30 bg-primary/5 rounded-md p-3 space-y-2">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Add new script
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Add new script
+                  </div>
+                  <div className="flex rounded-md border border-border/60 overflow-hidden text-[11px]">
+                    <button
+                      type="button"
+                      className={`px-2 py-1 ${addMode === "file" ? "bg-primary/20 text-primary" : "bg-background/40 text-muted-foreground hover:text-foreground"}`}
+                      onClick={() => setAddMode("file")}
+                      data-testid="button-add-mode-file"
+                    >
+                      From file
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-2 py-1 border-l border-border/60 ${addMode === "library" ? "bg-primary/20 text-primary" : "bg-background/40 text-muted-foreground hover:text-foreground"}`}
+                      onClick={() => setAddMode("library")}
+                      data-testid="button-add-mode-library"
+                    >
+                      From library
+                    </button>
+                  </div>
                 </div>
+
                 <Input
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
@@ -453,59 +552,113 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
                   className="h-8 text-sm"
                   data-testid="input-new-script-name"
                 />
-                <div className="flex gap-2">
-                  <Button
-                    asChild
-                    size="sm"
-                    className="flex-1 h-8 text-xs gap-1.5 cursor-pointer"
-                    disabled={!newName.trim() || addMutation.isPending}
-                  >
-                    <label>
-                      {addMutation.isPending ? (
-                        <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
-                      ) : (
-                        <><Upload className="h-3.5 w-3.5" /> Choose .funscript file</>
-                      )}
-                      <input
-                        type="file"
-                        accept=".funscript,.json,application/json"
-                        className="hidden"
-                        disabled={!newName.trim() || addMutation.isPending}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          e.target.value = "";
-                          if (file && newName.trim()) handleAddFile(file, newName.trim());
-                        }}
-                        data-testid="input-new-script-file"
-                      />
-                    </label>
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 text-xs"
-                    onClick={() => { setAdding(false); setNewName(""); }}
-                    disabled={addMutation.isPending}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : atCap ? (
-              <div className="text-xs text-muted-foreground bg-muted/40 border border-border/40 rounded-md px-3 py-2 flex items-center gap-2">
-                <Crown className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
-                {isSubscriber
-                  ? `You've reached the ${cap}-script limit for this media.`
-                  : (
-                    <span>
-                      Free tier limit reached.{" "}
-                      <Link href="/upgrade" className="text-primary hover:underline">
-                        Upgrade
-                      </Link>{" "}
-                      for up to 5 scripts per media.
-                    </span>
-                  )
-                }
+
+                {addMode === "file" ? (
+                  <div className="flex gap-2">
+                    <Button
+                      asChild
+                      size="sm"
+                      className="flex-1 h-8 text-xs gap-1.5 cursor-pointer"
+                      disabled={!newName.trim() || addMutation.isPending}
+                    >
+                      <label>
+                        {addMutation.isPending ? (
+                          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
+                        ) : (
+                          <><Upload className="h-3.5 w-3.5" /> Choose .funscript file</>
+                        )}
+                        <input
+                          type="file"
+                          accept=".funscript,.json,application/json"
+                          className="hidden"
+                          disabled={!newName.trim() || addMutation.isPending}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = "";
+                            if (file && newName.trim()) handleAddFile(file, newName.trim());
+                          }}
+                          data-testid="input-new-script-file"
+                        />
+                      </label>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 text-xs"
+                      onClick={() => { setAdding(false); setNewName(""); }}
+                      disabled={addMutation.isPending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <select
+                      value={copySourceLibraryId}
+                      onChange={(e) => {
+                        setCopySourceLibraryId(e.target.value);
+                        setCopySourceScriptId("");
+                      }}
+                      className="w-full h-8 text-xs rounded-md border border-input bg-background px-2"
+                      data-testid="select-copy-source-library"
+                    >
+                      <option value="">Pick a media item…</option>
+                      {otherEntries
+                        .filter((e) => e.id !== entry.id)
+                        .map((e) => (
+                          <option key={e.id} value={e.id}>{e.title}</option>
+                        ))}
+                    </select>
+                    {copySourceLibraryId && (
+                      <select
+                        value={copySourceScriptId}
+                        onChange={(e) => setCopySourceScriptId(e.target.value)}
+                        className="w-full h-8 text-xs rounded-md border border-input bg-background px-2"
+                        data-testid="select-copy-source-script"
+                      >
+                        <option value="">Pick a script…</option>
+                        {(sourceFunscripts?.funscripts ?? []).map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}{s.is_active ? " (active)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="flex-1 h-8 text-xs gap-1.5"
+                        disabled={
+                          !newName.trim() ||
+                          !copySourceScriptId ||
+                          addMutation.isPending
+                        }
+                        onClick={handleCopyFromLibrary}
+                        data-testid="button-copy-script-from-library"
+                      >
+                        {addMutation.isPending ? (
+                          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Copying…</>
+                        ) : (
+                          <><FileJson className="h-3.5 w-3.5" /> Copy script</>
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-xs"
+                        onClick={() => { setAdding(false); setNewName(""); }}
+                        disabled={addMutation.isPending}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                    {otherEntries.filter((e) => e.id !== entry.id).length === 0 && (
+                      <div className="text-[11px] text-muted-foreground italic">
+                        No other library entries to copy from.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <Button
@@ -515,7 +668,8 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
                 onClick={() => setAdding(true)}
                 data-testid="button-add-funscript"
               >
-                <Plus className="h-3.5 w-3.5" /> Add another script
+                <Plus className="h-3.5 w-3.5" />
+                {atCap ? "Try to add (will hit cap)" : "Add another script"}
               </Button>
             )}
           </div>

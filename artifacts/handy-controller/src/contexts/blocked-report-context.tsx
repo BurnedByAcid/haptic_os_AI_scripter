@@ -28,6 +28,13 @@ interface BlockedReportContextValue {
   openBlockedReport: (opts: OpenBlockedReportOpts) => void;
   /** Returns a ToastAction node that opens the report dialog with the given context. */
   reportAction: (opts: OpenBlockedReportOpts) => ReturnType<typeof ToastAction>;
+  /**
+   * Returns a ToastAction node that combines an "Upgrade" call-to-action
+   * (links to `/upgrade`) with the standard "Think this is in error?"
+   * report action. Use for plan-cap blocks where users may want to either
+   * upgrade or dispute the block.
+   */
+  upgradeAndReportAction: (opts: OpenBlockedReportOpts) => ReturnType<typeof ToastAction>;
 }
 
 const Ctx = createContext<BlockedReportContextValue | null>(null);
@@ -53,6 +60,32 @@ export function BlockedReportProvider({ children }: { children: ReactNode }) {
       </ToastAction>
     ),
     [openBlockedReport]
+  );
+
+  const upgradeAndReportAction = useCallback(
+    (o: OpenBlockedReportOpts) => (
+      <ToastAction
+        altText="Upgrade for higher limits or report this block"
+        asChild
+      >
+        <div className="flex items-center gap-1.5">
+          <a
+            href="/upgrade"
+            className="inline-flex h-8 items-center rounded-md border border-current bg-background/10 px-2.5 text-xs font-medium hover:bg-background/20"
+          >
+            Upgrade
+          </a>
+          <button
+            type="button"
+            onClick={() => openBlockedReport(o)}
+            className="inline-flex h-8 items-center rounded-md border border-current bg-transparent px-2.5 text-xs font-medium hover:bg-background/20"
+          >
+            Think this is in error?
+          </button>
+        </div>
+      </ToastAction>
+    ),
+    [openBlockedReport],
   );
 
   const handleSubmit = async () => {
@@ -88,7 +121,7 @@ export function BlockedReportProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ openBlockedReport, reportAction }}>
+    <Ctx.Provider value={{ openBlockedReport, reportAction, upgradeAndReportAction }}>
       {children}
       <Dialog open={open} onOpenChange={(o) => !submitting && setOpen(o)}>
         <DialogContent className="sm:max-w-lg">
