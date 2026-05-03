@@ -1,8 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="none">
-  <rect width="200" height="48" rx="8" fill="none"/>
-  <circle cx="20" cy="24" r="10" fill="#00E5FF" opacity="0.15"/>
-  <circle cx="20" cy="24" r="6" fill="#00E5FF"/>
-  <path d="M26 24 L34 24" stroke="#00E5FF" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M30 20 L30 28" stroke="#00E5FF" stroke-width="2.5" stroke-linecap="round"/>
-  <text x="44" y="30" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF" letter-spacing="-0.5">HANDY<tspan fill="#00E5FF">CTRL</tspan></text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" fill="none">
+  <defs>
+    <radialGradient id="bgGrad" cx="40%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#8B2FC9"/>
+      <stop offset="55%" stop-color="#6A1099"/>
+      <stop offset="100%" stop-color="#3D0068"/>
+    </radialGradient>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C850F0"/>
+      <stop offset="100%" stop-color="#FF2D9A"/>
+    </linearGradient>
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#D66EFF"/>
+      <stop offset="50%" stop-color="#FF61D8"/>
+      <stop offset="100%" stop-color="#D66EFF"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="0.6" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Circle background -->
+  <circle cx="24" cy="24" r="22" fill="url(#bgGrad)"/>
+
+  <!-- Outer ring -->
+  <circle cx="24" cy="24" r="19" stroke="url(#ringGrad)" stroke-width="0.8" fill="none" opacity="0.7"/>
+
+  <!-- Haptic waveform bars (scaled down from favicon) -->
+  <g filter="url(#glow)">
+    <rect x="10.5" y="21" width="2" height="6"  rx="1" fill="url(#waveGrad)" opacity="0.7"/>
+    <rect x="14"   y="18" width="2" height="12" rx="1" fill="url(#waveGrad)" opacity="0.85"/>
+    <rect x="17.5" y="14" width="2" height="20" rx="1" fill="url(#waveGrad)"/>
+    <rect x="21"   y="11" width="2" height="26" rx="1" fill="url(#waveGrad)"/>
+    <rect x="24.5" y="14" width="2" height="20" rx="1" fill="url(#waveGrad)"/>
+    <rect x="28"   y="18" width="2" height="12" rx="1" fill="url(#waveGrad)" opacity="0.85"/>
+    <rect x="31.5" y="21" width="2" height="6"  rx="1" fill="url(#waveGrad)" opacity="0.7"/>
+  </g>
+
+  <!-- Wordmark: "Haptic" in purple, "OS" in white -->
+  <text x="54" y="31" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" letter-spacing="-0.3" fill="#C850F0">Haptic</text>
+  <text x="124" y="31" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="700" letter-spacing="-0.3" fill="#FFFFFF">OS</text>
 </svg>
