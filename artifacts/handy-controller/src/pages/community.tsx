@@ -263,10 +263,16 @@ export default function Community() {
       }
       updateScript(s.id, (sc) => ({ ...sc, tags: next }));
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
       toast({
         title: "Could not update tags",
-        description: err instanceof Error ? err.message : "Unknown error",
+        description: msg,
         variant: "destructive",
+        action: reportAction({
+          kind: "other",
+          item: `community tag update for "${s.title}"`,
+          blockMessage: msg,
+        }),
       });
     } finally {
       setEditingTagsId(null);
@@ -601,20 +607,40 @@ export default function Community() {
       ) : filtered.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground gap-3 py-20">
           <Globe className="h-12 w-12 opacity-30" />
-          <p className="text-lg font-medium text-foreground">
-            {search ? "No scripts match your search" : "No scripts yet"}
-          </p>
-          <p className="max-w-xs text-sm">
-            {search
-              ? "Try different keywords, or clear the search to see all loaded scripts."
-              : isPro
-              ? "Be the first to share a video + funscript pair with the community."
-              : "Upgrade to Pro to share scripts with the community."}
-          </p>
-          {!search && isPro && (
-            <Button className="mt-2 gap-2" onClick={() => setShowForm(true)}>
-              <Plus className="h-4 w-4" /> Share the First Script
-            </Button>
+          {tagFilter.length > 0 ? (
+            <>
+              <p className="text-lg font-medium text-foreground">
+                No entries match these tags.
+              </p>
+              <p className="max-w-xs text-sm">Remove a filter to broaden the search.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => applyTagFilter([])}
+                data-testid="button-clear-tag-filter"
+              >
+                Clear tag filters
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-medium text-foreground">
+                {search ? "No scripts match your search" : "No scripts yet"}
+              </p>
+              <p className="max-w-xs text-sm">
+                {search
+                  ? "Try different keywords, or clear the search to see all loaded scripts."
+                  : isPro
+                  ? "Be the first to share a video + funscript pair with the community."
+                  : "Upgrade to Pro to share scripts with the community."}
+              </p>
+              {!search && isPro && (
+                <Button className="mt-2 gap-2" onClick={() => setShowForm(true)}>
+                  <Plus className="h-4 w-4" /> Share the First Script
+                </Button>
+              )}
+            </>
           )}
         </div>
       ) : (

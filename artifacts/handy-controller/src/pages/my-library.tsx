@@ -949,11 +949,19 @@ export default function MyLibrary() {
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["my-library"] }),
-    onError: (err) => toast({
-      title: "Could not update tags",
-      description: err instanceof Error ? err.message : "Unknown error",
-      variant: "destructive",
-    }),
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast({
+        title: "Could not update tags",
+        description: msg,
+        variant: "destructive",
+        action: reportAction({
+          kind: "other",
+          item: "library tag update",
+          blockMessage: msg,
+        }),
+      });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -1154,10 +1162,30 @@ export default function MyLibrary() {
       ) : entries.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground gap-3 py-20">
           <BookmarkPlus className="h-12 w-12 opacity-30" />
-          <p className="text-lg font-medium text-foreground">No saved scripts yet</p>
-          <p className="max-w-xs text-sm">
-            After creating a script in the Scripter, use "Save to My Library" to store it here.
-          </p>
+          {tagFilter.length > 0 ? (
+            <>
+              <p className="text-lg font-medium text-foreground">
+                No entries match these tags.
+              </p>
+              <p className="max-w-xs text-sm">Remove a filter to broaden the search.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => setTagFilter([])}
+                data-testid="button-clear-tag-filter"
+              >
+                Clear tag filters
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-medium text-foreground">No saved scripts yet</p>
+              <p className="max-w-xs text-sm">
+                After creating a script in the Scripter, use "Save to My Library" to store it here.
+              </p>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
