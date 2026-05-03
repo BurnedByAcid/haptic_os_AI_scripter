@@ -11,6 +11,7 @@ import mediaFunscriptsRouter from "./media-funscripts";
 import communityRouter from "./community";
 import blockReportsRouter from "./block-reports";
 import scripterDraftsRouter from "./scripter-drafts";
+import scripterSessionsRouter from "./scripter-sessions";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(mediaFunscriptsRouter);
 router.use(communityRouter);
 router.use(blockReportsRouter);
 router.use(scripterDraftsRouter);
+router.use(scripterSessionsRouter);
 
 export default router;
