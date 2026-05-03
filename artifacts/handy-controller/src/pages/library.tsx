@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { getAllEntries, addEntry, deleteEntry, LibraryEntry } from "@/lib/db";
-import { Card, CardFooter } from "@/components/ui/card";
+import { getAllEntries, addEntry, deleteEntry, updateEntry, LibraryEntry } from "@/lib/db";
+import { Card, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check } from "lucide-react";
+import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check, Pencil } from "lucide-react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { validateVideoUrl, validateAndParseFunscriptFile } from "@/lib/validation";
+import { validateVideoUrl, validateAndParseFunscriptFile, sanitizeName } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
 import {
   Tooltip,
@@ -103,6 +103,11 @@ export default function Library() {
   const [addingUrl, setAddingUrl] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editUrl, setEditUrl] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
   const loadEntries = async () => {
     const data = await getAllEntries();
     setEntries(data.sort((a, b) => b.addedAt - a.addedAt));
@@ -121,6 +126,67 @@ export default function Library() {
   const handleDelete = async (id: string) => {
     await deleteEntry(id);
     loadEntries();
+  };
+
+  const openEdit = (entry: LibraryEntry) => {
+    setEditingId(entry.id);
+    setEditName(entry.name);
+    setEditUrl(entry.url ?? "");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditName("");
+    setEditUrl("");
+  };
+
+  const handleSaveEdit = async (entry: LibraryEntry) => {
+    const cleanedName = sanitizeName(editName);
+    if (!cleanedName) {
+      toast({
+        title: "Invalid name",
+        description: "Name cannot be empty or contain only HTML/control characters.",
+        variant: "destructive",
+        action: reportAction({ kind: "library_file", item: editName, blockMessage: "Name is empty after sanitization." }),
+      });
+      return;
+    }
+
+    if (entry.url !== undefined) {
+      const trimmedUrl = editUrl.trim();
+      if (!trimmedUrl) {
+        toast({
+          title: "URL required",
+          description: "URL entries must have a non-empty URL.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const urlErr = validateVideoUrl(trimmedUrl);
+      if (urlErr) {
+        toast({
+          title: "Invalid URL",
+          description: urlErr.message,
+          variant: "destructive",
+          action: reportAction({ kind: "library_url", item: trimmedUrl, blockMessage: urlErr.message }),
+        });
+        return;
+      }
+    }
+
+    setEditSaving(true);
+    try {
+      const updated: LibraryEntry = {
+        ...entry,
+        name: cleanedName,
+        ...(entry.url !== undefined ? { url: editUrl.trim() } : {}),
+      };
+      await updateEntry(updated);
+      await loadEntries();
+      cancelEdit();
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const handleOpen = async (entry: LibraryEntry) => {
@@ -323,6 +389,18 @@ export default function Library() {
 
   const filtered = entries.filter(e => e.name.toLowerCase().includes(search.toLowerCase()));
 
+  const sharedEditProps = {
+    editingId,
+    editName,
+    setEditName,
+    editUrl,
+    setEditUrl,
+    editSaving,
+    openEdit,
+    cancelEdit,
+    handleSaveEdit,
+  };
+
   return (
     <TooltipProvider delayDuration={300}>
       <div className="p-8 max-w-7xl mx-auto space-y-8 h-full flex flex-col">
@@ -410,8 +488,8 @@ export default function Library() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 content-start">
           {filtered.map(entry => (
             entry.url
-              ? <UrlEntryCard key={entry.id} entry={entry} onOpen={handleOpen} onDelete={handleDelete} />
-              : <FileEntryCard key={entry.id} entry={entry} onOpen={handleOpen} onDelete={handleDelete} />
+              ? <UrlEntryCard key={entry.id} entry={entry} onOpen={handleOpen} onDelete={handleDelete} {...sharedEditProps} />
+              : <FileEntryCard key={entry.id} entry={entry} onOpen={handleOpen} onDelete={handleDelete} {...sharedEditProps} />
           ))}
           {filtered.length === 0 && (
             <div className="col-span-full py-12 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-border/50 rounded-xl">
@@ -431,9 +509,31 @@ interface EntryCardProps {
   entry: LibraryEntry;
   onOpen: (e: LibraryEntry) => void;
   onDelete: (id: string) => void;
+  editingId: string | null;
+  editName: string;
+  setEditName: (v: string) => void;
+  editUrl: string;
+  setEditUrl: (v: string) => void;
+  editSaving: boolean;
+  openEdit: (e: LibraryEntry) => void;
+  cancelEdit: () => void;
+  handleSaveEdit: (e: LibraryEntry) => void;
 }
 
-function UrlEntryCard({ entry, onOpen, onDelete }: EntryCardProps) {
+function UrlEntryCard({
+  entry,
+  onOpen,
+  onDelete,
+  editingId,
+  editName,
+  setEditName,
+  editUrl,
+  setEditUrl,
+  editSaving,
+  openEdit,
+  cancelEdit,
+  handleSaveEdit
+}: EntryCardProps) {
   const url = entry.url!;
   const hostLabel = getHostLabel(url);
   // Always derive the thumbnail statically — never use the persisted entry.thumbnail
@@ -465,36 +565,98 @@ function UrlEntryCard({ entry, onOpen, onDelete }: EntryCardProps) {
             </div>
           </div>
 
-          {/* Host label — 2-line clamped, no resting URL text */}
-          <div className="px-4 pt-3 pb-1">
-            <p
-              className="text-base font-semibold leading-snug line-clamp-2 overflow-hidden"
-              style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
-            >
-              {hostLabel || entry.name}
-            </p>
-          </div>
+          {editingId === entry.id ? (
+            <div className="p-4 space-y-2">
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Name</label>
+                <Input
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="h-8 text-sm"
+                  autoFocus
+                  onKeyDown={e => {
+                    if (e.key === "Enter") handleSaveEdit(entry);
+                    if (e.key === "Escape") cancelEdit();
+                  }}
+                  data-testid={`input-edit-name-${entry.id}`}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">URL</label>
+                <Input
+                  value={editUrl}
+                  onChange={e => setEditUrl(e.target.value)}
+                  className="h-8 text-sm"
+                  onKeyDown={e => {
+                    if (e.key === "Enter") handleSaveEdit(entry);
+                    if (e.key === "Escape") cancelEdit();
+                  }}
+                  data-testid={`input-edit-url-${entry.id}`}
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button
+                  size="sm"
+                  className="flex-1 h-8 text-xs gap-1"
+                  disabled={
+                    editSaving ||
+                    !sanitizeName(editName) ||
+                    (sanitizeName(editName) === entry.name && editUrl === (entry.url ?? ""))
+                  }
+                  onClick={() => handleSaveEdit(entry)}
+                  data-testid={`button-save-edit-${entry.id}`}
+                >
+                  {editSaving ? <span className="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block" /> : <Check className="h-3.5 w-3.5" />}
+                  Save
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={cancelEdit} data-testid={`button-cancel-edit-${entry.id}`}>
+                  <X className="h-3.5 w-3.5 mr-1" />Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Host label — 2-line clamped, no resting URL text */}
+              <div className="px-4 pt-3 pb-1">
+                <p
+                  className="text-base font-semibold leading-snug line-clamp-2 overflow-hidden"
+                  style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+                >
+                  {hostLabel || entry.name}
+                </p>
+              </div>
 
-          <CardFooter className="p-4 pt-2 gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="flex-1"
-              onClick={() => onOpen(entry)}
-              data-testid={`button-open-${entry.id}`}
-            >
-              <Play className="h-4 w-4 mr-2" /> Open
-            </Button>
-            <Button
-              variant="destructive"
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => onDelete(entry.id)}
-              data-testid={`button-delete-${entry.id}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </CardFooter>
+              <CardFooter className="p-4 pt-2 gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => onOpen(entry)}
+                  data-testid={`button-open-${entry.id}`}
+                >
+                  <Play className="h-4 w-4 mr-2" /> Open
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                  onClick={() => openEdit(entry)}
+                  data-testid={`button-edit-${entry.id}`}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => onDelete(entry.id)}
+                  data-testid={`button-delete-${entry.id}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </CardFooter>
+            </>
+          )}
         </Card>
       </TooltipTrigger>
       <TooltipContent
@@ -509,7 +671,19 @@ function UrlEntryCard({ entry, onOpen, onDelete }: EntryCardProps) {
 
 // ── File entry card (unchanged layout) ───────────────────────────────────────
 
-function FileEntryCard({ entry, onOpen, onDelete }: EntryCardProps) {
+function FileEntryCard({
+  entry,
+  onOpen,
+  onDelete,
+  editingId,
+  editName,
+  setEditName,
+  editUrl,
+  editSaving,
+  openEdit,
+  cancelEdit,
+  handleSaveEdit
+}: EntryCardProps) {
   return (
     <Card className="bg-card/50 backdrop-blur overflow-hidden group">
       <div className="aspect-video bg-black flex items-center justify-center relative border-b border-border/50 overflow-hidden">
@@ -529,29 +703,79 @@ function FileEntryCard({ entry, onOpen, onDelete }: EntryCardProps) {
           </div>
         )}
       </div>
-      <div className="px-4 pt-3 pb-1">
-        <p className="text-base font-semibold truncate" title={entry.name}>{entry.name}</p>
-      </div>
-      <CardFooter className="p-4 pt-2 gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          className="flex-1"
-          onClick={() => onOpen(entry)}
-          data-testid={`button-open-${entry.id}`}
-        >
-          <Play className="h-4 w-4 mr-2" /> Open
-        </Button>
-        <Button
-          variant="destructive"
-          size="icon"
-          className="h-9 w-9"
-          onClick={() => onDelete(entry.id)}
-          data-testid={`button-delete-${entry.id}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </CardFooter>
+
+      {editingId === entry.id ? (
+        <div className="p-4 space-y-2">
+          <div className="space-y-1.5">
+            <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Name</label>
+            <Input
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              className="h-8 text-sm"
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === "Enter") handleSaveEdit(entry);
+                if (e.key === "Escape") cancelEdit();
+              }}
+              data-testid={`input-edit-name-${entry.id}`}
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button
+              size="sm"
+              className="flex-1 h-8 text-xs gap-1"
+              disabled={
+                editSaving ||
+                !sanitizeName(editName) ||
+                (sanitizeName(editName) === entry.name && editUrl === (entry.url ?? ""))
+              }
+              onClick={() => handleSaveEdit(entry)}
+              data-testid={`button-save-edit-${entry.id}`}
+            >
+              {editSaving ? <span className="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block" /> : <Check className="h-3.5 w-3.5" />}
+              Save
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={cancelEdit} data-testid={`button-cancel-edit-${entry.id}`}>
+              <X className="h-3.5 w-3.5 mr-1" />Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="px-4 pt-3 pb-1">
+            <p className="text-base font-semibold truncate" title={entry.name}>{entry.name}</p>
+          </div>
+          <CardFooter className="p-4 pt-2 gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="flex-1"
+              onClick={() => onOpen(entry)}
+              data-testid={`button-open-${entry.id}`}
+            >
+              <Play className="h-4 w-4 mr-2" /> Open
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground hover:text-foreground"
+              onClick={() => openEdit(entry)}
+              data-testid={`button-edit-${entry.id}`}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="destructive"
+              size="icon"
+              className="h-9 w-9"
+              onClick={() => onDelete(entry.id)}
+              data-testid={`button-delete-${entry.id}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </CardFooter>
+        </>
+      )}
     </Card>
   );
 }

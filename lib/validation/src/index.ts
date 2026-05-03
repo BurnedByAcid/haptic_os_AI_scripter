@@ -72,6 +72,23 @@ export function validateFunscriptJson(
   return null;
 }
 
+// ─── Text sanitizer ────────────────────────────────────────────────────────
+
+/**
+ * Strip HTML/XML tags and control characters from a user-supplied name/title,
+ * then trim surrounding whitespace.  Returns the cleaned string (may be empty
+ * — callers should reject empty results).
+ *
+ * Kept free of DOM APIs so it can run in both the browser and Node.
+ */
+export function sanitizeName(raw: string): string {
+  return raw
+    .replace(/<[^>]*>/g, " ")             // strip HTML/XML tags
+    .replace(/[\x00-\x1F\x7F]/g, " ")    // strip control characters
+    .replace(/\s+/g, " ")                 // collapse whitespace
+    .trim();
+}
+
 // ─── URL safety validation ─────────────────────────────────────────────────
 
 /** Hostnames explicitly allowed for video embeds / library URLs. */

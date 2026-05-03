@@ -18,6 +18,7 @@ export {
   DIRECT_VIDEO_EXT_RE,
   FUNSCRIPT_MAX_BYTES,
   PRIVATE_IP_RE,
+  sanitizeName,
   validateFunscriptJson,
   validateVideoUrl,
 } from "@workspace/validation";

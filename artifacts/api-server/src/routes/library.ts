@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
 import sanitizeHtml from "sanitize-html";
-import { validateTagsForWrite, parseTagsFilter } from "@workspace/validation";
+import { validateTagsForWrite, parseTagsFilter, validateVideoUrl, sanitizeName } from "@workspace/validation";
 
 const router = Router();
 
@@ -201,6 +201,66 @@ router.patch("/library/:id/tags", async (req: Request, res: Response) => {
     res.json({ ok: true, tags: tagsResult.tags });
   } catch {
     res.status(500).json({ error: "Failed to update tags" });
+  }
+});
+
+/** PUT /api/library/:id — update title and/or video_url for one of the calling user's library entries */
+router.put("/library/:id", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const { title: rawTitle, video_url } = req.body as Record<string, unknown>;
+
+  // At least one field must be provided.
+  if (rawTitle === undefined && video_url === undefined) {
+    res.status(400).json({ error: "At least one of title or video_url must be provided" });
+    return;
+  }
+
+  const updates: Record<string, unknown> = {};
+
+  if (rawTitle !== undefined) {
+    if (typeof rawTitle !== "string") { res.status(400).json({ error: "title must be a string" }); return; }
+    const title = sanitizeName(rawTitle);
+    if (!title) { res.status(400).json({ error: "title must be non-empty" }); return; }
+    updates.title = title;
+  }
+
+  if (video_url !== undefined) {
+    if (video_url === null || video_url === "") {
+      // Clearing the URL is allowed.
+      updates.video_url = null;
+    } else {
+      if (typeof video_url !== "string") {
+        res.status(400).json({ error: "video_url must be a string" }); return;
+      }
+      const trimmedUrl = video_url.trim();
+      // Use the shared validator — re-checks the current allowlist at edit time.
+      const urlErr = validateVideoUrl(trimmedUrl);
+      if (urlErr) {
+        res.status(400).json({ error: urlErr.message }); return;
+      }
+      updates.video_url = trimmedUrl;
+    }
+  }
+
+  // Build the SET clause dynamically.
+  const fields = Object.keys(updates);
+  const setClauses = fields.map((f, i) => `${f} = $${i + 1}`).join(", ");
+  const values = fields.map((f) => updates[f]);
+  values.push(req.params.id, auth.userId);
+
+  try {
+    const { rows } = await pool.query(
+      `UPDATE private_library SET ${setClauses}
+       WHERE id = $${fields.length + 1} AND user_id = $${fields.length + 2}
+       RETURNING id, title, video_url, local_file_path, created_at`,
+      values,
+    );
+    if (!rows.length) { res.status(404).json({ error: "Not found or not your entry" }); return; }
+    res.json(rows[0]);
+  } catch {
+    res.status(500).json({ error: "Failed to update entry" });
   }
 });
 

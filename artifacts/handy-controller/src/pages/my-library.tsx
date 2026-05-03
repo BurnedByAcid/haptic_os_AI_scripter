@@ -28,7 +28,7 @@ import {
   deleteFileHandle,
   verifyHandlePermission,
 } from "@/lib/file-handle-store";
-import { validateAndParseFunscriptFile } from "@/lib/validation";
+import { validateAndParseFunscriptFile, validateVideoUrl, sanitizeName } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
 
 const API = import.meta.env.VITE_API_URL ?? "";
@@ -877,7 +877,6 @@ export default function MyLibrary() {
   const { isPro } = useSubscription();
   const qc = useQueryClient();
   const { toast } = useToast();
-  const { reportAction } = useBlockedReport();
   const [location, setLocation] = useLocation();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [shareEntry, setShareEntry] = useState<LibraryEntry | null>(null);
@@ -890,6 +889,11 @@ export default function MyLibrary() {
   const [tagFilter, setTagFilter] = useState<LibraryTag[]>(() =>
     parseTagsFilter(new URLSearchParams(window.location.search).get("tags")),
   );
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editUrl, setEditUrl] = useState("");
+
   // Wouter doesn't track query strings, so push our own ?tags= updates via
   // history.replaceState — matches how community.tsx handles ?offset=.
   useEffect(() => {
@@ -963,6 +967,76 @@ export default function MyLibrary() {
     },
   });
 
+  const openEdit = (entry: LibraryEntry) => {
+    setEditingId(entry.id);
+    setEditTitle(entry.title);
+    setEditUrl(entry.video_url ?? "");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditTitle("");
+    setEditUrl("");
+  };
+
+  const updateMutation = useMutation({
+    mutationFn: async (vars: { id: number; title: string; video_url: string | null }) => {
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/library/${vars.id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ title: vars.title, video_url: vars.video_url }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(d.error ?? "Update failed");
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-library"] });
+      cancelEdit();
+    },
+    onError: (err) => toast({
+      title: "Could not save changes",
+      description: err instanceof Error ? err.message : "Unknown error",
+      variant: "destructive",
+    }),
+  });
+
+  function handleSaveEdit(entry: LibraryEntry) {
+    const cleanedTitle = sanitizeName(editTitle);
+    if (!cleanedTitle) {
+      toast({
+        title: "Invalid title",
+        description: "Title cannot be empty or contain only HTML/control characters.",
+        variant: "destructive",
+        action: reportAction({ kind: "library_file", item: editTitle, blockMessage: "Title is empty after sanitization." }),
+      });
+      return;
+    }
+
+    // URL field is only shown/submitted for URL-backed entries.
+    const trimmedUrl = entry.video_url !== null ? (editUrl.trim() || null) : undefined;
+    if (trimmedUrl !== undefined && trimmedUrl !== null) {
+      const urlErr = validateVideoUrl(trimmedUrl);
+      if (urlErr) {
+        toast({
+          title: "Invalid URL",
+          description: urlErr.message,
+          variant: "destructive",
+          action: reportAction({ kind: "library_url", item: trimmedUrl, blockMessage: urlErr.message }),
+        });
+        return;
+      }
+    }
+
+    const payload: { id: number; title: string; video_url: string | null } = {
+      id: entry.id,
+      title: cleanedTitle,
+      video_url: trimmedUrl !== undefined ? trimmedUrl : (entry.video_url ?? null),
+    };
+    updateMutation.mutate(payload);
+  }
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const headers = await authHeaders();
@@ -1191,154 +1265,339 @@ export default function MyLibrary() {
           {entries.map((entry) => (
             <Card key={entry.id} className="border-border/50 bg-card/50 hover:border-primary/30 transition-colors flex flex-col">
               <CardContent className="pt-5 pb-4 flex flex-col flex-1 gap-3">
-                <div className="flex items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-foreground leading-tight truncate" title={entry.title}>
-                      {entry.title}
-                    </h3>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      {entry.video_url ? (
-                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground truncate max-w-[200px]">
-                          <LinkIcon className="h-3 w-3 shrink-0" />
-                          <a
-                            href={entry.video_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:text-primary truncate"
-                            title={entry.video_url}
-                          >
-                            {entry.video_url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 40)}
-                          </a>
-                        </span>
-                      ) : entry.local_file_path ? (
-                        <span className="flex items-center gap-1 text-[11px] text-muted-foreground truncate">
-                          <HardDrive className="h-3 w-3 shrink-0" />
-                          <span className="truncate max-w-[200px]" title={entry.local_file_path}>
-                            {entry.local_file_path}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-muted-foreground italic">No video source</span>
-                      )}
+                {editingId === entry.id ? (
+                  <div className="space-y-2">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Title</label>
+                      <Input
+                        value={editTitle}
+                        onChange={e => setEditTitle(e.target.value)}
+                        className="h-8 text-sm"
+                        autoFocus
+                        onKeyDown={e => {
+                          if (e.key === "Enter") handleSaveEdit(entry);
+                          if (e.key === "Escape") cancelEdit();
+                        }}
+                        data-testid={`input-edit-title-${entry.id}`}
+                      />
                     </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-auto">
-                  <Clock className="h-3 w-3" />
-                  {timeAgo(entry.created_at)}
-                </div>
-
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <CardTagChips tags={entry.tags} onTagClick={addTagToFilter} />
-                  <TagPicker
-                    mode="edit"
-                    selected={entry.tags ?? []}
-                    onChange={(next) =>
-                      updateTagsMutation.mutate({ id: entry.id, tags: next })
-                    }
-                    buttonLabel="Edit tags"
-                  />
-                </div>
-
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 text-xs h-8 gap-1.5"
-                    onClick={() => handleDownload(entry)}
-                  >
-                    <Download className="h-3.5 w-3.5" /> Download
-                  </Button>
-
-                  {entry.video_url ? (
-                    <PlayScriptMenu
-                      entry={entry}
-                      authHeaders={authHeaders}
-                      onPlayActive={() => handlePlay(entry)}
-                      onPlayWithScript={(id, name) => handlePlayWithScript(entry, id, name)}
-                    />
-                  ) : entry.local_file_path ? (
-                    <PlayScriptMenu
-                      entry={entry}
-                      authHeaders={authHeaders}
-                      onPlayActive={() => handleRegrantAccess(entry)}
-                      onPlayWithScript={(id, name) => handlePlayWithScript(entry, id, name)}
-                      primaryLabel="Re-grant Access"
-                      primaryIcon={<RefreshCw className="h-3.5 w-3.5" />}
-                      primaryVariant="secondary"
-                    />
-                  ) : null}
-                </div>
-
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="w-full text-xs h-7 gap-1.5 text-muted-foreground hover:text-primary"
-                  onClick={() => setScriptsEntry(entry)}
-                  data-testid={`button-manage-scripts-${entry.id}`}
-                >
-                  <FileJson className="h-3 w-3" /> Manage funscripts
-                  {(() => {
-                    const count = entry.script_count ?? 0;
-                    const cap = isPro ? 5 : 1;
-                    const atCap = count >= cap;
-                    const nearCap = isPro && count >= cap - 1 && !atCap;
-                    return (
-                      <span
-                        className={`ml-1 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums border ${
-                          atCap
-                            ? "bg-amber-400/10 text-amber-400 border-amber-400/30"
-                            : nearCap
-                              ? "bg-amber-400/5 text-amber-300/90 border-amber-400/20"
-                              : "bg-muted/40 text-muted-foreground border-border/40"
-                        }`}
-                        title={`${count} of ${cap} script${cap === 1 ? "" : "s"} attached`}
-                        data-testid={`badge-script-count-${entry.id}`}
+                    {entry.video_url !== null && (
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] text-muted-foreground font-medium uppercase tracking-wide">Video URL</label>
+                        <Input
+                          value={editUrl}
+                          onChange={e => setEditUrl(e.target.value)}
+                          placeholder="https://…"
+                          className="h-8 text-sm"
+                          onKeyDown={e => {
+                            if (e.key === "Enter") handleSaveEdit(entry);
+                            if (e.key === "Escape") cancelEdit();
+                          }}
+                          data-testid={`input-edit-url-${entry.id}`}
+                        />
+                      </div>
+                    )}
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        className="flex-1 h-8 text-xs gap-1"
+                        disabled={
+                          updateMutation.isPending ||
+                          !editTitle.trim() ||
+                          (
+                            sanitizeName(editTitle) === entry.title &&
+                            (entry.video_url === null || (editUrl.trim() || null) === entry.video_url)
+                          )
+                        }
+                        onClick={() => handleSaveEdit(entry)}
+                        data-testid={`button-save-edit-${entry.id}`}
                       >
-                        {count} / {cap}
-                      </span>
-                    );
-                  })()}
-                </Button>
-
-                <div className="flex gap-2">
-                  {isPro && entry.video_url ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="flex-1 text-xs h-7 gap-1.5 text-muted-foreground hover:text-primary"
-                      onClick={() => setShareEntry(entry)}
-                    >
-                      <Globe className="h-3 w-3" /> Share to Community
-                    </Button>
-                  ) : !isPro && entry.video_url ? (
-                    <Link href="/upgrade" className="flex-1">
+                        {updateMutation.isPending
+                          ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…</>
+                          : <><Check className="h-3.5 w-3.5" /> Save</>
+                        }
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={cancelEdit} disabled={updateMutation.isPending} data-testid={`button-cancel-edit-${entry.id}`}>
+                        <X className="h-3.5 w-3.5 mr-1" />Cancel
+                      </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground leading-tight truncate" title={entry.title}>
+                          {entry.title}
+                        </h3>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          {entry.video_url ? (
+                            <span className="flex items-center gap-1 text-[11px] text-muted-foreground truncate max-w-[200px]">
+                              <LinkIcon className="h-3 w-3 shrink-0" />
+                              <a
+                                href={entry.video_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:text-primary truncate"
+                                title={entry.video_url}
+                              >
+                                {entry.video_url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 40)}
+                              </a>
+                            </span>
+                          ) : entry.local_file_path ? (
+                            <span className="flex items-center gap-1 text-[11px] text-muted-foreground truncate">
+                              <HardDrive className="h-3 w-3 shrink-0" />
+                              <span className="truncate max-w-[200px]" title={entry.local_file_path}>
+                                {entry.local_file_path}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground italic">No video source</span>
+                          )}
+                        </div>
+                      </div>
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="w-full text-xs h-7 gap-1.5 text-muted-foreground/50"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                        onClick={() => openEdit(entry)}
+                        data-testid={`button-edit-${entry.id}`}
                       >
-                        <Crown className="h-3 w-3 text-amber-400" /> Share (Pro)
+                        <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                    </Link>
-                  ) : null}
+                    </div>
 
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-xs h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    disabled={deletingId === entry.id}
-                    onClick={() => {
-                      if (window.confirm(`Delete "${entry.title}"?`)) {
-                        setDeletingId(entry.id);
-                        deleteMutation.mutate(entry.id);
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-auto">
+                      <Clock className="h-3 w-3" />
+                      {timeAgo(entry.created_at)}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <CardTagChips tags={entry.tags} onTagClick={addTagToFilter} />
+                      <TagPicker
+                        mode="edit"
+                        selected={entry.tags ?? []}
+                        onChange={(next) =>
+                          updateTagsMutation.mutate({ id: entry.id, tags: next })
+                        }
+                        buttonLabel="Edit tags"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs h-8 gap-1.5"
+                        onClick={() => handleDownload(entry)}
+                      >
+                        <Download className="h-3.5 w-3.5" /> Download
+                      </Button>
+
+                      {entry.video_url ? (
+                        <PlayScriptMenu
+                          entry={entry}
+                          authHeaders={authHeaders}
+                          onPlayActive={() => handlePlay(entry)}
+                          onPlayWithScript={(id, name) => handlePlayWithScript(entry, id, name)}
+                        />
+                      ) : entry.local_file_path ? (
+                        <PlayScriptMenu
+                          entry={entry}
+                          authHeaders={authHeaders}
+                          onPlayActive={() => handleRegrantAccess(entry)}
+                          onPlayWithScript={(id, name) => handlePlayWithScript(entry, id, name)}
+                          primaryLabel="Re-grant Access"
+                          primaryIcon={<RefreshCw className="h-3.5 w-3.5" />}
+                          primaryVariant="secondary"
+                        />
+                      ) : null}
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full text-xs h-7 gap-1.5 text-muted-foreground hover:text-primary"
+                      onClick={() => setScriptsEntry(entry)}
+                      data-testid={`button-manage-scripts-${entry.id}`}
+                    >
+                      <FileJson className="h-3 w-3" /> Manage funscripts
+                      {(() => {
+                        const count = entry.script_count ?? 0;
+                        const cap = isPro ? 5 : 1;
+                        const atCap = count >= cap;
+                        const nearCap = isPro && count >= cap - 1 && !atCap;
+                        return (
+                          <span
+                            className={`ml-1 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums border ${
+                              atCap
+                                ? "bg-amber-400/10 text-amber-400 border-amber-400/30"
+                                : nearCap
+                                  ? "bg-amber-400/5 text-amber-300/90 border-amber-400/20"
+                                  : "bg-muted/40 text-muted-foreground border-border/40"
+                            }`}
+                            title={`${count} of ${cap} script${cap === 1 ? "" : "s"} attached`}
+                            data-testid={`badge-script-count-${entry.id}`}
+                          >
+                            {count} / {cap}
+                          </span>
+                        );
+                      })()}
+                    </Button>
+
+                    <div className="flex gap-2">
+                      {isPro && entry.video_url ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="flex-1 text-xs h-7 gap-1.5 text-muted-foreground hover:text-primary"
+                          onClick={() => setShareEntry(entry)}
+                        >
+                          <Globe className="h-3 w-3" /> Share to Community
+                        </Button>
+                      ) : !isPro && entry.video_url ? (
+                        <Link href="/upgrade" className="flex-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="w-full text-xs h-7 gap-1.5 text-muted-foreground/50"
+                          >
+                            <Crown className="h-3 w-3 text-amber-400" /> Share (Pro)
+                          </Button>
+                        </Link>
+                      ) : null}
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        disabled={deletingId === entry.id}
+                        onClick={() => {
+                          if (window.confirm(`Delete "${entry.title}"?`)) {
+                            setDeletingId(entry.id);
+                            deleteMutation.mutate(entry.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground shrink-0"
+                        onClick={() => openEdit(entry)}
+                        data-testid={`button-edit-${entry.id}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-auto">
+                      <Clock className="h-3 w-3" />
+                      {timeAgo(entry.created_at)}
+                    </div>
+
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs h-8 gap-1.5"
+                        onClick={() => handleDownload(entry)}
+                      >
+                        <Download className="h-3.5 w-3.5" /> Download
+                      </Button>
+
+                      {entry.video_url ? (
+                        <Button
+                          size="sm"
+                          className="flex-1 text-xs h-8 gap-1.5"
+                          onClick={() => handlePlay(entry)}
+                        >
+                          <Play className="h-3.5 w-3.5" /> Play
+                        </Button>
+                      ) : entry.local_file_path ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="flex-1 text-xs h-8 gap-1.5"
+                          onClick={() => handleRegrantAccess(entry)}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" /> Re-grant Access
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full text-xs h-7 gap-1.5 text-muted-foreground hover:text-primary"
+                      onClick={() => setScriptsEntry(entry)}
+                      data-testid={`button-manage-scripts-${entry.id}`}
+                    >
+                      <FileJson className="h-3 w-3" /> Manage funscripts
+                      {(() => {
+                        const count = entry.script_count ?? 0;
+                        const cap = isPro ? 5 : 1;
+                        const atCap = count >= cap;
+                        const nearCap = isPro && count >= cap - 1 && !atCap;
+                        return (
+                          <span
+                            className={`ml-1 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums border ${
+                              atCap
+                                ? "bg-amber-400/10 text-amber-400 border-amber-400/30"
+                                : nearCap
+                                  ? "bg-amber-400/5 text-amber-300/90 border-amber-400/20"
+                                  : "bg-muted/40 text-muted-foreground border-border/40"
+                            }`}
+                            title={`${count} of ${cap} script${cap === 1 ? "" : "s"} attached`}
+                            data-testid={`badge-script-count-${entry.id}`}
+                          >
+                            {count} / {cap}
+                          </span>
+                        );
+                      })()}
+                    </Button>
+
+                    <div className="flex gap-2">
+                      {isPro && entry.video_url ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="flex-1 text-xs h-7 gap-1.5 text-muted-foreground hover:text-primary"
+                          onClick={() => setShareEntry(entry)}
+                        >
+                          <Globe className="h-3 w-3" /> Share to Community
+                        </Button>
+                      ) : !isPro && entry.video_url ? (
+                        <Link href="/upgrade" className="flex-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="w-full text-xs h-7 gap-1.5 text-muted-foreground/50"
+                          >
+                            <Crown className="h-3 w-3 text-amber-400" /> Share (Pro)
+                          </Button>
+                        </Link>
+                      ) : null}
+
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        disabled={deletingId === entry.id}
+                        onClick={() => {
+                          if (window.confirm(`Delete "${entry.title}"?`)) {
+                            setDeletingId(entry.id);
+                            deleteMutation.mutate(entry.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           ))}
