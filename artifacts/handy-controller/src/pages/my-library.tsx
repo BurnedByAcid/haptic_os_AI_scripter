@@ -11,7 +11,12 @@ import {
 import {
   BookmarkPlus, Download, Play, Trash2, Clock, Link as LinkIcon, HardDrive,
   RefreshCw, Globe, Crown, Loader2, Check, FileJson, Star, Pencil, Plus, X, Upload,
+  ChevronDown,
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { Link } from "wouter";
@@ -758,6 +763,112 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
   );
 }
 
+interface PlayScriptMenuProps {
+  entry: LibraryEntry;
+  authHeaders: () => Promise<Record<string, string>>;
+  onPlayActive: () => void;
+  onPlayWithScript: (scriptId: number, scriptName: string) => void;
+  primaryLabel?: string;
+  primaryIcon?: React.ReactNode;
+  primaryVariant?: "default" | "secondary";
+}
+
+/**
+ * Split-button on the My Library card: the main "Play" runs the active
+ * script; the chevron opens a list of all attached scripts so users can
+ * launch the player ad-hoc with any of them in one click. The launch is
+ * non-destructive — it does NOT change which script is marked active.
+ */
+function PlayScriptMenu({
+  entry,
+  authHeaders,
+  onPlayActive,
+  onPlayWithScript,
+  primaryLabel = "Play",
+  primaryIcon,
+  primaryVariant = "default",
+}: PlayScriptMenuProps) {
+  const [open, setOpen] = useState(false);
+
+  // Lazy fetch: only hit the API when the dropdown is opened. Keeps the
+  // library list view cheap when users have many entries. Cached by react-query
+  // so subsequent opens reuse the result, and the manage-scripts dialog
+  // shares the same cache key for free invalidation.
+  const { data, isLoading } = useQuery<FunscriptListResponse>({
+    queryKey: ["media-funscripts", entry.id],
+    enabled: open,
+    queryFn: async () => {
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/library/${entry.id}/funscripts`, { headers });
+      if (!res.ok) throw new Error("Failed to load funscripts");
+      return res.json();
+    },
+  });
+
+  const scripts = data?.funscripts ?? [];
+
+  return (
+    <div className="flex flex-1 min-w-0">
+      <Button
+        size="sm"
+        variant={primaryVariant}
+        className="flex-1 text-xs h-8 gap-1.5 rounded-r-none"
+        onClick={onPlayActive}
+        data-testid={`button-play-${entry.id}`}
+      >
+        {primaryIcon ?? <Play className="h-3.5 w-3.5" />} {primaryLabel}
+      </Button>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="sm"
+            variant={primaryVariant}
+            className="h-8 px-1.5 rounded-l-none border-l border-primary-foreground/20"
+            title="Play with a specific script"
+            data-testid={`button-play-with-${entry.id}`}
+          >
+            <ChevronDown className="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Play with…
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {isLoading ? (
+            <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
+            </div>
+          ) : scripts.length === 0 ? (
+            <div className="px-2 py-2 text-xs text-muted-foreground italic">
+              No scripts attached.
+            </div>
+          ) : (
+            scripts.map((s) => (
+              <DropdownMenuItem
+                key={s.id}
+                onSelect={() => onPlayWithScript(s.id, s.name)}
+                className="text-xs gap-2"
+                data-testid={`menu-play-script-${s.id}`}
+              >
+                <Star
+                  className={`h-3.5 w-3.5 flex-shrink-0 ${
+                    s.is_active ? "fill-primary text-primary" : "text-muted-foreground/40"
+                  }`}
+                />
+                <span className="flex-1 truncate">{s.name}</span>
+                {s.is_active && (
+                  <span className="text-[10px] text-primary">active</span>
+                )}
+              </DropdownMenuItem>
+            ))
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
 export default function MyLibrary() {
   const { getToken } = useAuth();
   const { isPro } = useSubscription();
@@ -821,14 +932,36 @@ export default function MyLibrary() {
     }
   }
 
-  async function navigateToPlayer(entry: LibraryEntry, videoUrl: string) {
+  async function navigateToPlayer(
+    entry: LibraryEntry,
+    videoUrl: string,
+    override?: { scriptId: number; scriptName: string },
+  ) {
     try {
       const headers = await authHeaders();
-      const res = await fetch(`${API}/api/library/${entry.id}/funscript`, { headers });
-      if (!res.ok) throw new Error("Failed to fetch funscript");
-      const { funscript } = await res.json() as { funscript: string };
+      // When the user picked a specific script from the inline menu, fetch
+      // that script's body directly. Otherwise fall back to the active script
+      // via the legacy single-funscript endpoint.
+      let funscript: string;
+      let displayName: string;
+      if (override) {
+        const res = await fetch(
+          `${API}/api/library/${entry.id}/funscripts/${override.scriptId}`,
+          { headers },
+        );
+        if (!res.ok) throw new Error("Failed to fetch funscript");
+        const body = await res.json() as { funscript_json: string };
+        funscript = body.funscript_json;
+        displayName = `${entry.title} — ${override.scriptName}`;
+      } else {
+        const res = await fetch(`${API}/api/library/${entry.id}/funscript`, { headers });
+        if (!res.ok) throw new Error("Failed to fetch funscript");
+        const body = await res.json() as { funscript: string };
+        funscript = body.funscript;
+        displayName = entry.title;
+      }
       localStorage.setItem("handy_pending_script", funscript);
-      localStorage.setItem("handy_pending_script_name", entry.title);
+      localStorage.setItem("handy_pending_script_name", displayName);
       localStorage.setItem("handy_pending_video_url", videoUrl);
       setLocation("/player");
     } catch {
@@ -836,7 +969,7 @@ export default function MyLibrary() {
     }
   }
 
-  async function handlePlay(entry: LibraryEntry) {
+  async function handlePlay(entry: LibraryEntry, override?: { scriptId: number; scriptName: string }) {
     if (!entry.video_url) {
       toast({
         title: "No video URL",
@@ -845,7 +978,48 @@ export default function MyLibrary() {
       });
       return;
     }
-    await navigateToPlayer(entry, entry.video_url);
+    await navigateToPlayer(entry, entry.video_url, override);
+  }
+
+  async function handlePlayWithScript(entry: LibraryEntry, scriptId: number, scriptName: string) {
+    if (entry.video_url) {
+      await handlePlay(entry, { scriptId, scriptName });
+      return;
+    }
+    // Local-file entries: try the stored FileSystemFileHandle first.
+    const stored = await loadFileHandle(entry.id);
+    if (stored && (await verifyHandlePermission(stored))) {
+      try {
+        const file = await stored.getFile();
+        const blobUrl = URL.createObjectURL(file);
+        await navigateToPlayer(entry, blobUrl, { scriptId, scriptName });
+        return;
+      } catch {
+        // Stale handle — fall through to picker.
+      }
+    }
+    // No granted handle — prompt the user for the local video, then launch
+    // with the chosen script. Mirrors handleRegrantAccess so the picker
+    // works on local-file cards even before the first re-grant.
+    const fsa = (window as unknown as Record<string, unknown>).showOpenFilePicker;
+    if (typeof fsa !== "function") {
+      toast({ title: "File System Access not supported in this browser", variant: "destructive" });
+      return;
+    }
+    try {
+      const [handle] = await (fsa as (opts: unknown) => Promise<FileSystemFileHandle[]>)({
+        types: [{ description: "Video", accept: { "video/*": [".mp4", ".webm", ".mov", ".ogg", ".mkv"] } }],
+        id: "library-video-regrant",
+      });
+      await storeFileHandle(entry.id, handle);
+      const file = await handle.getFile();
+      const blobUrl = URL.createObjectURL(file);
+      await navigateToPlayer(entry, blobUrl, { scriptId, scriptName });
+    } catch (err) {
+      if ((err as { name?: string }).name !== "AbortError") {
+        toast({ title: "Could not access local video", variant: "destructive" });
+      }
+    }
   }
 
   async function handleRegrantAccess(entry: LibraryEntry) {
@@ -965,22 +1139,22 @@ export default function MyLibrary() {
                   </Button>
 
                   {entry.video_url ? (
-                    <Button
-                      size="sm"
-                      className="flex-1 text-xs h-8 gap-1.5"
-                      onClick={() => handlePlay(entry)}
-                    >
-                      <Play className="h-3.5 w-3.5" /> Play
-                    </Button>
+                    <PlayScriptMenu
+                      entry={entry}
+                      authHeaders={authHeaders}
+                      onPlayActive={() => handlePlay(entry)}
+                      onPlayWithScript={(id, name) => handlePlayWithScript(entry, id, name)}
+                    />
                   ) : entry.local_file_path ? (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="flex-1 text-xs h-8 gap-1.5"
-                      onClick={() => handleRegrantAccess(entry)}
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" /> Re-grant Access
-                    </Button>
+                    <PlayScriptMenu
+                      entry={entry}
+                      authHeaders={authHeaders}
+                      onPlayActive={() => handleRegrantAccess(entry)}
+                      onPlayWithScript={(id, name) => handlePlayWithScript(entry, id, name)}
+                      primaryLabel="Re-grant Access"
+                      primaryIcon={<RefreshCw className="h-3.5 w-3.5" />}
+                      primaryVariant="secondary"
+                    />
                   ) : null}
                 </div>
 
