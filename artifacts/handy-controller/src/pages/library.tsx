@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { getAllEntries, addEntry, deleteEntry, LibraryEntry } from "@/lib/db";
-import { Card, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check } from "lucide-react";
@@ -8,6 +8,13 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { validateVideoUrl, validateAndParseFunscriptFile } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { getHostLabel } from "@/lib/url-utils";
 
 // File System Access API types (Chrome/Edge, not yet in standard TS lib)
 interface FSAFileHandle extends FileSystemFileHandle {
@@ -23,90 +30,64 @@ interface FSAWindow {
 
 const hasFSA = typeof window !== "undefined" && "showOpenFilePicker" in window;
 
-function getYouTubeId(url: string): string | null {
+/** Returns a static SVG data-URI thumbnail for a known platform host, or null. */
+function getStaticPlatformThumbnail(url: string): string | null {
   try {
-    const u = new URL(url);
-    const h = u.hostname.replace(/^(www\.|m\.)/, "");
-    if (h === "youtu.be") return u.pathname.slice(1).split("?")[0];
-    if (h === "youtube.com") return u.searchParams.get("v");
-  } catch { /* ignore */ }
-  return null;
-}
+    const h = new URL(url).hostname.replace(/^(www\.|m\.)/, "").toLowerCase();
 
-function isDirectVideoUrl(url: string): boolean {
-  try {
-    const u = new URL(url);
-    return /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(u.pathname);
-  } catch { return false; }
-}
-
-
-function getEmbedPlatformThumbnail(url: string): string | null {
-  try {
-    const h = new URL(url).hostname.replace("www.", "");
-    const platforms: Record<string, { label: string; bg: string; fg: string }> = {
+    type PlatformSpec = { label: string; bg: string; fg: string };
+    const platforms: Record<string, PlatformSpec> = {
+      "youtube.com": { label: "YT", bg: "#ff0000", fg: "#fff" },
+      "youtu.be":    { label: "YT", bg: "#ff0000", fg: "#fff" },
       "pornhub.com": { label: "PH", bg: "#1b1b1b", fg: "#f90" },
       "xvideos.com": { label: "XV", bg: "#d40000", fg: "#fff" },
       "redtube.com": { label: "RT", bg: "#cc0000", fg: "#fff" },
-      "vimeo.com": { label: "Vi", bg: "#1ab7ea", fg: "#fff" },
+      "vimeo.com":   { label: "Vi", bg: "#1ab7ea", fg: "#fff" },
     };
-    const xhamster = h.includes("xhamster");
-    if (xhamster) {
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#ff6000"/><text x="160" y="105" font-family="Arial,sans-serif" font-size="52" font-weight="bold" fill="#fff" text-anchor="middle">xH</text></svg>`;
+
+    if (h.includes("xhamster")) {
+      const svg = makeBadgeSvg("xH", "#ff6000", "#fff");
       return `data:image/svg+xml;base64,${btoa(svg)}`;
     }
-    const p = platforms[h];
-    if (p) {
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="${p.bg}"/><text x="160" y="105" font-family="Arial,sans-serif" font-size="52" font-weight="bold" fill="${p.fg}" text-anchor="middle">${p.label}</text></svg>`;
+
+    const spec = platforms[h];
+    if (spec) {
+      const svg = makeBadgeSvg(spec.label, spec.bg, spec.fg);
       return `data:image/svg+xml;base64,${btoa(svg)}`;
     }
   } catch { /* ignore */ }
   return null;
 }
 
+/** Builds the neutral placeholder SVG used when no platform match exists. */
+function getPlaceholderThumbnail(): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180">
+    <rect width="320" height="180" fill="#18181b"/>
+    <rect x="130" y="55" width="60" height="70" rx="4" fill="#3f3f46"/>
+    <polygon points="148,72 148,108 180,90" fill="#71717a"/>
+  </svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+}
+
+function makeBadgeSvg(label: string, bg: string, fg: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="${bg}"/><text x="160" y="105" font-family="Arial,sans-serif" font-size="52" font-weight="bold" fill="${fg}" text-anchor="middle">${label}</text></svg>`;
+}
+
+/**
+ * Resolves a static thumbnail for a URL entry.
+ * Prefers a per-platform bundled SVG; falls back to the neutral placeholder.
+ * Does NOT make any network request to third-party hosts.
+ */
+function getStaticUrlThumbnail(url: string): string {
+  return getStaticPlatformThumbnail(url) ?? getPlaceholderThumbnail();
+}
+
+/**
+ * Resolves a thumbnail for a URL entry at add-time.
+ * Always returns a static, bundled result — no network requests to third-party hosts.
+ */
 function getThumbnailForUrl(url: string): Promise<string> {
-  const ytId = getYouTubeId(url);
-  if (ytId) {
-    return Promise.resolve(`https://img.youtube.com/vi/${ytId}/mqdefault.jpg`);
-  }
-  if (isDirectVideoUrl(url)) {
-    return new Promise(resolve => {
-      const video = document.createElement("video");
-      video.crossOrigin = "anonymous";
-      video.preload = "metadata";
-      video.muted = true;
-      video.src = url;
-      const timeout = setTimeout(() => {
-        video.src = "";
-        resolve("");
-      }, 8000);
-      video.onloadeddata = () => {
-        video.currentTime = Math.min(5, video.duration * 0.1);
-      };
-      video.onseeked = () => {
-        clearTimeout(timeout);
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = 320;
-          canvas.height = 180;
-          const ctx = canvas.getContext("2d");
-          if (ctx) ctx.drawImage(video, 0, 0, 320, 180);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-          video.src = "";
-          resolve(dataUrl);
-        } catch {
-          video.src = "";
-          resolve("");
-        }
-      };
-      video.onerror = () => {
-        clearTimeout(timeout);
-        video.src = "";
-        resolve("");
-      };
-    });
-  }
-  return Promise.resolve(getEmbedPlatformThumbnail(url) ?? "");
+  return Promise.resolve(getStaticUrlThumbnail(url));
 }
 
 export default function Library() {
@@ -114,6 +95,7 @@ export default function Library() {
   const [search, setSearch] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { reportAction } = useBlockedReport();
 
   const [showUrlForm, setShowUrlForm] = useState(false);
   const [urlInput, setUrlInput] = useState("");
@@ -342,134 +324,235 @@ export default function Library() {
   const filtered = entries.filter(e => e.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 h-full flex flex-col">
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Library</h1>
-          <p className="text-muted-foreground">Manage your local videos and scripts.</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="w-64">
-            <Input
-              placeholder="Search library..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="bg-card"
-            />
+    <TooltipProvider delayDuration={300}>
+      <div className="p-8 max-w-7xl mx-auto space-y-8 h-full flex flex-col">
+        <div className="flex justify-between items-end">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Library</h1>
+            <p className="text-muted-foreground">Manage your local videos and scripts.</p>
           </div>
-          <Button variant="outline" onClick={() => setShowUrlForm(v => !v)} data-testid="button-add-url">
-            <Link className="h-4 w-4 mr-2" /> Add URL
-          </Button>
-          {hasFSA ? (
-            <Button variant="default" onClick={handleBrowseFSA} data-testid="button-upload-library">
-              <FolderOpen className="h-4 w-4 mr-2" /> Browse Files
-            </Button>
-          ) : (
-            <Button variant="default" className="relative cursor-pointer" data-testid="button-upload-library">
-              <Upload className="h-4 w-4 mr-2" /> Upload
-              <input
-                type="file"
-                accept="video/*,.funscript,.json"
-                multiple
-                className="absolute inset-0 opacity-0 cursor-pointer"
-                onChange={handleUpload}
+          <div className="flex items-center gap-4">
+            <div className="w-64">
+              <Input
+                placeholder="Search library..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="bg-card"
               />
+            </div>
+            <Button variant="outline" onClick={() => setShowUrlForm(v => !v)} data-testid="button-add-url">
+              <Link className="h-4 w-4 mr-2" /> Add URL
             </Button>
+            {hasFSA ? (
+              <Button variant="default" onClick={handleBrowseFSA} data-testid="button-upload-library">
+                <FolderOpen className="h-4 w-4 mr-2" /> Browse Files
+              </Button>
+            ) : (
+              <Button variant="default" className="relative cursor-pointer" data-testid="button-upload-library">
+                <Upload className="h-4 w-4 mr-2" /> Upload
+                <input
+                  type="file"
+                  accept="video/*,.funscript,.json"
+                  multiple
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  onChange={handleUpload}
+                />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {showUrlForm && (
+          <div className="rounded-xl border border-border/60 bg-card/70 backdrop-blur p-4 flex flex-col gap-3 shadow-sm" data-testid="url-form">
+            <div className="flex items-center gap-2">
+              <Link className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm font-medium">Add video from URL</span>
+            </div>
+            <div className="flex gap-2">
+              <Input
+                ref={urlInputRef}
+                placeholder="Paste video URL (YouTube, Pornhub, xVideos, Vimeo, or direct .mp4/.webm)…"
+                value={urlInput}
+                onChange={e => setUrlInput(e.target.value)}
+                onKeyDown={handleUrlKeyDown}
+                className="flex-1 bg-background/50"
+                data-testid="url-input"
+              />
+              <Input
+                placeholder="Name (optional)"
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onKeyDown={handleUrlKeyDown}
+                className="w-48 bg-background/50"
+                data-testid="url-name-input"
+              />
+              <Button
+                onClick={handleAddUrl}
+                disabled={!urlInput.trim() || addingUrl}
+                data-testid="url-confirm"
+              >
+                {addingUrl ? (
+                  <span className="flex items-center gap-1.5"><span className="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block" />Adding…</span>
+                ) : (
+                  <><Check className="h-4 w-4 mr-1.5" />Add</>
+                )}
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => { setShowUrlForm(false); setUrlInput(""); setNameInput(""); }} data-testid="url-cancel">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground ml-6">
+              Supports YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo, or any direct .mp4/.webm URL
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 content-start">
+          {filtered.map(entry => (
+            entry.url
+              ? <UrlEntryCard key={entry.id} entry={entry} onOpen={handleOpen} onDelete={handleDelete} />
+              : <FileEntryCard key={entry.id} entry={entry} onOpen={handleOpen} onDelete={handleDelete} />
+          ))}
+          {filtered.length === 0 && (
+            <div className="col-span-full py-12 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-border/50 rounded-xl">
+              <LibraryIcon className="h-12 w-12 mb-4 opacity-20" />
+              <p>No entries found in library.</p>
+            </div>
           )}
         </div>
       </div>
+    </TooltipProvider>
+  );
+}
 
-      {showUrlForm && (
-        <div className="rounded-xl border border-border/60 bg-card/70 backdrop-blur p-4 flex flex-col gap-3 shadow-sm" data-testid="url-form">
-          <div className="flex items-center gap-2">
-            <Link className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <span className="text-sm font-medium">Add video from URL</span>
-          </div>
-          <div className="flex gap-2">
-            <Input
-              ref={urlInputRef}
-              placeholder="Paste video URL (YouTube, Pornhub, xVideos, Vimeo, or direct .mp4/.webm)…"
-              value={urlInput}
-              onChange={e => setUrlInput(e.target.value)}
-              onKeyDown={handleUrlKeyDown}
-              className="flex-1 bg-background/50"
-              data-testid="url-input"
-            />
-            <Input
-              placeholder="Name (optional)"
-              value={nameInput}
-              onChange={e => setNameInput(e.target.value)}
-              onKeyDown={handleUrlKeyDown}
-              className="w-48 bg-background/50"
-              data-testid="url-name-input"
-            />
-            <Button
-              onClick={handleAddUrl}
-              disabled={!urlInput.trim() || addingUrl}
-              data-testid="url-confirm"
-            >
-              {addingUrl ? (
-                <span className="flex items-center gap-1.5"><span className="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block" />Adding…</span>
-              ) : (
-                <><Check className="h-4 w-4 mr-1.5" />Add</>
-              )}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => { setShowUrlForm(false); setUrlInput(""); setNameInput(""); }} data-testid="url-cancel">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <p className="text-[11px] text-muted-foreground ml-6">
-            Supports YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo, or any direct .mp4/.webm URL
-          </p>
-        </div>
-      )}
+// ── URL entry card ────────────────────────────────────────────────────────────
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 content-start">
-        {filtered.map(entry => (
-          <Card key={entry.id} className="bg-card/50 backdrop-blur overflow-hidden group">
-            <div className="aspect-video bg-black flex items-center justify-center relative border-b border-border/50 overflow-hidden">
-              {entry.thumbnail ? (
-                <img src={entry.thumbnail} alt={entry.name} className="w-full h-full object-cover" />
-              ) : entry.type === "video" ? (
-                <Film className="h-12 w-12 text-primary/50 group-hover:text-primary transition-colors" />
-              ) : (
-                <FileJson className="h-12 w-12 text-primary/50 group-hover:text-primary transition-colors" />
-              )}
-              <div className="absolute top-2 right-2 bg-background/80 backdrop-blur px-2 py-1 rounded text-xs font-mono">
-                {entry.type.toUpperCase()}
-              </div>
-              {entry.url && (
-                <div className="absolute top-2 left-2 bg-primary/80 backdrop-blur px-2 py-1 rounded text-xs font-mono text-black font-semibold">
-                  URL
-                </div>
-              )}
-              {entry.fileHandle && !entry.url && (
-                <div className="absolute top-2 left-2 bg-primary/80 backdrop-blur px-2 py-1 rounded text-xs font-mono text-black font-semibold">
-                  LINKED
-                </div>
-              )}
+interface EntryCardProps {
+  entry: LibraryEntry;
+  onOpen: (e: LibraryEntry) => void;
+  onDelete: (id: string) => void;
+}
+
+function UrlEntryCard({ entry, onOpen, onDelete }: EntryCardProps) {
+  const url = entry.url!;
+  const hostLabel = getHostLabel(url);
+  // Always derive the thumbnail statically — never use the persisted entry.thumbnail
+  // for URL entries, as it may contain legacy remote URLs (e.g. YouTube image CDN)
+  // that would cause third-party network requests at render time.
+  const thumbnail = getStaticUrlThumbnail(url);
+
+  const tooltipContent = (
+    <div className="space-y-1 max-w-xs">
+      <p className="font-semibold text-xs leading-snug break-words">{entry.name}</p>
+      <p className="text-[10px] text-muted-foreground break-all opacity-80">{url}</p>
+    </div>
+  );
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Card tabIndex={0} className="bg-card/50 backdrop-blur overflow-hidden group outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+          {/* Thumbnail */}
+          <div className="aspect-video bg-black flex items-center justify-center relative border-b border-border/50 overflow-hidden">
+            <img
+              src={thumbnail}
+              alt={hostLabel || entry.name}
+              className="w-full h-full object-cover"
+              draggable={false}
+            />
+            <div className="absolute top-2 right-2 bg-background/80 backdrop-blur px-2 py-1 rounded text-xs font-mono">
+              URL
             </div>
-            <CardHeader className="p-4 pb-2">
-              <CardTitle className="text-base truncate" title={entry.name}>{entry.name}</CardTitle>
-            </CardHeader>
-            <CardFooter className="p-4 pt-0 gap-2">
-              <Button variant="secondary" size="sm" className="flex-1" onClick={() => handleOpen(entry)} data-testid={`button-open-${entry.id}`}>
-                <Play className="h-4 w-4 mr-2" /> Open
-              </Button>
-              <Button variant="destructive" size="icon" className="h-9 w-9" onClick={() => handleDelete(entry.id)} data-testid={`button-delete-${entry.id}`}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </CardFooter>
-          </Card>
-        ))}
-        {filtered.length === 0 && (
-          <div className="col-span-full py-12 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-border/50 rounded-xl">
-            <LibraryIcon className="h-12 w-12 mb-4 opacity-20" />
-            <p>No entries found in library.</p>
+          </div>
+
+          {/* Host label — 2-line clamped, no resting URL text */}
+          <div className="px-4 pt-3 pb-1">
+            <p
+              className="text-base font-semibold leading-snug line-clamp-2 overflow-hidden"
+              style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+            >
+              {hostLabel || entry.name}
+            </p>
+          </div>
+
+          <CardFooter className="p-4 pt-2 gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="flex-1"
+              onClick={() => onOpen(entry)}
+              data-testid={`button-open-${entry.id}`}
+            >
+              <Play className="h-4 w-4 mr-2" /> Open
+            </Button>
+            <Button
+              variant="destructive"
+              size="icon"
+              className="h-9 w-9"
+              onClick={() => onDelete(entry.id)}
+              data-testid={`button-delete-${entry.id}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </CardFooter>
+        </Card>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        className="bg-popover text-popover-foreground border border-border shadow-lg px-3 py-2 rounded-lg"
+      >
+        {tooltipContent}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+// ── File entry card (unchanged layout) ───────────────────────────────────────
+
+function FileEntryCard({ entry, onOpen, onDelete }: EntryCardProps) {
+  return (
+    <Card className="bg-card/50 backdrop-blur overflow-hidden group">
+      <div className="aspect-video bg-black flex items-center justify-center relative border-b border-border/50 overflow-hidden">
+        {entry.thumbnail ? (
+          <img src={entry.thumbnail} alt={entry.name} className="w-full h-full object-cover" />
+        ) : entry.type === "video" ? (
+          <Film className="h-12 w-12 text-primary/50 group-hover:text-primary transition-colors" />
+        ) : (
+          <FileJson className="h-12 w-12 text-primary/50 group-hover:text-primary transition-colors" />
+        )}
+        <div className="absolute top-2 right-2 bg-background/80 backdrop-blur px-2 py-1 rounded text-xs font-mono">
+          {entry.type.toUpperCase()}
+        </div>
+        {entry.fileHandle && (
+          <div className="absolute top-2 left-2 bg-primary/80 backdrop-blur px-2 py-1 rounded text-xs font-mono text-black font-semibold">
+            LINKED
           </div>
         )}
       </div>
-    </div>
+      <div className="px-4 pt-3 pb-1">
+        <p className="text-base font-semibold truncate" title={entry.name}>{entry.name}</p>
+      </div>
+      <CardFooter className="p-4 pt-2 gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1"
+          onClick={() => onOpen(entry)}
+          data-testid={`button-open-${entry.id}`}
+        >
+          <Play className="h-4 w-4 mr-2" /> Open
+        </Button>
+        <Button
+          variant="destructive"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => onDelete(entry.id)}
+          data-testid={`button-delete-${entry.id}`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }
 
