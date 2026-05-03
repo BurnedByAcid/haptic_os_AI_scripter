@@ -195,7 +195,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div className="flex items-center gap-2.5">
                   <img src="/favicon.svg" alt="HapticOS" className="h-8 w-8 flex-shrink-0" />
                   <h1 className="text-xl font-bold tracking-tight whitespace-nowrap">
-                    <span className="text-[#C850F0]">Haptic</span><span className="text-foreground">OS</span>
+                    <span className="text-[#5B1E8C]">Haptic</span><span className="text-[#C850F0]">OS</span>
                   </h1>
                 </div>
                 <div className="flex items-center gap-2">

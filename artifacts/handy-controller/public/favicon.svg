@@ -1,67 +1,98 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <radialGradient id="bgGrad" cx="40%" cy="35%" r="70%">
-      <stop offset="0%" stop-color="#8B2FC9"/>
-      <stop offset="55%" stop-color="#6A1099"/>
-      <stop offset="100%" stop-color="#3D0068"/>
+    <radialGradient id="bgGrad" cx="45%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#7B22C0"/>
+      <stop offset="50%" stop-color="#510D8A"/>
+      <stop offset="100%" stop-color="#2A0050"/>
     </radialGradient>
     <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#C850F0"/>
-      <stop offset="100%" stop-color="#FF2D9A"/>
+      <stop offset="0%" stop-color="#C050E8"/>
+      <stop offset="100%" stop-color="#8B20C0"/>
     </linearGradient>
-    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#D66EFF"/>
-      <stop offset="50%" stop-color="#FF61D8"/>
-      <stop offset="100%" stop-color="#D66EFF"/>
-    </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+    <filter id="waveGlow" x="-30%" y="-80%" width="160%" height="260%">
+      <feGaussianBlur stdDeviation="5" result="blur1"/>
+      <feGaussianBlur stdDeviation="10" result="blur2"/>
       <feMerge>
-        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur1"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
+    <filter id="traceGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#E060FF" stop-opacity="0.7"/>
+      <stop offset="35%" stop-color="#FF80FF"/>
+      <stop offset="50%" stop-color="#FFFFFF"/>
+      <stop offset="65%" stop-color="#FF80FF"/>
+      <stop offset="100%" stop-color="#E060FF" stop-opacity="0.7"/>
+    </linearGradient>
   </defs>
 
   <!-- Outer circle background -->
   <circle cx="128" cy="128" r="124" fill="url(#bgGrad)"/>
 
-  <!-- Circuit-board ring: outer track -->
-  <circle cx="128" cy="128" r="108" stroke="url(#ringGrad)" stroke-width="2.5" fill="none" opacity="0.7"/>
+  <!-- Outer ring -->
+  <circle cx="128" cy="128" r="110" stroke="url(#ringGrad)" stroke-width="2" fill="none" opacity="0.6"/>
 
-  <!-- Circuit nodes around the ring -->
-  <circle cx="128" cy="20"  r="4" fill="#C850F0"/>
-  <circle cx="220" cy="68"  r="4" fill="#E040D0"/>
-  <circle cx="236" cy="160" r="4" fill="#FF2D9A"/>
-  <circle cx="168" cy="228" r="4" fill="#E040D0"/>
-  <circle cx="88"  cy="228" r="4" fill="#C850F0"/>
-  <circle cx="20"  cy="168" r="4" fill="#FF2D9A"/>
-  <circle cx="20"  cy="88"  r="4" fill="#E040D0"/>
+  <!-- Inner subtle ring -->
+  <circle cx="128" cy="128" r="88" stroke="#8B30C8" stroke-width="1" fill="none" opacity="0.3"/>
 
-  <!-- Small tick lines at node points (circuit traces) -->
-  <line x1="128" y1="24"  x2="128" y2="36"  stroke="#C850F0" stroke-width="2" opacity="0.8"/>
-  <line x1="216" y1="72"  x2="208" y2="80"  stroke="#E040D0" stroke-width="2" opacity="0.8"/>
-  <line x1="232" y1="156" x2="220" y2="156" stroke="#FF2D9A" stroke-width="2" opacity="0.8"/>
-  <line x1="164" y1="224" x2="156" y2="216" stroke="#E040D0" stroke-width="2" opacity="0.8"/>
-  <line x1="92"  y1="224" x2="100" y2="216" stroke="#C850F0" stroke-width="2" opacity="0.8"/>
-  <line x1="24"  y1="164" x2="36"  y2="164" stroke="#FF2D9A" stroke-width="2" opacity="0.8"/>
-  <line x1="24"  y1="92"  x2="36"  y2="100" stroke="#E040D0" stroke-width="2" opacity="0.8"/>
+  <!-- Circuit traces on the LEFT side -->
+  <g filter="url(#traceGlow)" stroke="#C050E8" stroke-width="2.5" fill="none" opacity="0.9">
+    <!-- Main horizontal backbone from waveform start going left -->
+    <line x1="82" y1="128" x2="55" y2="128"/>
 
-  <!-- Inner ring -->
-  <circle cx="128" cy="128" r="86" stroke="#9B30E0" stroke-width="1.5" fill="none" opacity="0.4"/>
+    <!-- Junction node at horizontal backbone -->
+    <circle cx="55" cy="128" r="4" fill="#C050E8" stroke="none"/>
 
-  <!-- Haptic waveform in the center -->
-  <g filter="url(#glow)">
-    <!-- Waveform bars: center tall, tapering out -->
-    <rect x="73"  y="118" width="8" height="20" rx="4" fill="url(#waveGrad)" opacity="0.7"/>
-    <rect x="87"  y="109" width="8" height="38" rx="4" fill="url(#waveGrad)" opacity="0.85"/>
-    <rect x="101" y="98"  width="8" height="60" rx="4" fill="url(#waveGrad)"/>
-    <rect x="115" y="88"  width="8" height="80" rx="4" fill="url(#waveGrad)"/>
-    <rect x="129" y="98"  width="8" height="60" rx="4" fill="url(#waveGrad)"/>
-    <rect x="143" y="109" width="8" height="38" rx="4" fill="url(#waveGrad)" opacity="0.85"/>
-    <rect x="157" y="118" width="8" height="20" rx="4" fill="url(#waveGrad)" opacity="0.7"/>
+    <!-- Top branch: go up from junction, then left -->
+    <polyline points="55,128 55,98 34,98"/>
+    <!-- Top-branch end node -->
+    <circle cx="34" cy="98" r="5" fill="none" stroke="#C050E8" stroke-width="2.5"/>
+    <circle cx="34" cy="98" r="2" fill="#D870FF" stroke="none"/>
+
+    <!-- Upper-mid sub-branch off the top branch -->
+    <polyline points="55,113 42,113 42,98"/>
+    <circle cx="42" cy="113" r="3" fill="#C050E8" stroke="none"/>
+
+    <!-- Bottom branch: go down from junction, then left -->
+    <polyline points="55,128 55,158 34,158"/>
+    <!-- Bottom-branch end node -->
+    <circle cx="34" cy="158" r="5" fill="none" stroke="#C050E8" stroke-width="2.5"/>
+    <circle cx="34" cy="158" r="2" fill="#D870FF" stroke="none"/>
+
+    <!-- Lower-mid sub-branch off the bottom branch -->
+    <polyline points="55,143 42,143 42,158"/>
+    <circle cx="42" cy="143" r="3" fill="#C050E8" stroke="none"/>
   </g>
 
-  <!-- Subtle center glow -->
-  <circle cx="128" cy="128" r="52" fill="#9B30E0" opacity="0.08"/>
+  <!-- ECG / Heartbeat waveform -->
+  <g filter="url(#waveGlow)">
+    <polyline
+      points="82,128 100,128 112,68 124,178 136,118 144,136 152,128 180,128"
+      stroke="url(#waveGrad)"
+      stroke-width="4"
+      fill="none"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <!-- Extra bright core of the spike for bloom -->
+  <g opacity="0.6">
+    <polyline
+      points="108,90 112,68 124,178 130,128"
+      stroke="#FFFFFF"
+      stroke-width="2"
+      fill="none"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
 </svg>
