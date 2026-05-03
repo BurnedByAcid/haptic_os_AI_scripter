@@ -267,6 +267,47 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
     }),
   });
 
+  const replaceMutation = useMutation({
+    mutationFn: async (vars: { id: number; funscriptStr: string }) => {
+      if (!entry) throw new Error("no entry");
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/library/${entry.id}/funscripts/${vars.id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ funscript_json: vars.funscriptStr }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(d.error ?? "Replace failed");
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+    onError: (err) => toast({
+      title: "Could not replace script",
+      description: err instanceof Error ? err.message : "Unknown error",
+      variant: "destructive",
+    }),
+  });
+
+  async function handleReplaceFile(id: number, file: File) {
+    try {
+      const parsed = await validateAndParseFunscriptFile(file);
+      replaceMutation.mutate({ id, funscriptStr: JSON.stringify(parsed) });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not parse funscript.";
+      toast({
+        title: `Invalid funscript: ${file.name}`,
+        description: msg,
+        variant: "destructive",
+        action: reportAction({
+          kind: "library_file",
+          item: file.name,
+          blockMessage: msg,
+        }),
+      });
+    }
+  }
+
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       if (!entry) throw new Error("no entry");
@@ -489,6 +530,34 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
                       data-testid={`button-rename-script-${s.id}`}
                     >
                       <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
+                      title="Replace file"
+                      disabled={replaceMutation.isPending}
+                    >
+                      <label>
+                        {replaceMutation.isPending && replaceMutation.variables?.id === s.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="h-3.5 w-3.5" />
+                        )}
+                        <input
+                          type="file"
+                          accept=".funscript,.json,application/json"
+                          className="hidden"
+                          disabled={replaceMutation.isPending}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = "";
+                            if (file) handleReplaceFile(s.id, file);
+                          }}
+                          data-testid={`input-replace-script-${s.id}`}
+                        />
+                      </label>
                     </Button>
                     <Button
                       size="sm"
