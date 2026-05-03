@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Shield, Sparkles, LogIn, LogOut, User, Users, Heart, Pencil, ShieldCheck } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Shield, Sparkles, LogIn, LogOut, User, Users, Pencil, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
@@ -390,40 +390,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </nav>
         </div>
-
-        {/* Donation box */}
-        {/* To activate: replace PAYPAL_DONATE_URL with your real PayPal.me link */}
-        {(() => {
-          const PAYPAL_DONATE_URL = "#";
-          return collapsed ? (
-            <div className="flex justify-center py-2 border-t border-border/40">
-              <a
-                href={PAYPAL_DONATE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Support this project"
-                className="h-8 w-8 flex items-center justify-center rounded-md text-pink-400 hover:text-pink-300 hover:bg-pink-500/10 transition-colors"
-              >
-                <Heart className="h-4 w-4 fill-current" />
-              </a>
-            </div>
-          ) : (
-            <div className="px-3 py-2 border-t border-border/40">
-              <a
-                href={PAYPAL_DONATE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg bg-pink-500/10 hover:bg-pink-500/20 border border-pink-500/20 hover:border-pink-500/40 transition-all group"
-              >
-                <Heart className="h-4 w-4 text-pink-400 fill-current flex-shrink-0 group-hover:scale-110 transition-transform" />
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-pink-300 leading-tight">Support via PayPal</p>
-                  <p className="text-[10px] text-pink-400/70 leading-tight">Buy me a coffee ☕</p>
-                </div>
-              </a>
-            </div>
-          );
-        })()}
 
         {/* User account section */}
         <div className={`border-t border-border flex-shrink-0 ${collapsed ? "p-2" : "p-3"}`}>
