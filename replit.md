@@ -27,6 +27,7 @@ Full-featured browser-based controller for The Handy device. Entirely client-sid
 - `/player` — Video + Funscript Player (local video + up to 4 scripts, real-time sync)
 - `/control` — Manual device control (speed/stroke sliders)
 - `/library` — Personal library (IndexedDB for local video/funscript storage)
+- `/my-library` — Cloud-synced private library (multiple funscripts per media: 1 for free tier, up to 5 for subscribers; backed by `private_library` + `private_library_funscripts` tables)
 - `/games` — Fappy Bird game with live Handy strokes per flap
 - `/beat` — Beat 2 Beat (mic/MP3 beat detection → Handy strokes)
 - `/scripter` — Funscript editor (timeline + Visual Trigger 5×5 pixel color matching). **Free tier: max 2 sessions/day, enforced server-side via `scripter_usage` table.**

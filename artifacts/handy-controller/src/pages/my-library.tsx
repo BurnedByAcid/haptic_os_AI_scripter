@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   BookmarkPlus, Download, Play, Trash2, Clock, Link as LinkIcon, HardDrive,
-  RefreshCw, Globe, Crown, Loader2, Check,
+  RefreshCw, Globe, Crown, Loader2, Check, FileJson, Star, Pencil, Plus, X, Upload,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -21,6 +21,8 @@ import {
   deleteFileHandle,
   verifyHandlePermission,
 } from "@/lib/file-handle-store";
+import { validateAndParseFunscriptFile } from "@/lib/validation";
+import { useBlockedReport } from "@/contexts/blocked-report-context";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 
@@ -30,6 +32,20 @@ interface LibraryEntry {
   video_url: string | null;
   local_file_path: string | null;
   created_at: string;
+}
+
+interface AttachedScript {
+  id: number;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface FunscriptListResponse {
+  cap: number;
+  plan: string;
+  funscripts: AttachedScript[];
 }
 
 function timeAgo(dateStr: string): string {
@@ -139,6 +155,376 @@ function ShareToCommunityDialog({ entry, onClose, authHeaders, onSuccess }: Shar
   );
 }
 
+interface ScriptsDialogProps {
+  entry: LibraryEntry | null;
+  onClose: () => void;
+  authHeaders: () => Promise<Record<string, string>>;
+}
+
+function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProps) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const { reportAction } = useBlockedReport();
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  const queryKey = ["media-funscripts", entry?.id];
+
+  const { data, isLoading } = useQuery<FunscriptListResponse>({
+    queryKey,
+    enabled: !!entry,
+    queryFn: async () => {
+      if (!entry) throw new Error("no entry");
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/library/${entry.id}/funscripts`, { headers });
+      if (!res.ok) throw new Error("Failed to load funscripts");
+      return res.json();
+    },
+  });
+
+  const cap = data?.cap ?? 1;
+  const plan = data?.plan ?? "free";
+  const scripts = data?.funscripts ?? [];
+  const atCap = scripts.length >= cap;
+  const isSubscriber = plan !== "free";
+
+  const renameMutation = useMutation({
+    mutationFn: async (vars: { id: number; name: string }) => {
+      if (!entry) throw new Error("no entry");
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/library/${entry.id}/funscripts/${vars.id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ name: vars.name }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(d.error ?? "Rename failed");
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      setEditingId(null);
+    },
+    onError: (err) => toast({
+      title: "Could not rename",
+      description: err instanceof Error ? err.message : "Unknown error",
+      variant: "destructive",
+    }),
+  });
+
+  const setActiveMutation = useMutation({
+    mutationFn: async (id: number) => {
+      if (!entry) throw new Error("no entry");
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/library/${entry.id}/funscripts/${id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ set_active: true }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(d.error ?? "Failed to set active");
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+    onError: (err) => toast({
+      title: "Could not set active",
+      description: err instanceof Error ? err.message : "Unknown error",
+      variant: "destructive",
+    }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      if (!entry) throw new Error("no entry");
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/library/${entry.id}/funscripts/${id}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(d.error ?? "Delete failed");
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+    onError: (err) => toast({
+      title: "Could not delete",
+      description: err instanceof Error ? err.message : "Unknown error",
+      variant: "destructive",
+    }),
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (vars: { name: string; funscriptStr: string; setActive: boolean }) => {
+      if (!entry) throw new Error("no entry");
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/library/${entry.id}/funscripts`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          name: vars.name,
+          funscript_json: vars.funscriptStr,
+          set_active: vars.setActive,
+        }),
+      });
+      const body = await res.json().catch(() => ({})) as { error?: string; code?: string };
+      if (!res.ok) {
+        const err = new Error(body.error ?? "Add failed");
+        (err as Error & { code?: string }).code = body.code;
+        throw err;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      setAdding(false);
+      setNewName("");
+    },
+    onError: (err) => {
+      const e = err as Error & { code?: string };
+      const isCap = e.code === "CAP_REACHED";
+      toast({
+        title: isCap ? "Script cap reached" : "Could not add script",
+        description: e.message,
+        variant: "destructive",
+        action: reportAction({
+          kind: "library_file",
+          item: entry?.title ?? "",
+          blockMessage: e.message,
+        }),
+      });
+    },
+  });
+
+  async function handleAddFile(file: File, name: string) {
+    try {
+      const parsed = await validateAndParseFunscriptFile(file);
+      // Default new script to active if there are no scripts yet, else preserve current active
+      const setActive = scripts.length === 0;
+      addMutation.mutate({
+        name,
+        funscriptStr: JSON.stringify(parsed),
+        setActive,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not parse funscript.";
+      toast({
+        title: `Invalid funscript: ${file.name}`,
+        description: msg,
+        variant: "destructive",
+        action: reportAction({
+          kind: "library_file",
+          item: file.name,
+          blockMessage: msg,
+        }),
+      });
+    }
+  }
+
+  if (!entry) return null;
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileJson className="h-5 w-5 text-primary" />
+            Funscripts for "{entry.title}"
+          </DialogTitle>
+          <DialogDescription>
+            {isSubscriber
+              ? `Subscribers can attach up to ${cap} scripts per media item.`
+              : `Free tier supports ${cap} script per media. Upgrade for up to 5.`}
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="py-10 flex justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {scripts.length === 0 && (
+              <div className="text-sm text-muted-foreground italic px-3 py-6 text-center border border-dashed border-border/50 rounded-md">
+                No scripts attached yet.
+              </div>
+            )}
+            {scripts.map((s) => (
+              <div
+                key={s.id}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md border ${
+                  s.is_active ? "border-primary/40 bg-primary/5" : "border-border/40 bg-card/40"
+                }`}
+              >
+                <button
+                  onClick={() => !s.is_active && setActiveMutation.mutate(s.id)}
+                  disabled={s.is_active || setActiveMutation.isPending}
+                  className={`flex-shrink-0 ${s.is_active ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
+                  title={s.is_active ? "Active script" : "Set as active"}
+                  data-testid={`button-set-active-${s.id}`}
+                >
+                  <Star className={`h-4 w-4 ${s.is_active ? "fill-primary" : ""}`} />
+                </button>
+
+                {editingId === s.id ? (
+                  <div className="flex-1 flex items-center gap-2">
+                    <Input
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      className="h-7 text-sm"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && editingName.trim()) {
+                          renameMutation.mutate({ id: s.id, name: editingName.trim() });
+                        } else if (e.key === "Escape") {
+                          setEditingId(null);
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2"
+                      disabled={!editingName.trim() || renameMutation.isPending}
+                      onClick={() => renameMutation.mutate({ id: s.id, name: editingName.trim() })}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2"
+                      onClick={() => setEditingId(null)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{s.name}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {s.is_active && <span className="text-primary mr-2">Active</span>}
+                        {timeAgo(s.updated_at)}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => { setEditingId(s.id); setEditingName(s.name); }}
+                      data-testid={`button-rename-script-${s.id}`}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      disabled={deleteMutation.isPending || scripts.length <= 1}
+                      title={scripts.length <= 1 ? "Can't delete the only script" : "Delete script"}
+                      onClick={() => {
+                        if (window.confirm(`Delete "${s.name}"?`)) {
+                          deleteMutation.mutate(s.id);
+                        }
+                      }}
+                      data-testid={`button-delete-script-${s.id}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            ))}
+
+            {adding ? (
+              <div className="border border-primary/30 bg-primary/5 rounded-md p-3 space-y-2">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Add new script
+                </div>
+                <Input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Script name (e.g. Soft, Hardcore, Remix)"
+                  autoFocus
+                  className="h-8 text-sm"
+                  data-testid="input-new-script-name"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    asChild
+                    size="sm"
+                    className="flex-1 h-8 text-xs gap-1.5 cursor-pointer"
+                    disabled={!newName.trim() || addMutation.isPending}
+                  >
+                    <label>
+                      {addMutation.isPending ? (
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
+                      ) : (
+                        <><Upload className="h-3.5 w-3.5" /> Choose .funscript file</>
+                      )}
+                      <input
+                        type="file"
+                        accept=".funscript,.json,application/json"
+                        className="hidden"
+                        disabled={!newName.trim() || addMutation.isPending}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          if (file && newName.trim()) handleAddFile(file, newName.trim());
+                        }}
+                        data-testid="input-new-script-file"
+                      />
+                    </label>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 text-xs"
+                    onClick={() => { setAdding(false); setNewName(""); }}
+                    disabled={addMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : atCap ? (
+              <div className="text-xs text-muted-foreground bg-muted/40 border border-border/40 rounded-md px-3 py-2 flex items-center gap-2">
+                <Crown className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
+                {isSubscriber
+                  ? `You've reached the ${cap}-script limit for this media.`
+                  : (
+                    <span>
+                      Free tier limit reached.{" "}
+                      <Link href="/upgrade" className="text-primary hover:underline">
+                        Upgrade
+                      </Link>{" "}
+                      for up to 5 scripts per media.
+                    </span>
+                  )
+                }
+              </div>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full h-8 text-xs gap-1.5"
+                onClick={() => setAdding(true)}
+                data-testid="button-add-funscript"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add another script
+              </Button>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function MyLibrary() {
   const { getToken } = useAuth();
   const { isPro } = useSubscription();
@@ -147,6 +533,7 @@ export default function MyLibrary() {
   const [, setLocation] = useLocation();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [shareEntry, setShareEntry] = useState<LibraryEntry | null>(null);
+  const [scriptsEntry, setScriptsEntry] = useState<LibraryEntry | null>(null);
 
   async function authHeaders(): Promise<Record<string, string>> {
     const token = await getToken();
@@ -229,7 +616,6 @@ export default function MyLibrary() {
   }
 
   async function handleRegrantAccess(entry: LibraryEntry) {
-    // First try to restore from a previously persisted FSA handle
     const stored = await loadFileHandle(entry.id);
     if (stored) {
       const ok = await verifyHandlePermission(stored);
@@ -240,12 +626,11 @@ export default function MyLibrary() {
           await navigateToPlayer(entry, blobUrl);
           return;
         } catch {
-          // Handle stale — fall through to manual re-pick
+          // Handle stale — fall through
         }
       }
     }
 
-    // Prompt the user to re-select the file
     const fsa = (window as unknown as Record<string, unknown>).showOpenFilePicker;
     if (typeof fsa !== "function") {
       toast({ title: "File System Access not supported in this browser", variant: "destructive" });
@@ -256,7 +641,6 @@ export default function MyLibrary() {
         types: [{ description: "Video", accept: { "video/*": [".mp4", ".webm", ".mov", ".ogg", ".mkv"] } }],
         id: "library-video-regrant",
       });
-      // Persist for next time
       await storeFileHandle(entry.id, handle);
       const file = await handle.getFile();
       const blobUrl = URL.createObjectURL(file);
@@ -367,6 +751,16 @@ export default function MyLibrary() {
                   ) : null}
                 </div>
 
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="w-full text-xs h-7 gap-1.5 text-muted-foreground hover:text-primary"
+                  onClick={() => setScriptsEntry(entry)}
+                  data-testid={`button-manage-scripts-${entry.id}`}
+                >
+                  <FileJson className="h-3 w-3" /> Manage funscripts
+                </Button>
+
                 <div className="flex gap-2">
                   {isPro && entry.video_url ? (
                     <Button
@@ -416,6 +810,14 @@ export default function MyLibrary() {
           onClose={() => setShareEntry(null)}
           authHeaders={authHeaders}
           onSuccess={() => qc.invalidateQueries({ queryKey: ["community-scripts"] })}
+        />
+      )}
+
+      {scriptsEntry && (
+        <ScriptsManagerDialog
+          entry={scriptsEntry}
+          onClose={() => setScriptsEntry(null)}
+          authHeaders={authHeaders}
         />
       )}
     </div>

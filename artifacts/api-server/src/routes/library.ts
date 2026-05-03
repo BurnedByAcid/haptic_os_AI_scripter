@@ -75,31 +75,78 @@ router.post("/library", async (req: Request, res: Response) => {
   const localFilePath = typeof local_file_path === "string" ? local_file_path.trim() || null : null;
 
   try {
-    const { rows } = await pool.query(
-      `INSERT INTO private_library (user_id, title, video_url, local_file_path, funscript)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, title, video_url, local_file_path, created_at`,
-      [auth.userId, title, videoUrl, localFilePath, funscriptStr]
-    );
-    res.status(201).json(rows[0]);
+    // Insert the media row + seed a row in private_library_funscripts named
+    // "Default" marked active. The legacy `funscript` column is kept for
+    // backwards compatibility / lazy seed of older entries.
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { rows } = await client.query(
+        `INSERT INTO private_library (user_id, title, video_url, local_file_path, funscript)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, title, video_url, local_file_path, created_at`,
+        [auth.userId, title, videoUrl, localFilePath, funscriptStr]
+      );
+      const libraryId = (rows[0] as { id: number }).id;
+      await client.query(
+        `INSERT INTO private_library_funscripts
+           (library_id, user_id, name, funscript_json, is_active, created_at, updated_at)
+         VALUES ($1, $2, 'Default', $3, TRUE, NOW(), NOW())
+         ON CONFLICT (library_id, name) DO NOTHING`,
+        [libraryId, auth.userId, funscriptStr]
+      );
+      await client.query("COMMIT");
+      res.status(201).json(rows[0]);
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   } catch {
     res.status(500).json({ error: "Failed to save to library" });
   }
 });
 
-/** GET /api/library/:id/funscript — download the funscript for one entry */
+/**
+ * GET /api/library/:id/funscript — download the *active* funscript for one entry.
+ *
+ * Backwards-compatible wrapper used by the player launcher and download buttons.
+ * Prefers the active row from `private_library_funscripts`; falls back to the
+ * legacy single-funscript column for entries that haven't been touched since
+ * the multi-script feature shipped (lazy migration also covers this elsewhere).
+ */
 router.get("/library/:id/funscript", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
   try {
-    const { rows } = await pool.query(
+    const { rows: media } = await pool.query(
       `SELECT title, funscript FROM private_library WHERE id = $1 AND user_id = $2`,
       [req.params.id, auth.userId]
     );
-    if (!rows.length) { res.status(404).json({ error: "Not found" }); return; }
-    const row = rows[0] as { title: string; funscript: string };
-    res.json({ title: row.title, funscript: row.funscript });
+    if (!media.length) { res.status(404).json({ error: "Not found" }); return; }
+    const row = media[0] as { title: string; funscript: string };
+
+    // Prefer the active script from the multi-script table. If no row is
+    // marked active but rows exist (defensive — delete normally promotes a
+    // new active), fall back to the OLDEST attached script — never to the
+    // legacy column, which can be stale relative to the new table. Only
+    // fall back to the legacy column when the new table is truly empty
+    // (i.e. an old entry that hasn't been touched since this feature shipped).
+    const { rows: fromTable } = await pool.query(
+      `SELECT funscript_json, is_active
+       FROM private_library_funscripts
+       WHERE library_id = $1 AND user_id = $2
+       ORDER BY is_active DESC, created_at ASC
+       LIMIT 1`,
+      [req.params.id, auth.userId],
+    );
+    const funscript = fromTable.length
+      ? (fromTable[0] as { funscript_json: string }).funscript_json
+      : row.funscript;
+
+    res.json({ title: row.title, funscript });
   } catch {
     res.status(500).json({ error: "Failed to fetch funscript" });
   }

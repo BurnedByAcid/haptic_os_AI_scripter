@@ -45,6 +45,19 @@ export const privateLibraryTable = pgTable("private_library", {
   createdAt:     timestamp("created_at").notNull().defaultNow(),
 });
 
+export const privateLibraryFunscriptsTable = pgTable("private_library_funscripts", {
+  id:            integer("id").generatedAlwaysAsIdentity().primaryKey(),
+  libraryId:     integer("library_id").notNull().references(() => privateLibraryTable.id, { onDelete: "cascade" }),
+  userId:        text("user_id").notNull().references(() => usersTable.clerkId, { onDelete: "cascade" }),
+  name:          text("name").notNull(),
+  funscriptJson: text("funscript_json").notNull(),
+  isActive:      boolean("is_active").notNull().default(false),
+  createdAt:     timestamp("created_at").notNull().defaultNow(),
+  updatedAt:     timestamp("updated_at").notNull().defaultNow(),
+}, (t) => [
+  unique().on(t.libraryId, t.name),
+]);
+
 export const communityScriptsTable = pgTable("community_scripts", {
   id:          integer("id").generatedAlwaysAsIdentity().primaryKey(),
   userId:      text("user_id").notNull().references(() => usersTable.clerkId, { onDelete: "cascade" }),
