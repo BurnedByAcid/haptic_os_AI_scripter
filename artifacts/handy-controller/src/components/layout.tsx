@@ -153,8 +153,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const displaySub  = handle ? "private handle" : (user?.primaryEmailAddress?.emailAddress ?? "");
 
   const handleSaveKey = () => {
+    // updateKey() persists the key and runs a bounded retry burst. If all
+    // attempts fail it stops silently (no toast) per product requirement —
+    // the sidebar status dot already reflects connection state.
     updateKey(inputKey);
-    toast({ title: "Key updated", description: "Attempting to connect to Handy..." });
   };
 
   return (
