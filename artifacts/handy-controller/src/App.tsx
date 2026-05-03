@@ -26,7 +26,6 @@ import Community from "@/pages/community";
 import Upgrade from "@/pages/upgrade";
 import Admin from "@/pages/admin";
 import MyLibrary from "@/pages/my-library";
-import Chat from "@/pages/chat";
 
 const queryClient = new QueryClient();
 
@@ -139,7 +138,6 @@ function Router() {
       <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
       <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
       <Route path="/admin"        component={() => <ProtectedRoute component={Admin} />} />
-      <Route path="/chat"         component={() => <ProtectedRoute component={Chat} />} />
 
       <Route component={NotFound} />
     </Switch>

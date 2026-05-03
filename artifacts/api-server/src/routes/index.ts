@@ -8,7 +8,6 @@ import billingRouter from "./billing";
 import usageRouter from "./usage";
 import libraryRouter from "./library";
 import communityRouter from "./community";
-import chatRouter from "./chat";
 import blockReportsRouter from "./block-reports";
 
 const router: IRouter = Router();
@@ -22,7 +21,6 @@ router.use(billingRouter);
 router.use(usageRouter);
 router.use(libraryRouter);
 router.use(communityRouter);
-router.use(chatRouter);
 router.use(blockReportsRouter);
 
 export default router;

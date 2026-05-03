@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Library, MessageSquare, Mic, PlaySquare, Settings2, Shield, Sparkles, LogIn, LogOut, User, Users, Heart, Pencil, ShieldCheck } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Library, Mic, PlaySquare, Settings2, Shield, Sparkles, LogIn, LogOut, User, Users, Heart, Pencil, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
@@ -86,7 +86,6 @@ const PRO_NAV_ITEMS = [
   { href: "/games",     label: "Games",      icon: Gamepad2 },
   { href: "/beat",      label: "Live Audio",  icon: Activity },
   { href: "/ai",        label: "AI Control",  icon: Sparkles },
-  { href: "/chat",      label: "AI Chat",     icon: MessageSquare },
 ];
 
 const COMING_SOON_ITEMS: { href: string; label: string; icon: typeof Gamepad2 }[] = [];
