@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { validateVideoUrl } from "@/lib/validation";
+import { useBlockedReport } from "@/contexts/blocked-report-context";
 import { VideoControlBar } from "@/components/video-control-bar";
 import { SaveScriptDialog } from "@/components/save-script-dialog";
 
@@ -135,6 +136,7 @@ export default function Scripter() {
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { openBlockedReport } = useBlockedReport();
   const [currentTime, setCurrentTime] = useState(0);
   // Tracks how many times each base filename has been exported this session
   const exportCountsRef = useRef<Map<string, number>>(new Map());
@@ -2497,7 +2499,23 @@ export default function Scripter() {
               data-testid="input-video-url"
             />
             {urlError && (
-              <p className="text-sm text-destructive" data-testid="text-url-error">{urlError}</p>
+              <div className="space-y-1">
+                <p className="text-sm text-destructive" data-testid="text-url-error">{urlError}</p>
+                <button
+                  type="button"
+                  className="text-xs text-primary underline hover:text-primary/80"
+                  onClick={() =>
+                    openBlockedReport({
+                      kind: "scripter_url",
+                      item: urlInput.trim(),
+                      blockMessage: urlError,
+                    })
+                  }
+                  data-testid="button-report-blocked-url"
+                >
+                  Think this is in error? Click to report.
+                </button>
+              </div>
             )}
             <p className="text-xs text-muted-foreground">
               Note: the video host must allow cross-origin playback. If loading fails, download the file and use Load Video instead.

@@ -10,6 +10,7 @@ import { FunscriptWaveform } from "@/components/funscript-waveform";
 import { VideoControlBar } from "@/components/video-control-bar";
 import { useToast } from "@/hooks/use-toast";
 import { validateAndParseFunscriptFile } from "@/lib/validation";
+import { useBlockedReport } from "@/contexts/blocked-report-context";
 
 function parseFunscript(json: unknown): Funscript {
   if (typeof json !== "object" || json === null) throw new Error("Not an object");
@@ -230,6 +231,8 @@ export default function Player() {
     }
   };
 
+  const { reportAction } = useBlockedReport();
+
   const handleScriptUpload = async (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -240,10 +243,12 @@ export default function Player() {
       newScripts[idx] = script as Funscript;
       setScripts(newScripts);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not load script.";
       toast({
         title: "Invalid funscript",
-        description: err instanceof Error ? err.message : "Could not load script.",
+        description: msg,
         variant: "destructive",
+        action: reportAction({ kind: "player_file", item: file.name, blockMessage: msg }),
       });
     }
   };

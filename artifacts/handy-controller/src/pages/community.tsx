@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { validateVideoUrl, validateAndParseFunscriptFile } from "@/lib/validation";
+import { useBlockedReport } from "@/contexts/blocked-report-context";
 import { Link, useLocation } from "wouter";
 
 const API = import.meta.env.VITE_API_URL ?? "";
@@ -189,11 +190,19 @@ export default function Community() {
       setScriptFile(null);
       toast({ title: "Script shared!", description: "Your script is now live in the community." });
     },
-    onError: (err) => toast({
-      title: "Could not share script",
-      description: err instanceof Error ? err.message : "Unknown error.",
-      variant: "destructive",
-    }),
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : "Unknown error.";
+      toast({
+        title: "Could not share script",
+        description: msg,
+        variant: "destructive",
+        action: reportAction({
+          kind: "community_submission",
+          item: form.video_url || form.title || "(submission)",
+          blockMessage: msg,
+        }),
+      });
+    },
   });
 
   async function handleFavorite(s: CommunityScript) {

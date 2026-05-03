@@ -7,6 +7,7 @@ import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check } from
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { validateVideoUrl, validateAndParseFunscriptFile } from "@/lib/validation";
+import { useBlockedReport } from "@/contexts/blocked-report-context";
 
 // File System Access API types (Chrome/Edge, not yet in standard TS lib)
 interface FSAFileHandle extends FileSystemFileHandle {
@@ -230,10 +231,12 @@ export default function Library() {
             await validateAndParseFunscriptFile(file);
           } catch (err) {
             hadError = true;
+            const msg = err instanceof Error ? err.message : "Could not validate file.";
             toast({
               title: `Invalid funscript: ${file.name}`,
-              description: err instanceof Error ? err.message : "Could not validate file.",
+              description: msg,
               variant: "destructive",
+              action: reportAction({ kind: "library_file", item: file.name, blockMessage: msg }),
             });
             continue;
           }
@@ -266,10 +269,12 @@ export default function Library() {
         try {
           await validateAndParseFunscriptFile(file);
         } catch (err) {
+          const msg = err instanceof Error ? err.message : "Could not validate file.";
           toast({
             title: `Invalid funscript: ${file.name}`,
-            description: err instanceof Error ? err.message : "Could not validate file.",
+            description: msg,
             variant: "destructive",
+            action: reportAction({ kind: "library_file", item: file.name, blockMessage: msg }),
           });
           continue;
         }
@@ -294,7 +299,12 @@ export default function Library() {
 
     const urlErr = validateVideoUrl(trimmedUrl);
     if (urlErr) {
-      toast({ title: "Invalid URL", description: urlErr.message, variant: "destructive" });
+      toast({
+        title: "Invalid URL",
+        description: urlErr.message,
+        variant: "destructive",
+        action: reportAction({ kind: "library_url", item: trimmedUrl, blockMessage: urlErr.message }),
+      });
       return;
     }
 

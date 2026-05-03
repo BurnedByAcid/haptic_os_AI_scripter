@@ -9,6 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
 import { HandyProvider } from "@/contexts/handy-context";
+import { BlockedReportProvider } from "@/contexts/blocked-report-context";
 
 import Home from "@/pages/home";
 import Player from "@/pages/player";
@@ -161,10 +162,12 @@ function ClerkProviderWithRouter() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <HandyProvider>
-            <Layout>
-              <Router />
-            </Layout>
-            <Toaster />
+            <BlockedReportProvider>
+              <Layout>
+                <Router />
+              </Layout>
+              <Toaster />
+            </BlockedReportProvider>
           </HandyProvider>
         </TooltipProvider>
       </QueryClientProvider>
