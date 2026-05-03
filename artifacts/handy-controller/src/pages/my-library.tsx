@@ -316,11 +316,15 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
     onError: (err) => {
       const e = err as Error & { code?: string };
       const isCap = e.code === "CAP_REACHED";
+      // Only show the Upgrade CTA when upgrading would actually raise the
+      // cap — i.e. for free-tier users. Subscribers/pro/admin already at
+      // 5/5 just get the standard report action.
+      const showUpgrade = isCap && !isSubscriber;
       toast({
         title: isCap ? "Script cap reached" : "Could not add script",
         description: e.message,
         variant: "destructive",
-        action: isCap
+        action: showUpgrade
           ? upgradeAndReportAction({
               kind: "library_file",
               item: entry?.title ?? "",
