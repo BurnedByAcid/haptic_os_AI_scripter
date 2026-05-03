@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { validateVideoUrl, validateAndParseFunscriptFile } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
 import { Link, useLocation } from "wouter";
+import { TagPicker, ActiveTagChips, CardTagChips } from "@/components/tag-picker";
+import { parseTagsFilter, MAX_TAG_FILTERS, type LibraryTag } from "@workspace/validation";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 const PAGE_SIZE = 20;
@@ -31,6 +33,7 @@ interface CommunityScript {
   rating_count: number;
   user_favorited: boolean;
   user_rating: number | null;
+  tags?: string[];
 }
 
 interface PageResult {
@@ -134,17 +137,26 @@ export default function Community() {
   const { reportAction } = useBlockedReport();
 
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "", video_url: "", tags: "" });
+  const [form, setForm] = useState<{
+    title: string; description: string; video_url: string; tags: LibraryTag[];
+  }>({ title: "", description: "", video_url: "", tags: [] });
   const [scriptFile, setScriptFile] = useState<File | null>(null);
   const [search, setSearch] = useState("");
   const [favoriteLoadingId, setFavoriteLoadingId] = useState<number | null>(null);
   const [rateLoadingId, setRateLoadingId] = useState<number | null>(null);
+  const [editingTagsId, setEditingTagsId] = useState<number | null>(null);
 
   const [allScripts, setAllScripts] = useState<CommunityScript[]>([]);
   const [total, setTotal] = useState(0);
   const [nextOffset, setNextOffset] = useState(0);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Tag filter — synced to URL alongside ?offset. Initial value is parsed
+  // from `?tags=` so refresh / shared links preserve the active filter.
+  const [tagFilter, setTagFilter] = useState<LibraryTag[]>(() =>
+    parseTagsFilter(new URLSearchParams(window.location.search).get("tags")),
+  );
 
   const initializedRef = useRef(false);
 
@@ -155,9 +167,10 @@ export default function Community() {
     return h;
   }
 
-  async function fetchPage(offset: number): Promise<PageResult> {
+  async function fetchPage(offset: number, tags: readonly string[] = tagFilter): Promise<PageResult> {
     const headers = await authHeaders();
-    const res = await fetch(`${API}/api/community?limit=${PAGE_SIZE}&offset=${offset}`, { headers });
+    const tagsQs = tags.length > 0 ? `&tags=${encodeURIComponent(tags.join(","))}` : "";
+    const res = await fetch(`${API}/api/community?limit=${PAGE_SIZE}&offset=${offset}${tagsQs}`, { headers });
     if (!res.ok) throw new Error("Failed to load");
     return res.json() as Promise<PageResult>;
   }
@@ -167,13 +180,12 @@ export default function Community() {
     return Math.max(0, parseInt(params.get("offset") ?? "0", 10));
   }
 
-  function setUrlOffset(offset: number) {
+  function setUrlOffset(offset: number, tags: readonly string[] = tagFilter) {
     const params = new URLSearchParams(window.location.search);
-    if (offset === 0) {
-      params.delete("offset");
-    } else {
-      params.set("offset", String(offset));
-    }
+    if (offset === 0) params.delete("offset");
+    else params.set("offset", String(offset));
+    if (tags.length === 0) params.delete("tags");
+    else params.set("tags", tags.join(","));
     const search = params.toString();
     const newPath = location.split("?")[0] + (search ? `?${search}` : "");
     setLocation(newPath, { replace: true });
@@ -189,7 +201,7 @@ export default function Community() {
     async function init() {
       try {
         const offsets = Array.from({ length: pagesToLoad }, (_, i) => i * PAGE_SIZE);
-        const results = await Promise.all(offsets.map(fetchPage));
+        const results = await Promise.all(offsets.map((o) => fetchPage(o)));
         const accumulated = results.flatMap((r) => r.scripts);
         const lastResult = results[results.length - 1];
         setAllScripts(accumulated);
@@ -205,12 +217,68 @@ export default function Community() {
     init();
   }, []);
 
+  // Re-query from the top whenever the tag filter changes (after init).
+  // We reset paging cursor + clear loaded items so the grid reflects only
+  // results matching the new filter intersection. URL stays in sync.
+  function applyTagFilter(next: LibraryTag[]) {
+    setTagFilter(next);
+    setUrlOffset(0, next);
+    setIsInitialLoading(true);
+    setAllScripts([]);
+    setNextOffset(0);
+    fetchPage(0, next)
+      .then((r) => {
+        setAllScripts(r.scripts);
+        setTotal(r.total);
+        setNextOffset(PAGE_SIZE);
+      })
+      .catch(() => toast({ title: "Failed to apply tag filter", variant: "destructive" }))
+      .finally(() => setIsInitialLoading(false));
+  }
+
+  function addTagToFilter(tag: string) {
+    if (tagFilter.includes(tag as LibraryTag)) return;
+    if (tagFilter.length >= MAX_TAG_FILTERS) {
+      toast({
+        title: `Up to ${MAX_TAG_FILTERS} tags at a time`,
+        description: "Remove a filter chip to add another.",
+      });
+      return;
+    }
+    applyTagFilter([...tagFilter, tag as LibraryTag]);
+  }
+
+  async function handleEditTags(s: CommunityScript, next: LibraryTag[]) {
+    setEditingTagsId(s.id);
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/community/${s.id}/tags`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ tags: next }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(d.error ?? "Failed to update tags");
+      }
+      updateScript(s.id, (sc) => ({ ...sc, tags: next }));
+    } catch (err) {
+      toast({
+        title: "Could not update tags",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setEditingTagsId(null);
+    }
+  }
+
   const hasMore = nextOffset < total;
 
   async function loadMore() {
     setIsLoadingMore(true);
     try {
-      const result = await fetchPage(nextOffset);
+      const result = await fetchPage(nextOffset, tagFilter);
       setAllScripts((prev) => [...prev, ...result.scripts]);
       setTotal(result.total);
       const newNextOffset = nextOffset + PAGE_SIZE;
@@ -238,7 +306,10 @@ export default function Community() {
         method: "POST",
         headers,
         body: JSON.stringify({
-          ...form,
+          title: form.title,
+          description: form.description,
+          video_url: form.video_url,
+          tags: form.tags,
           funscript: JSON.stringify(script),
         }),
       });
@@ -274,7 +345,7 @@ export default function Community() {
       // next "load more" fetch starts at the correct offset.
       setNextOffset((n) => n + 1);
       setShowForm(false);
-      setForm({ title: "", description: "", video_url: "", tags: "" });
+      setForm({ title: "", description: "", video_url: "", tags: [] });
       setScriptFile(null);
       toast({ title: "Script shared!", description: "Your script is now live in the community." });
     },
@@ -449,6 +520,22 @@ export default function Community() {
               />
             </div>
             <div className="space-y-1">
+              <label className="text-xs text-muted-foreground font-medium">Tags (optional)</label>
+              <div className="flex items-center gap-2 flex-wrap">
+                <TagPicker
+                  mode="edit"
+                  selected={form.tags}
+                  onChange={(next) => setForm((f) => ({ ...f, tags: next }))}
+                />
+                <ActiveTagChips
+                  selected={form.tags}
+                  onRemove={(tag) =>
+                    setForm((f) => ({ ...f, tags: f.tags.filter((t) => t !== tag) as LibraryTag[] }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
               <label className="text-xs text-muted-foreground font-medium">Funscript File *</label>
               <div className="relative">
                 <Button variant="outline" className="w-full relative h-10 text-sm justify-start gap-2">
@@ -484,6 +571,17 @@ export default function Community() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm bg-background/50 border-border/50"
+        />
+        <TagPicker
+          mode="filter"
+          selected={tagFilter}
+          onChange={(next) => applyTagFilter(next)}
+        />
+        <ActiveTagChips
+          selected={tagFilter}
+          onRemove={(tag) =>
+            applyTagFilter(tagFilter.filter((t) => t !== tag) as LibraryTag[])
+          }
         />
         {!isInitialLoading && (
           <span className="text-sm text-muted-foreground">
@@ -574,6 +672,18 @@ export default function Community() {
                       <span className="flex items-center gap-1 ml-auto">
                         <Eye className="h-3 w-3" />{s.view_count}
                       </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <CardTagChips tags={s.tags} onTagClick={addTagToFilter} />
+                      {isOwner && (
+                        <TagPicker
+                          mode="edit"
+                          selected={s.tags ?? []}
+                          onChange={(next) => handleEditTags(s, next)}
+                          buttonLabel={editingTagsId === s.id ? "Saving…" : "Edit tags"}
+                        />
+                      )}
                     </div>
 
                     <div className="flex gap-2">

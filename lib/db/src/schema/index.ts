@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, timestamp, integer, date, unique, primaryKey, check } from "drizzle-orm/pg-core";
+import { pgTable, text, boolean, timestamp, integer, date, unique, primaryKey, check, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { sql } from "drizzle-orm";
@@ -53,8 +53,11 @@ export const privateLibraryTable = pgTable("private_library", {
   videoUrl:      text("video_url"),
   localFilePath: text("local_file_path"),
   funscript:     text("funscript").notNull(),
+  tags:          text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
   createdAt:     timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => [
+  index("private_library_tags_gin_idx").using("gin", t.tags),
+]);
 
 export const privateLibraryFunscriptsTable = pgTable("private_library_funscripts", {
   id:            integer("id").generatedAlwaysAsIdentity().primaryKey(),
@@ -78,8 +81,11 @@ export const communityScriptsTable = pgTable("community_scripts", {
   videoUrl:    text("video_url").notNull(),
   funscript:   text("funscript").notNull(),
   viewCount:   integer("view_count").notNull().default(0),
+  tags:        text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
   createdAt:   timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => [
+  index("community_scripts_tags_gin_idx").using("gin", t.tags),
+]);
 
 export const communityFavoritesTable = pgTable("community_favorites", {
   userId:   text("user_id").notNull().references(() => usersTable.clerkId, { onDelete: "cascade" }),

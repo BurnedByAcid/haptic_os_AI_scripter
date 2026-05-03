@@ -3,6 +3,7 @@ import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
 import sanitizeHtml from "sanitize-html";
 import { scriptUploadLimiter, writeLimiter } from "../middlewares/rateLimiters";
+import { validateTagsForWrite, parseTagsFilter } from "@workspace/validation";
 
 const router = Router();
 
@@ -62,12 +63,21 @@ router.get("/community", async (req: Request, res: Response) => {
 
   const limit = Math.min(20, Math.max(1, parseInt(String(req.query.limit ?? "20"), 10)));
   const offset = Math.max(0, parseInt(String(req.query.offset ?? "0"), 10));
+  const tagFilter = parseTagsFilter(req.query.tags);
 
   try {
+    // Build optional tag intersection clause. Tags column has a GIN index so
+    // `cs.tags @> $4::text[]` stays fast even on large tables.
+    const params: unknown[] = [limit, offset, auth.userId];
+    let tagClause = "";
+    if (tagFilter.length > 0) {
+      params.push(tagFilter);
+      tagClause = ` WHERE cs.tags @> $${params.length}::text[]`;
+    }
     const { rows } = await pool.query(
       `SELECT
          cs.id, cs.user_id, cs.username, cs.title, cs.description,
-         cs.video_url, cs.view_count, cs.created_at,
+         cs.video_url, cs.view_count, cs.tags, cs.created_at,
          COUNT(DISTINCT cf.user_id)::int        AS favorite_count,
          ROUND(AVG(cr.rating)::numeric, 1)::float AS avg_rating,
          COUNT(DISTINCT cr.user_id)::int         AS rating_count,
@@ -76,12 +86,23 @@ router.get("/community", async (req: Request, res: Response) => {
        FROM community_scripts cs
        LEFT JOIN community_favorites cf ON cf.script_id = cs.id
        LEFT JOIN community_ratings   cr ON cr.script_id = cs.id
+       ${tagClause}
        GROUP BY cs.id
        ORDER BY cs.created_at DESC
        LIMIT $1 OFFSET $2`,
-      [limit, offset, auth.userId]
+      params,
     );
-    const { rows: countRows } = await pool.query(`SELECT COUNT(*)::int AS total FROM community_scripts`);
+    // Total respects the same tag filter so pagination math stays correct.
+    const totalParams: unknown[] = [];
+    let totalClause = "";
+    if (tagFilter.length > 0) {
+      totalParams.push(tagFilter);
+      totalClause = ` WHERE tags @> $1::text[]`;
+    }
+    const { rows: countRows } = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM community_scripts${totalClause}`,
+      totalParams,
+    );
     res.json({ scripts: rows, total: (countRows[0] as { total: number }).total, limit, offset });
   } catch (err) {
     console.error("GET /community error:", err);
@@ -107,7 +128,7 @@ router.get("/community/:id", async (req: Request, res: Response) => {
     const { rows } = await pool.query(
       `SELECT
          cs.id, cs.user_id, cs.username, cs.title, cs.description,
-         cs.video_url, cs.funscript, cs.view_count, cs.created_at,
+         cs.video_url, cs.funscript, cs.view_count, cs.tags, cs.created_at,
          COUNT(DISTINCT cf.user_id)::int        AS favorite_count,
          ROUND(AVG(cr.rating)::numeric, 1)::float AS avg_rating,
          COUNT(DISTINCT cr.user_id)::int         AS rating_count,
@@ -145,6 +166,7 @@ router.post("/community", writeLimiter, scriptUploadLimiter, async (req: Request
     description: rawDescription,
     video_url: rawVideoUrl,
     funscript: rawFunscript,
+    tags: rawTags,
   } = req.body as Record<string, unknown>;
 
   const title = sanitizeText(rawTitle, 255);
@@ -154,6 +176,10 @@ router.post("/community", writeLimiter, scriptUploadLimiter, async (req: Request
   if (!title) { res.status(400).json({ error: "title is required" }); return; }
   if (!video_url) { res.status(400).json({ error: "video_url is required" }); return; }
   if (!rawFunscript) { res.status(400).json({ error: "funscript is required" }); return; }
+
+  const tagsResult = validateTagsForWrite(rawTags);
+  if ("error" in tagsResult) { res.status(400).json({ error: tagsResult.error.message }); return; }
+  const tags = tagsResult.tags;
 
   // Derive username from trusted DB record — never trust client-supplied username
   const { rows: userRows } = await pool.query(
@@ -179,10 +205,10 @@ router.post("/community", writeLimiter, scriptUploadLimiter, async (req: Request
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO community_scripts (user_id, username, title, description, video_url, funscript)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, user_id, username, title, description, video_url, view_count, created_at`,
-      [auth.userId, username, title, description, video_url, funscriptStr]
+      `INSERT INTO community_scripts (user_id, username, title, description, video_url, funscript, tags)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, user_id, username, title, description, video_url, view_count, tags, created_at`,
+      [auth.userId, username, title, description, video_url, funscriptStr, tags],
     );
     res.status(201).json(rows[0]);
   } catch {
@@ -210,6 +236,32 @@ router.delete("/community/:id", writeLimiter, async (req: Request, res: Response
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Failed to delete" });
+  }
+});
+
+/**
+ * PATCH /api/community/:id/tags
+ * Update tags on the caller's own shared script.
+ */
+router.patch("/community/:id/tags", writeLimiter, async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const id = parseInt(String(req.params.id), 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  const tagsResult = validateTagsForWrite((req.body as Record<string, unknown>).tags);
+  if ("error" in tagsResult) { res.status(400).json({ error: tagsResult.error.message }); return; }
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE community_scripts SET tags = $1 WHERE id = $2 AND user_id = $3`,
+      [tagsResult.tags, id, auth.userId],
+    );
+    if (!rowCount) { res.status(404).json({ error: "Not found or not your script" }); return; }
+    res.json({ ok: true, tags: tagsResult.tags });
+  } catch {
+    res.status(500).json({ error: "Failed to update tags" });
   }
 });
 

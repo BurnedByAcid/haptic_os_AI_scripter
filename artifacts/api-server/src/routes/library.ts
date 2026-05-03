@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
 import sanitizeHtml from "sanitize-html";
+import { validateTagsForWrite, parseTagsFilter } from "@workspace/validation";
 
 const router = Router();
 
@@ -31,10 +32,16 @@ function validateFunscriptJson(raw: unknown): string | null {
   return null;
 }
 
-/** GET /api/library — list the calling user's private library entries */
+/** GET /api/library — list the calling user's private library entries.
+ *  Optional `?tags=foo,bar,baz` (max 3, AND/intersection) narrows the result.
+ */
 router.get("/library", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  // Parse + sanitise tag filter — unknown tags are silently dropped so a
+  // stale URL doesn't 400. Capped at MAX_TAG_FILTERS (3) to bound query cost.
+  const tagFilter = parseTagsFilter(req.query.tags);
 
   try {
     // Include a count of scripts attached to each entry so the My Library
@@ -43,8 +50,14 @@ router.get("/library", async (req: Request, res: Response) => {
     // 0 rows in private_library_funscripts but always have the legacy single
     // funscript column populated, so they effectively have 1 script — surface
     // that as a minimum of 1 when the legacy column is non-null.
+    const params: unknown[] = [auth.userId];
+    let tagClause = "";
+    if (tagFilter.length > 0) {
+      params.push(tagFilter);
+      tagClause = ` AND pl.tags @> $${params.length}::text[]`;
+    }
     const { rows } = await pool.query(
-      `SELECT pl.id, pl.title, pl.video_url, pl.local_file_path, pl.created_at,
+      `SELECT pl.id, pl.title, pl.video_url, pl.local_file_path, pl.tags, pl.created_at,
               GREATEST(
                 COALESCE((
                   SELECT COUNT(*)::int FROM private_library_funscripts plf
@@ -53,9 +66,9 @@ router.get("/library", async (req: Request, res: Response) => {
                 CASE WHEN pl.funscript IS NOT NULL THEN 1 ELSE 0 END
               ) AS script_count
        FROM private_library pl
-       WHERE pl.user_id = $1
+       WHERE pl.user_id = $1${tagClause}
        ORDER BY pl.created_at DESC`,
-      [auth.userId]
+      params,
     );
     res.json(rows);
   } catch {
@@ -68,11 +81,15 @@ router.post("/library", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
-  const { title: rawTitle, video_url, local_file_path, funscript: rawFunscript } = req.body as Record<string, unknown>;
+  const { title: rawTitle, video_url, local_file_path, funscript: rawFunscript, tags: rawTags } = req.body as Record<string, unknown>;
 
   const title = sanitizeText(rawTitle);
   if (!title) { res.status(400).json({ error: "title is required" }); return; }
   if (!rawFunscript) { res.status(400).json({ error: "funscript is required" }); return; }
+
+  const tagsResult = validateTagsForWrite(rawTags);
+  if ("error" in tagsResult) { res.status(400).json({ error: tagsResult.error.message }); return; }
+  const tags = tagsResult.tags;
 
   const funscriptStr = typeof rawFunscript === "string" ? rawFunscript : JSON.stringify(rawFunscript);
   if (funscriptStr.length > 10 * 1024 * 1024) {
@@ -97,10 +114,10 @@ router.post("/library", async (req: Request, res: Response) => {
     try {
       await client.query("BEGIN");
       const { rows } = await client.query(
-        `INSERT INTO private_library (user_id, title, video_url, local_file_path, funscript)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, title, video_url, local_file_path, created_at`,
-        [auth.userId, title, videoUrl, localFilePath, funscriptStr]
+        `INSERT INTO private_library (user_id, title, video_url, local_file_path, funscript, tags)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, title, video_url, local_file_path, tags, created_at`,
+        [auth.userId, title, videoUrl, localFilePath, funscriptStr, tags],
       );
       const libraryId = (rows[0] as { id: number }).id;
       await client.query(
@@ -164,6 +181,26 @@ router.get("/library/:id/funscript", async (req: Request, res: Response) => {
     res.json({ title: row.title, funscript });
   } catch {
     res.status(500).json({ error: "Failed to fetch funscript" });
+  }
+});
+
+/** PATCH /api/library/:id/tags — update the tags on one library entry. */
+router.patch("/library/:id/tags", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const tagsResult = validateTagsForWrite((req.body as Record<string, unknown>).tags);
+  if ("error" in tagsResult) { res.status(400).json({ error: tagsResult.error.message }); return; }
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE private_library SET tags = $1 WHERE id = $2 AND user_id = $3`,
+      [tagsResult.tags, req.params.id, auth.userId],
+    );
+    if (!rowCount) { res.status(404).json({ error: "Not found or not your entry" }); return; }
+    res.json({ ok: true, tags: tagsResult.tags });
+  } catch {
+    res.status(500).json({ error: "Failed to update tags" });
   }
 });
 

@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { TagPicker, ActiveTagChips, CardTagChips } from "@/components/tag-picker";
+import { parseTagsFilter, MAX_TAG_FILTERS, type LibraryTag } from "@workspace/validation";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
@@ -38,6 +40,7 @@ interface LibraryEntry {
   local_file_path: string | null;
   created_at: string;
   script_count?: number;
+  tags?: string[];
 }
 
 interface AttachedScript {
@@ -874,10 +877,30 @@ export default function MyLibrary() {
   const { isPro } = useSubscription();
   const qc = useQueryClient();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [shareEntry, setShareEntry] = useState<LibraryEntry | null>(null);
   const [scriptsEntry, setScriptsEntry] = useState<LibraryEntry | null>(null);
+
+  // Tag-filter state. Source of truth lives in the URL (`?tags=foo,bar`)
+  // so a refresh / share-link preserves the active filter. We hydrate the
+  // initial value from the URL via parseTagsFilter — same canonicalisation
+  // the server uses, so unknown/duplicate tags are dropped silently.
+  const [tagFilter, setTagFilter] = useState<LibraryTag[]>(() =>
+    parseTagsFilter(new URLSearchParams(window.location.search).get("tags")),
+  );
+  // Wouter doesn't track query strings, so push our own ?tags= updates via
+  // history.replaceState — matches how community.tsx handles ?offset=.
+  const tagFilterRef = useRef(tagFilter);
+  tagFilterRef.current = tagFilter;
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (tagFilter.length === 0) params.delete("tags");
+    else params.set("tags", tagFilter.join(","));
+    const search = params.toString();
+    const newPath = location.split("?")[0] + (search ? `?${search}` : "");
+    setLocation(newPath, { replace: true });
+  }, [tagFilter, location, setLocation]);
 
   async function authHeaders(): Promise<Record<string, string>> {
     const token = await getToken();
@@ -886,14 +909,51 @@ export default function MyLibrary() {
     return h;
   }
 
+  const tagsQueryParam = tagFilter.join(",");
   const { data: entries = [], isLoading } = useQuery<LibraryEntry[]>({
-    queryKey: ["my-library"],
+    queryKey: ["my-library", tagsQueryParam],
     queryFn: async () => {
       const headers = await authHeaders();
-      const res = await fetch(`${API}/api/library`, { headers });
+      const url = `${API}/api/library${tagsQueryParam ? `?tags=${encodeURIComponent(tagsQueryParam)}` : ""}`;
+      const res = await fetch(url, { headers });
       if (!res.ok) throw new Error("Failed to load library");
       return res.json();
     },
+  });
+
+  function addTagToFilter(tag: string) {
+    setTagFilter((prev) => {
+      if (prev.includes(tag as LibraryTag)) return prev;
+      if (prev.length >= MAX_TAG_FILTERS) {
+        toast({
+          title: `Up to ${MAX_TAG_FILTERS} tags at a time`,
+          description: "Remove a filter chip to add another.",
+        });
+        return prev;
+      }
+      return [...prev, tag as LibraryTag];
+    });
+  }
+
+  const updateTagsMutation = useMutation({
+    mutationFn: async (vars: { id: number; tags: string[] }) => {
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/library/${vars.id}/tags`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ tags: vars.tags }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(d.error ?? "Failed to update tags");
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["my-library"] }),
+    onError: (err) => toast({
+      title: "Could not update tags",
+      description: err instanceof Error ? err.message : "Unknown error",
+      variant: "destructive",
+    }),
   });
 
   const deleteMutation = useMutation({
@@ -1066,10 +1126,24 @@ export default function MyLibrary() {
           <h1 className="text-3xl font-bold tracking-tight">My Library</h1>
           <p className="text-muted-foreground">Your privately saved funscripts.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ["my-library"] })}>
-          <RefreshCw className="h-4 w-4 mr-2" /> Refresh
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <TagPicker
+            mode="filter"
+            selected={tagFilter}
+            onChange={(next) => setTagFilter(next)}
+          />
+          <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ["my-library"] })}>
+            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+          </Button>
+        </div>
       </div>
+
+      <ActiveTagChips
+        selected={tagFilter}
+        onRemove={(tag) =>
+          setTagFilter((prev) => prev.filter((t) => t !== tag) as LibraryTag[])
+        }
+      />
 
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1126,6 +1200,18 @@ export default function MyLibrary() {
                 <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-auto">
                   <Clock className="h-3 w-3" />
                   {timeAgo(entry.created_at)}
+                </div>
+
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <CardTagChips tags={entry.tags} onTagClick={addTagToFilter} />
+                  <TagPicker
+                    mode="edit"
+                    selected={entry.tags ?? []}
+                    onChange={(next) =>
+                      updateTagsMutation.mutate({ id: entry.id, tags: next })
+                    }
+                    buttonLabel="Edit tags"
+                  />
                 </div>
 
                 <div className="flex gap-2 flex-wrap">
