@@ -892,8 +892,6 @@ export default function MyLibrary() {
   );
   // Wouter doesn't track query strings, so push our own ?tags= updates via
   // history.replaceState — matches how community.tsx handles ?offset=.
-  const tagFilterRef = useRef(tagFilter);
-  tagFilterRef.current = tagFilter;
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (tagFilter.length === 0) params.delete("tags");
