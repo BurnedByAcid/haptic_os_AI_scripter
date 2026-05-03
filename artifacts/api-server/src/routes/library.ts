@@ -37,9 +37,24 @@ router.get("/library", async (req: Request, res: Response) => {
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
   try {
+    // Include a count of scripts attached to each entry so the My Library
+    // cards can show a "N / cap" badge without N+1 round-trips. Older entries
+    // that haven't been touched since the multi-script feature shipped have
+    // 0 rows in private_library_funscripts but always have the legacy single
+    // funscript column populated, so they effectively have 1 script — surface
+    // that as a minimum of 1 when the legacy column is non-null.
     const { rows } = await pool.query(
-      `SELECT id, title, video_url, local_file_path, created_at FROM private_library
-       WHERE user_id = $1 ORDER BY created_at DESC`,
+      `SELECT pl.id, pl.title, pl.video_url, pl.local_file_path, pl.created_at,
+              GREATEST(
+                COALESCE((
+                  SELECT COUNT(*)::int FROM private_library_funscripts plf
+                  WHERE plf.library_id = pl.id AND plf.user_id = pl.user_id
+                ), 0),
+                CASE WHEN pl.funscript IS NOT NULL THEN 1 ELSE 0 END
+              ) AS script_count
+       FROM private_library pl
+       WHERE pl.user_id = $1
+       ORDER BY pl.created_at DESC`,
       [auth.userId]
     );
     res.json(rows);

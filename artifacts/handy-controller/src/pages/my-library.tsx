@@ -32,6 +32,7 @@ interface LibraryEntry {
   video_url: string | null;
   local_file_path: string | null;
   created_at: string;
+  script_count?: number;
 }
 
 interface AttachedScript {
@@ -234,6 +235,7 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey });
+      qc.invalidateQueries({ queryKey: ["my-library"] });
       setEditingId(null);
     },
     onError: (err) => toast({
@@ -278,7 +280,10 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
         throw new Error(d.error ?? "Delete failed");
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      qc.invalidateQueries({ queryKey: ["my-library"] });
+    },
     onError: (err) => toast({
       title: "Could not delete",
       description: err instanceof Error ? err.message : "Unknown error",
@@ -308,6 +313,7 @@ function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProp
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey });
+      qc.invalidateQueries({ queryKey: ["my-library"] });
       setAdding(false);
       setNewName("");
       setCopySourceLibraryId("");
@@ -917,6 +923,27 @@ export default function MyLibrary() {
                   data-testid={`button-manage-scripts-${entry.id}`}
                 >
                   <FileJson className="h-3 w-3" /> Manage funscripts
+                  {(() => {
+                    const count = entry.script_count ?? 0;
+                    const cap = isPro ? 5 : 1;
+                    const atCap = count >= cap;
+                    const nearCap = isPro && count >= cap - 1 && !atCap;
+                    return (
+                      <span
+                        className={`ml-1 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums border ${
+                          atCap
+                            ? "bg-amber-400/10 text-amber-400 border-amber-400/30"
+                            : nearCap
+                              ? "bg-amber-400/5 text-amber-300/90 border-amber-400/20"
+                              : "bg-muted/40 text-muted-foreground border-border/40"
+                        }`}
+                        title={`${count} of ${cap} script${cap === 1 ? "" : "s"} attached`}
+                        data-testid={`badge-script-count-${entry.id}`}
+                      >
+                        {count} / {cap}
+                      </span>
+                    );
+                  })()}
                 </Button>
 
                 <div className="flex gap-2">
