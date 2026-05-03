@@ -31,6 +31,9 @@ interface SaveScriptDialogProps {
   videoFileName: string | null;
   suggestedTitle?: string;
   onDownload: () => void;
+  /** Called after a successful Save-to-Library or Share-to-Community write
+   * so the parent can clear its dirty/unsaved-work flag. */
+  onSavedSuccess?: () => void;
 }
 
 type SaveMode = "idle" | "library" | "community";
@@ -43,6 +46,7 @@ export function SaveScriptDialog({
   videoFileName,
   suggestedTitle = "",
   onDownload,
+  onSavedSuccess,
 }: SaveScriptDialogProps) {
   const { getToken } = useAuth();
   const { isPro, isLoaded: planLoaded } = useSubscription();
@@ -121,6 +125,7 @@ export function SaveScriptDialog({
       }
 
       setSaved(true);
+      onSavedSuccess?.();
       toast({ title: "Saved to My Library", description: `"${title.trim()}" has been saved.` });
       setTimeout(() => { setSaved(false); onClose(); setMode("idle"); }, 1200);
     } catch (err) {
@@ -163,6 +168,7 @@ export function SaveScriptDialog({
         throw new Error(data.error ?? "Failed to share");
       }
       setSaved(true);
+      onSavedSuccess?.();
       toast({ title: "Shared to Community!", description: `"${title.trim()}" is now live.` });
       setTimeout(() => { setSaved(false); onClose(); setMode("idle"); }, 1200);
     } catch (err) {

@@ -84,6 +84,10 @@ Express 5 backend with Clerk auth middleware.
 - `POST /api/billing/webhook` — raw body (no Clerk auth); handles Stripe webhook events for plan updates
 - `GET /api/usage/scripter/today` — auth-required; returns today's Scripter session count
 - `POST /api/usage/scripter/record` — auth-required; increments today's Scripter session count
+- `GET /api/scripter-drafts` — auth-required; lists current user's draft slots (free + subscriber both allowed; free is read-only)
+- `GET /api/scripter-drafts/:slot` — auth-required; returns one slot incl. `funscript_json`
+- `PUT /api/scripter-drafts/:slot` — auth+subscriber-only; upserts a slot (1-3), re-validates name + funscript on every write, refreshes 10-day TTL
+- `DELETE /api/scripter-drafts/:slot` — auth-required; removes a slot
 
 **Stripe initialization:** `initStripe()` in `index.ts` runs `runMigrations()`, creates managed webhook, and runs `syncBackfill()` on startup. Fails gracefully if Stripe is not connected.
 
@@ -98,6 +102,7 @@ Drizzle ORM + PostgreSQL. Schema in `lib/db/src/schema/index.ts`. Push changes w
 **Tables:**
 - `users` — `clerk_id` (PK), `username` (unique), `age_verified` (bool), `plan` (text, default 'free'), `stripe_customer_id` (text, nullable), `stripe_subscription_id` (text, nullable), `created_at`
 - `scripter_usage` — `id` (PK), `user_id` (FK → users.clerk_id), `usage_date` (date), `count` (int). Unique on (user_id, usage_date).
+- `scripter_drafts` — `id` (PK), `user_id` (FK → users.clerk_id), `slot` (1-3, CHECK), `name`, `funscript_json`, `updated_at`, `expires_at` (last write + 10 days). Unique on (user_id, slot). Subscriber-only feature; downgraded users keep read-only access until TTL expiry.
 - `stripe.*` — Auto-managed by `stripe-replit-sync` (products, prices, customers, subscriptions, etc.)
 
 ### Scripts (`scripts/`)

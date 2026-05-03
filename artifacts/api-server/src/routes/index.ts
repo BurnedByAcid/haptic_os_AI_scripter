@@ -9,6 +9,7 @@ import usageRouter from "./usage";
 import libraryRouter from "./library";
 import communityRouter from "./community";
 import blockReportsRouter from "./block-reports";
+import scripterDraftsRouter from "./scripter-drafts";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(usageRouter);
 router.use(libraryRouter);
 router.use(communityRouter);
 router.use(blockReportsRouter);
+router.use(scripterDraftsRouter);
 
 export default router;

@@ -18,6 +18,9 @@ import { validateVideoUrl } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
 import { VideoControlBar } from "@/components/video-control-bar";
 import { SaveScriptDialog } from "@/components/save-script-dialog";
+import { ScripterDrafts, ResumeDraftPicker, ExitWarningDialog, type DraftSummary } from "@/components/scripter-drafts";
+import { useDirtyExitWarning } from "@/hooks/use-dirty-exit-warning";
+import { useLocation } from "wouter";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -62,7 +65,34 @@ interface Point {
 export default function Scripter() {
   const { key, connected } = useHandy();
   const { isFree, isLoaded: planLoaded } = useSubscription();
+  const isSubscriber = planLoaded && !isFree;
   const { getToken } = useAuth();
+  const [, setLocation] = useLocation();
+
+  // ─── Dirty / unsaved-work tracking ───
+  // We snapshot the "clean" `Point[]` array reference. Dirty = the live
+  // `points` reference is no longer the snapshot. React always swaps the
+  // array reference on every `setPoints(...)`, so identity comparison is
+  // both cheap (no JSON hashing of thousands of points) and correct (it
+  // catches every real mutation while letting trusted checkpoints below
+  // swap the snapshot in lockstep with the new points value).
+  //
+  // Checkpoint usage:
+  //   - export (no points change)        → `markClean()`
+  //   - import / draft load / New Script → `setPoints(next); markClean(next);`
+  const [dirty, setDirty] = useState(false);
+  const cleanPointsRef = useRef<Point[] | null>(null);
+  const markClean = useCallback((snapshot?: Point[]) => {
+    cleanPointsRef.current = snapshot ?? pointsRef.current;
+    setDirty(false);
+  }, []);
+
+  // ─── Draft / exit warning state ───
+  const [activeDraftSlot, setActiveDraftSlot] = useState<number | null>(null);
+  const [resumeDrafts, setResumeDrafts] = useState<DraftSummary[]>([]);
+  const [resumePickerOpen, setResumePickerOpen] = useState(false);
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
+  const pendingNavRef = useRef<string | null>(null);
 
   // ─── Save dialog ───
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
@@ -155,6 +185,127 @@ export default function Scripter() {
   useEffect(() => { currentTimeRef.current = currentTime; }, [currentTime]);
   useEffect(() => { pointsRef.current = points; }, [points]);
   useEffect(() => { selectedIdsRef.current = selectedIds; }, [selectedIds]);
+
+  // Initialise the clean-snapshot to whatever points we hydrated with so a
+  // localStorage-restored session opens as "clean", then keep `dirty` in
+  // sync via identity comparison against the snapshot.
+  useEffect(() => {
+    if (cleanPointsRef.current === null) cleanPointsRef.current = points;
+    setDirty(points !== cleanPointsRef.current);
+  }, [points]);
+
+  // Build / apply funscript JSON for draft save/load.
+  const buildFunscriptJson = useCallback(() => {
+    const sorted = [...pointsRef.current].sort((a, b) => a.time - b.time);
+    return JSON.stringify({ actions: sorted.map(p => ({ at: Math.round(p.time), pos: p.pos })) });
+  }, []);
+
+  // Replaces the editor's points with a freshly-parsed funscript and
+  // simultaneously snapshots the new array as the "clean" baseline. Doing
+  // both in the same call avoids the async-setState race where the parent
+  // would otherwise call `markClean()` against the stale `pointsRef.current`
+  // and the next commit would immediately re-mark dirty.
+  const applyFunscriptJson = useCallback((json: string, _draftName: string): Point[] => {
+    try {
+      const parsed = JSON.parse(json) as { actions?: { at: number; pos: number }[] };
+      if (!Array.isArray(parsed.actions)) return pointsRef.current;
+      const imported: Point[] = parsed.actions
+        .filter(a => a && typeof a.at === "number" && typeof a.pos === "number")
+        .map(a => ({
+          id: crypto.randomUUID(),
+          time: a.at,
+          pos: Math.max(0, Math.min(100, a.pos)),
+        }));
+      setPoints(imported);
+      setSelectedIds(new Set());
+      markClean(imported);
+      return imported;
+    } catch {
+      toast({ title: "Couldn't load draft (invalid funscript JSON)", variant: "destructive" });
+      return pointsRef.current;
+    }
+  }, [markClean]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Resume-draft picker on mount: show only when editor is empty and the
+  //     user actually has saved drafts (subscriber or recently-downgraded). ───
+  const resumeCheckedRef = useRef(false);
+  useEffect(() => {
+    if (resumeCheckedRef.current) return;
+    if (!planLoaded) return;
+    resumeCheckedRef.current = true;
+    if (pointsRef.current.length > 0) return;
+    (async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const res = await fetch(`${API_BASE}/api/scripter-drafts`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const list = await res.json() as DraftSummary[];
+        if (list.length > 0) {
+          setResumeDrafts(list);
+          setResumePickerOpen(true);
+        }
+      } catch { /* silent */ }
+    })();
+  }, [planLoaded, getToken]);
+
+  const handleResumeDraft = useCallback(async (slot: number) => {
+    setResumePickerOpen(false);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/scripter-drafts/${slot}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        toast({ title: "Couldn't load draft", variant: "destructive" });
+        return;
+      }
+      const d = await res.json() as DraftSummary & { funscript_json: string };
+      const nextPoints = applyFunscriptJson(d.funscript_json, d.name);
+      setActiveDraftSlot(slot);
+      markClean(nextPoints);
+    } catch {
+      toast({ title: "Network error loading draft", variant: "destructive" });
+    }
+  }, [getToken, applyFunscriptJson, markClean, toast]);
+
+  // ─── Exit warning ───
+  const handleAttemptNavigate = useCallback((href: string | null) => {
+    pendingNavRef.current = href;
+    setExitDialogOpen(true);
+    return false;
+  }, []);
+  useDirtyExitWarning({ dirty, onAttemptNavigate: handleAttemptNavigate });
+  const handleExitConfirm = useCallback(() => {
+    setExitDialogOpen(false);
+    setDirty(false);
+    const href = pendingNavRef.current;
+    pendingNavRef.current = null;
+    if (href === null) {
+      // Came from popstate (back/forward) — replay the back action.
+      setTimeout(() => window.history.back(), 0);
+      return;
+    }
+    if (href) {
+      try {
+        const url = new URL(href, window.location.href);
+        if (url.origin === window.location.origin) {
+          // Defer so React commits the dirty=false update first
+          setTimeout(() => setLocation(url.pathname + url.search + url.hash), 0);
+        } else {
+          window.location.href = href;
+        }
+      } catch {
+        window.location.href = href;
+      }
+    }
+  }, [setLocation]);
+  const handleExitCancel = useCallback(() => {
+    setExitDialogOpen(false);
+    pendingNavRef.current = null;
+  }, []);
 
   // ─── Video rect (for VT overlay alignment) ───
   const videoBlockRef = useRef<HTMLDivElement>(null);
@@ -875,6 +1026,7 @@ export default function Scripter() {
         const writable = await handle.createWritable();
         await writable.write(json);
         await writable.close();
+        markClean();
         return;
       } catch (err) {
         // User cancelled the picker — do nothing
@@ -891,6 +1043,7 @@ export default function Scripter() {
     a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
+    markClean();
   };
 
   const deleteSelected = () => {
@@ -1077,6 +1230,7 @@ export default function Scripter() {
         ) {
           setPoints(imported);
           setSelectedIds(new Set());
+          markClean(imported);
         }
       } catch {
         alert("Could not parse the file. Make sure it is a valid .funscript or JSON file.");
@@ -1664,9 +1818,12 @@ export default function Scripter() {
             size="sm"
             onClick={() => {
               if (points.length === 0 || window.confirm("Start a new script? All unsaved points will be cleared.")) {
-                setPoints([]);
+                const empty: Point[] = [];
+                setPoints(empty);
                 setSelectedIds(new Set());
+                setActiveDraftSlot(null);
                 try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+                markClean(empty);
               }
             }}
             data-testid="button-new-script"
@@ -1677,6 +1834,21 @@ export default function Scripter() {
             <BookmarkPlus className="mr-2 h-4 w-4" /> Save Script
           </Button>
         </div>
+      </div>
+
+      {/* ── Drafts panel (subscriber: 3 slots, free: upsell badge) ── */}
+      <div className="flex-shrink-0">
+        <ScripterDrafts
+          isSubscriber={isSubscriber}
+          planLoaded={planLoaded}
+          buildFunscriptJson={buildFunscriptJson}
+          applyFunscriptJson={applyFunscriptJson}
+          onSaved={markClean}
+          suggestedName={videoFileName ? videoFileName.replace(/\.[^/.]+$/, "") : undefined}
+          autosaveDirty={dirty && points.length > 0}
+          activeSlot={activeDraftSlot}
+          onActiveSlotChange={setActiveDraftSlot}
+        />
       </div>
 
       {/* ── Shared video player — takes 2/3 of available height ── */}
@@ -2528,6 +2700,23 @@ export default function Scripter() {
         </DialogContent>
       </Dialog>
 
+      {/* ── Resume-draft picker (shown on mount when editor empty + drafts exist) ── */}
+      {resumePickerOpen && (
+        <ResumeDraftPicker
+          drafts={resumeDrafts}
+          onResume={handleResumeDraft}
+          onSkip={() => setResumePickerOpen(false)}
+        />
+      )}
+
+      {/* ── Exit warning dialog ── */}
+      <ExitWarningDialog
+        open={exitDialogOpen}
+        isFree={isFree}
+        onStay={handleExitCancel}
+        onLeave={handleExitConfirm}
+      />
+
       {/* ── Save Script Dialog ── */}
       {saveDialogOpen && (() => {
         const sorted = [...points].sort((a, b) => a.time - b.time);
@@ -2542,6 +2731,7 @@ export default function Scripter() {
             videoFileName={videoFileName}
             suggestedTitle={baseName}
             onDownload={() => { exportScript(); setSaveDialogOpen(false); }}
+            onSavedSuccess={() => markClean()}
           />
         );
       })()}

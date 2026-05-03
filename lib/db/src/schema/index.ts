@@ -22,6 +22,19 @@ export const scripterUsageTable = pgTable("scripter_usage", {
   unique().on(t.userId, t.usageDate),
 ]);
 
+export const scripterDraftsTable = pgTable("scripter_drafts", {
+  id:            integer("id").generatedAlwaysAsIdentity().primaryKey(),
+  userId:        text("user_id").notNull().references(() => usersTable.clerkId, { onDelete: "cascade" }),
+  slot:          integer("slot").notNull(),
+  name:          text("name").notNull(),
+  funscriptJson: text("funscript_json").notNull(),
+  updatedAt:     timestamp("updated_at").notNull().defaultNow(),
+  expiresAt:     timestamp("expires_at").notNull(),
+}, (t) => [
+  unique().on(t.userId, t.slot),
+  check("scripter_draft_slot_range", sql`${t.slot} BETWEEN 1 AND 3`),
+]);
+
 export const privateLibraryTable = pgTable("private_library", {
   id:            integer("id").generatedAlwaysAsIdentity().primaryKey(),
   userId:        text("user_id").notNull().references(() => usersTable.clerkId, { onDelete: "cascade" }),
