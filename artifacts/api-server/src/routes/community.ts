@@ -60,7 +60,7 @@ router.get("/community", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
-  const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit ?? "20"), 10)));
+  const limit = Math.min(20, Math.max(1, parseInt(String(req.query.limit ?? "20"), 10)));
   const offset = Math.max(0, parseInt(String(req.query.offset ?? "0"), 10));
 
   try {
