@@ -44,6 +44,21 @@ function stripBase(path: string): string {
     : path;
 }
 
+const clerkLocalization = {
+  signIn: {
+    start: {
+      title: "Sign in to HapticOS",
+      subtitle: "to continue to HapticOS",
+    },
+  },
+  signUp: {
+    start: {
+      title: "Create your HapticOS account",
+      subtitle: "to continue to HapticOS",
+    },
+  },
+};
+
 const clerkAppearance = {
   baseTheme: dark,
   cssLayerName: "clerk",
@@ -85,8 +100,8 @@ const clerkAppearance = {
     identityPreviewEditButton: "!text-[#A855F7]",
     formFieldSuccessText: "!text-green-400",
     alertText: "!text-white",
-    alert: "!bg-[#161B22] !border-[#30363D]",
-    otpCodeFieldInput: "!bg-[#161B22] !border-[#30363D] !text-white",
+    alert: "!bg-[#17131F] !border-[#302840]",
+    otpCodeFieldInput: "!bg-[#17131F] !border-[#302840] !text-white",
     formFieldRow: "",
     main: "",
     logoBox: "flex justify-center",
@@ -151,6 +166,7 @@ function ClerkProviderWithRouter() {
       publishableKey={clerkPubKey!}
       proxyUrl={clerkProxyUrl}
       appearance={clerkAppearance}
+      localization={clerkLocalization}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
       afterSignOutUrl={`${basePath}/`}
