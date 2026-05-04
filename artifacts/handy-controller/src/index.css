@@ -194,13 +194,31 @@
   }
 }
 
-.emblem-glow {
+.emblem-glow-wrap {
+  position: relative;
+}
+
+.emblem-glow-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 400ms ease-in-out;
+  border-radius: 50%;
+}
+
+.emblem-glow-layer--active {
+  opacity: 1;
+}
+
+.emblem-glow-layer--disconnected {
   animation: emblem-glow-disconnected 3s ease-in-out infinite;
 }
-.emblem-glow--checking {
+
+.emblem-glow-layer--checking {
   animation: emblem-glow-checking 1.5s ease-in-out infinite;
 }
-.emblem-glow--connected {
+
+.emblem-glow-layer--connected {
   animation: emblem-glow-connected 3s ease-in-out infinite;
 }
 

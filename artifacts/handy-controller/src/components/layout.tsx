@@ -153,11 +153,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
     updateKey(inputKey);
   };
 
-  const emblemGlowClass = checking
-    ? "emblem-glow emblem-glow--checking"
-    : connected
-    ? "emblem-glow emblem-glow--connected"
-    : "emblem-glow";
+  const emblemGlowState = checking ? "checking" : connected ? "connected" : "disconnected";
+
+  const EmblemGlow = ({ className = "" }: { className?: string }) => (
+    <div className={`emblem-glow-wrap h-8 w-8 flex-shrink-0 ${className}`}>
+      <img
+        src="/hapticos-logo.jpg"
+        alt="HapticOS"
+        className={`h-8 w-8 rounded-full emblem-glow-layer emblem-glow-layer--disconnected${emblemGlowState === "disconnected" ? " emblem-glow-layer--active" : ""}`}
+      />
+      <img
+        src="/hapticos-logo.jpg"
+        alt=""
+        aria-hidden="true"
+        className={`h-8 w-8 rounded-full emblem-glow-layer emblem-glow-layer--checking${emblemGlowState === "checking" ? " emblem-glow-layer--active" : ""}`}
+      />
+      <img
+        src="/hapticos-logo.jpg"
+        alt=""
+        aria-hidden="true"
+        className={`h-8 w-8 rounded-full emblem-glow-layer emblem-glow-layer--connected${emblemGlowState === "connected" ? " emblem-glow-layer--active" : ""}`}
+      />
+    </div>
+  );
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
@@ -170,7 +188,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {collapsed ? (
             <div className="flex flex-col items-center gap-3">
               {/* Purple Fusion icon */}
-              <img src="/hapticos-logo.jpg" alt="HapticOS" className={`h-8 w-8 flex-shrink-0 rounded-full ${emblemGlowClass}`} />
+              <EmblemGlow />
               {/* Connection dot */}
               <div
                 className={`h-3 w-3 rounded-full flex-shrink-0 ${
@@ -193,7 +211,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
-                  <img src="/hapticos-logo.jpg" alt="HapticOS" className={`h-8 w-8 flex-shrink-0 rounded-full ${emblemGlowClass}`} />
+                  <EmblemGlow />
                   <h1 className="text-xl font-bold tracking-tight whitespace-nowrap">
                     <span className="text-[#C850F0]">Haptic</span><span className="text-white">OS</span>
                   </h1>
