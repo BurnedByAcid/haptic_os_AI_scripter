@@ -1691,10 +1691,37 @@ export default function Scripter() {
       { type: "module" },
     );
 
-    // ── Single centralised message handler ────────────────────────────────────
-    // Pending resolvers are set just before each postMessage and cleared on reply.
-    let resolveFrame:    (() => void)            | null = null;
-    let rejectFrame:     ((e: Error) => void)    | null = null;
+    // ── Pipelined message handler ─────────────────────────────────────────────
+    // The rVFC loop no longer waits for a worker reply before registering the
+    // next frame callback.  Instead the main thread keeps up to PIPELINE_DEPTH
+    // frames in-flight simultaneously: capture → send → re-register immediately,
+    // while the worker processes each frame and replies asynchronously.
+    //
+    // Each in-flight frame is tracked by its frameMs timestamp in pendingFrames.
+    // The worker echoes frameMs on every 'progress' and 'frame-skip' reply so
+    // we can resolve the correct promise without relying on ordering.
+    //
+    // A semaphore (pipelineSlots) caps concurrent in-flight frames to prevent
+    // unbounded ImageBitmap memory accumulation when the worker is slower than
+    // the rVFC delivery rate.
+    const PIPELINE_DEPTH = 4;
+
+    // frameMs → { resolve, reject } for in-flight sendFrame promises
+    const pendingFrames = new Map<number, { resolve: () => void; reject: (e: Error) => void }>();
+
+    // Semaphore: tracks free pipeline slots
+    let freeSlots = PIPELINE_DEPTH;
+    const slotWaiters: Array<() => void> = [];
+
+    const acquireSlot = (): Promise<void> => {
+      if (freeSlots > 0) { freeSlots--; return Promise.resolve(); }
+      return new Promise<void>(res => slotWaiters.push(res));
+    };
+    const releaseSlot = (): void => {
+      const waiter = slotWaiters.shift();
+      if (waiter) { waiter(); } else { freeSlots++; }
+    };
+
     let resolveComplete: ((t: number[]) => void) | null = null;
     let rejectComplete:  ((e: Error) => void)    | null = null;
     let resolveInit:     (() => void)            | null = null;
@@ -1702,8 +1729,11 @@ export default function Scripter() {
 
     const rejectAll = (err: Error) => {
       rejectInit?.(err);     resolveInit     = null; rejectInit     = null;
-      rejectFrame?.(err);    resolveFrame    = null; rejectFrame    = null;
       rejectComplete?.(err); resolveComplete = null; rejectComplete = null;
+      for (const { reject } of pendingFrames.values()) reject(err);
+      pendingFrames.clear();
+      // Drain semaphore waiters so any blocked acquireSlot calls reject cleanly
+      slotWaiters.splice(0).forEach(w => w());
     };
 
     worker.onmessage = (e: MessageEvent) => {
@@ -1723,16 +1753,23 @@ export default function Scripter() {
           });
           break;
         }
-        case "progress":
-          // Worker emits this after analysing a frame — drives the progress badge.
+        case "progress": {
+          // Worker finished analysing a frame — drive the progress badge and
+          // unblock the corresponding pipeline slot.
           setVtProgress(e.data.percent as number);
-          resolveFrame?.(); resolveFrame = null; rejectFrame = null;
+          const p = pendingFrames.get(e.data.frameMs as number);
+          if (p) { pendingFrames.delete(e.data.frameMs as number); p.resolve(); }
+          releaseSlot();
           break;
-        case "frame-skip":
-          // Worker decided this frame was too close to the previous analysed one;
-          // resolve so the main thread rVFC loop can continue without blocking.
-          resolveFrame?.(); resolveFrame = null; rejectFrame = null;
+        }
+        case "frame-skip": {
+          // Worker skipped this frame (too close to the previous analysed one);
+          // unblock the pipeline slot so the next frame can be sent.
+          const p = pendingFrames.get(e.data.frameMs as number);
+          if (p) { pendingFrames.delete(e.data.frameMs as number); p.resolve(); }
+          releaseSlot();
           break;
+        }
         case "complete":
           resolveComplete?.(e.data.triggerTimes as number[]);
           resolveComplete = null; rejectComplete = null;
@@ -1753,11 +1790,13 @@ export default function Scripter() {
 
     // ── RPC helpers ───────────────────────────────────────────────────────────
 
-    // Send one frame bitmap; worker decides whether to analyse or skip it.
-    // Bitmap is transferred (zero-copy); worker closes it in either case.
+    // Post one frame bitmap to the worker and track its reply promise.
+    // The caller is responsible for acquiring a pipeline slot before calling
+    // this, and must NOT await the returned promise in the hot rVFC path —
+    // fire-and-forget with a .catch() handler to keep the loop pipelined.
     const sendFrame = (bitmap: ImageBitmap, frameMs: number): Promise<void> =>
       new Promise<void>((res, rej) => {
-        resolveFrame = res; rejectFrame = rej;
+        pendingFrames.set(frameMs, { resolve: res, reject: rej });
         worker.postMessage({ type: "frame", bitmap, frameMs }, [bitmap]);
       });
 
@@ -1767,6 +1806,17 @@ export default function Scripter() {
         resolveComplete = res; rejectComplete = rej;
         worker.postMessage({ type: "end" });
       });
+
+    // Wait for all pipelined in-flight frames to receive their worker replies
+    // before sending 'end'.  We do this by acquiring every slot — once we hold
+    // all PIPELINE_DEPTH slots the pipeline is fully drained.
+    const drainPipeline = async (): Promise<void> => {
+      const drains: Promise<void>[] = [];
+      for (let i = 0; i < PIPELINE_DEPTH; i++) drains.push(acquireSlot());
+      await Promise.all(drains);
+      // Release them all so the semaphore is clean for any future use.
+      for (let i = 0; i < PIPELINE_DEPTH; i++) releaseSlot();
+    };
 
     // Initialise the worker: sets up GPU/CPU path and all scan parameters.
     // Worker replies with { type: 'ready', mode } once it is ready.
@@ -1824,6 +1874,13 @@ export default function Scripter() {
 
           // processFrame is the main-thread rVFC callback — kept intentionally
           // thin.  The worker owns all frame scheduling and analysis decisions.
+          //
+          // Pipeline: we acquire a slot (throttles to PIPELINE_DEPTH in-flight
+          // frames), capture the bitmap, post to the worker, then immediately
+          // re-register the next rVFC callback WITHOUT waiting for the worker
+          // reply.  The worker reply (progress/frame-skip) releases the slot
+          // asynchronously, so up to PIPELINE_DEPTH frames are in-flight at
+          // once — the main thread is never idle waiting for the worker.
           const processFrame = async (_now: number, meta: { mediaTime: number }) => {
             if (done || vtCancelRef.current) { finish(); return; }
             const frameMs = meta.mediaTime * 1000;
@@ -1833,20 +1890,38 @@ export default function Scripter() {
               return;
             }
 
+            // Throttle: block here only when all pipeline slots are occupied.
+            // This keeps at most PIPELINE_DEPTH ImageBitmaps alive at once.
+            await acquireSlot();
+            if (done) { releaseSlot(); return; }
+
+            let bmp: ImageBitmap;
             try {
               // createImageBitmap is DOM-only; must stay on main thread.
-              // Transfer the bitmap to the worker (zero-copy); it decides
-              // whether to analyse it or skip based on the stepMs window.
-              const bmp = await createImageBitmap(video);
-              await sendFrame(bmp, frameMs);
+              bmp = await createImageBitmap(video);
             } catch (err) {
-              console.error("[VideoAnalysis] frame error:", err);
+              // Slot was acquired but no sendFrame will be called, so release
+              // manually before propagating the error.
+              releaseSlot();
+              console.error("[VideoAnalysis] frame capture error:", err);
               reject(err);
               finish();
               return;
             }
 
-            (video as any).requestVideoFrameCallback(processFrame);
+            if (done) { releaseSlot(); bmp.close(); return; }
+
+            // Fire-and-forget: post to worker, do NOT await the reply.
+            // The reply handler (progress/frame-skip) releases the slot.
+            sendFrame(bmp, frameMs).catch(err => {
+              console.error("[VideoAnalysis] frame error:", err);
+              reject(err);
+              finish();
+            });
+
+            // Re-register immediately — this is the key pipelining step:
+            // the next frame is captured while the worker processes this one.
+            if (!done) (video as any).requestVideoFrameCallback(processFrame);
           };
 
           (video as any).requestVideoFrameCallback(processFrame);
@@ -1857,6 +1932,8 @@ export default function Scripter() {
         // ─── FALLBACK: seek-based loop (works in all browsers) ──────────────
         // Main thread drives seeking (video.currentTime is DOM-only).
         // The worker receives each seeked frame and handles analysis.
+        // Seeking is the bottleneck here so pipelining is minimal, but we
+        // still go through acquireSlot/sendFrame to share the same tracking.
         let t = startMs;
         while (t <= endMs && !vtCancelRef.current) {
           video.currentTime = t / 1000;
@@ -1868,11 +1945,18 @@ export default function Scripter() {
           if (vtCancelRef.current) break;
 
           const bmp = await createImageBitmap(video);
+          await acquireSlot();
+          // sendFrame adds the frame to pendingFrames; the message handler
+          // resolves the promise AND calls releaseSlot() on reply, so we
+          // must NOT call releaseSlot() ourselves — just await the promise.
           await sendFrame(bmp, t);
 
           t += stepMs;
         }
       }
+
+      // Drain pipeline: wait for all in-flight frames before sending 'end'.
+      await drainPipeline();
 
       // Signal end of scan; worker replies with all accumulated trigger times.
       // Skipped when cancelled — partial results are discarded.

@@ -25,10 +25,12 @@
  *   { type: 'frame', bitmap: ImageBitmap, frameMs: number }
  *     One video frame (transferred, zero-copy).
  *     Worker decides whether to analyse it based on the stepMs resolution.
- *       Analysed frame → { type: 'progress', percent: number }
- *       Skipped frame  → { type: 'frame-skip' }
+ *       Analysed frame → { type: 'progress', percent: number, frameMs: number }
+ *       Skipped frame  → { type: 'frame-skip', frameMs: number }
  *       GPU demotion   → { type: 'mode-changed', mode: 'cpu', reason: 'webgpu'|'webgl' }
  *       Error          → { type: 'error', message: string }
+ *     frameMs is echoed back so the main thread can match replies to the
+ *     correct pipeline slot without relying on message ordering.
  *
  *   { type: 'end' }
  *     No more frames. Reply: { type: 'complete', triggerTimes: number[] }
@@ -192,8 +194,8 @@ async function handleFrame(bitmap: ImageBitmap, frameMs: number): Promise<void> 
   // frame passes this check — but the guard is correct either way.
   if (frameMs - lastAnalyzedMs < stepMs) {
     bitmap.close();
-    // Reply so the main thread can continue its rVFC loop without blocking.
-    self.postMessage({ type: "frame-skip" });
+    // Reply so the main thread can unblock the corresponding pipeline slot.
+    self.postMessage({ type: "frame-skip", frameMs });
     return;
   }
 
@@ -213,8 +215,9 @@ async function handleFrame(bitmap: ImageBitmap, frameMs: number): Promise<void> 
     lastState = matched;
 
     // ── Emit progress to main thread ──────────────────────────────────────
+    // frameMs is echoed so the main thread can resolve the correct pipeline slot.
     const percent = Math.min(99, Math.round(((frameMs - startMs) / rangeMs) * 100));
-    self.postMessage({ type: "progress", percent });
+    self.postMessage({ type: "progress", percent, frameMs });
 
   } catch (err) {
     bitmap.close();
