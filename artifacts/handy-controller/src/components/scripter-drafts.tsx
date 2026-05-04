@@ -312,8 +312,14 @@ export function ResumeDraftPicker({
         throw new Error(data.error ?? "Delete failed");
       }
       toast({ title: "Draft deleted" });
+      const isLast = drafts.length <= 1;
       onDeleted?.();
-      onSkip();
+      if (isLast) {
+        onSkip();
+      } else {
+        setDeleting(false);
+        setConfirmDelete(false);
+      }
     } catch (err) {
       toast({
         title: "Couldn't delete draft",
