@@ -2674,7 +2674,12 @@ export default function Scripter() {
 
                   {vtPreviewPoints.length > 0 && (
                     <div className="space-y-2 p-3 bg-primary/10 border border-primary/30 rounded-lg">
-                      <p className="text-xs font-medium text-primary">{vtPreviewPoints.length} points ready — preview in Timeline Editor</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-medium text-primary">{vtPreviewPoints.length} points ready — preview in Timeline Editor</p>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${analyzeMode === "webgpu" ? "border-primary/50 text-primary bg-primary/10" : analyzeMode === "webgl" ? "border-primary/40 text-primary/80 bg-primary/5" : "border-muted-foreground/30 text-muted-foreground"}`}>
+                          {analyzeMode === "webgpu" ? "⚡ Analyzed with WebGPU" : analyzeMode === "webgl" ? "⚡ Analyzed with WebGL" : "Analyzed with CPU"}
+                        </span>
+                      </div>
                       <div className="flex gap-2">
                         <Button size="sm" className="flex-1" onClick={commitPreviewPoints} data-testid="button-vt-commit">
                           Add to Script
