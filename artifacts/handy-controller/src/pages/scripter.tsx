@@ -1712,6 +1712,17 @@ export default function Scripter() {
           setAnalyzeMode(e.data.mode as "webgpu" | "webgl" | "cpu");
           resolveInit?.(); resolveInit = null; rejectInit = null;
           break;
+        case "mode-changed": {
+          const newMode = e.data.mode as "webgpu" | "webgl" | "cpu";
+          const lostMode = e.data.reason as string;
+          setAnalyzeMode(newMode);
+          toast({
+            title: `${lostMode === "webgpu" ? "WebGPU" : "WebGL"} lost — switched to CPU`,
+            description: "GPU device was lost mid-scan. Analysis will continue using the CPU.",
+            variant: "destructive",
+          });
+          break;
+        }
         case "progress":
           // Worker emits this after analysing a frame — drives the progress badge.
           setVtProgress(e.data.percent as number);

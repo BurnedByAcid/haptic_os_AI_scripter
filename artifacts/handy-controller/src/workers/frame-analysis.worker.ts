@@ -27,6 +27,7 @@
  *     Worker decides whether to analyse it based on the stepMs resolution.
  *       Analysed frame → { type: 'progress', percent: number }
  *       Skipped frame  → { type: 'frame-skip' }
+ *       GPU demotion   → { type: 'mode-changed', mode: 'cpu', reason: 'webgpu'|'webgl' }
  *       Error          → { type: 'error', message: string }
  *
  *   { type: 'end' }
@@ -104,6 +105,7 @@ async function computeRms(bitmap: ImageBitmap): Promise<number> {
       wgpuMatcher.destroy();
       wgpuMatcher = null;
       mode = "cpu";
+      self.postMessage({ type: "mode-changed", mode, reason: "webgpu" });
       return cpuRmsFromBitmap(bitmap);
     }
   }
@@ -115,6 +117,7 @@ async function computeRms(bitmap: ImageBitmap): Promise<number> {
       glMatcher.destroy();
       glMatcher = null;
       mode = "cpu";
+      self.postMessage({ type: "mode-changed", mode, reason: "webgl" });
       return cpuRmsFromBitmap(bitmap);
     }
   }
