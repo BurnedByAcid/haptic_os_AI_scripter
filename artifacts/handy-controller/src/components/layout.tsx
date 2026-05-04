@@ -192,7 +192,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {/* Connection dot */}
               <div
                 className={`h-3 w-3 rounded-full flex-shrink-0 ${
-                  checking ? "bg-yellow-500 animate-pulse" :
+                  checking ? "bg-yellow-500 animate-pulse [animation-duration:1s]" :
                   connected ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" :
                   "bg-red-500"
                 }`}
@@ -222,7 +222,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   )}
                   <div
                     className={`h-3 w-3 rounded-full flex-shrink-0 ${
-                      checking ? "bg-yellow-500 animate-pulse" :
+                      checking ? "bg-yellow-500 animate-pulse [animation-duration:1s]" :
                       connected ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" :
                       "bg-red-500"
                     }`}

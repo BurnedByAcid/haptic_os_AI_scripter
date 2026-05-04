@@ -221,7 +221,7 @@
 }
 
 .emblem-glow-layer--checking {
-  animation: emblem-glow-checking 1.5s ease-in-out infinite;
+  animation: emblem-glow-checking 1s ease-in-out infinite;
 }
 
 .emblem-glow-layer--connected {
