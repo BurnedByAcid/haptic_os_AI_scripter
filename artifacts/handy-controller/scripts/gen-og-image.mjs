@@ -1,5 +1,5 @@
-import { execSync } from 'child_process';
-import { writeFileSync, readFileSync } from 'fs';
+import { Resvg } from '@resvg/resvg-js';
+import { writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
@@ -222,15 +222,14 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
   >hapticos.app</text>
 </svg>`;
 
-const svgPath = path.join(publicDir, 'og-image.svg');
 const pngPath = path.join(publicDir, 'og-image.png');
 
-writeFileSync(svgPath, svg);
-console.log('SVG written to', svgPath);
+const resvg = new Resvg(svg, {
+  fitTo: { mode: 'width', value: 1200 },
+});
 
-execSync(`convert -background none -density 144 "${svgPath}" -resize 1200x630 "${pngPath}"`, { stdio: 'inherit' });
+const pngData = resvg.render();
+const pngBuffer = pngData.asPng();
+
+writeFileSync(pngPath, pngBuffer);
 console.log('PNG generated at', pngPath);
-
-import { unlinkSync } from 'fs';
-unlinkSync(svgPath);
-console.log('Cleaned up temp SVG');

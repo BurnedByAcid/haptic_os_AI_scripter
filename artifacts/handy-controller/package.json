@@ -82,6 +82,7 @@
   "dependencies": {
     "@clerk/react": "^6.4.5",
     "@clerk/themes": "^2.4.57",
+    "@resvg/resvg-js": "^2.6.2",
     "idb": "^8.0.3"
   }
 }
