@@ -78,6 +78,7 @@ interface ShareDialogProps {
 
 function ShareToCommunityDialog({ entry, onClose, authHeaders, onSuccess }: ShareDialogProps) {
   const [description, setDescription] = useState("");
+  const [tags, setTags] = useState<LibraryTag[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const { toast } = useToast();
@@ -103,6 +104,7 @@ function ShareToCommunityDialog({ entry, onClose, authHeaders, onSuccess }: Shar
           title: entry.title,
           description: description.trim(),
           video_url: entry.video_url,
+          tags,
           funscript,
         }),
       });
@@ -113,7 +115,7 @@ function ShareToCommunityDialog({ entry, onClose, authHeaders, onSuccess }: Shar
       setSaved(true);
       toast({ title: "Shared to Community!", description: `"${entry.title}" is now live.` });
       onSuccess();
-      setTimeout(() => { setSaved(false); onClose(); setDescription(""); }, 1200);
+      setTimeout(() => { setSaved(false); onClose(); setDescription(""); setTags([]); }, 1200);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       toast({
@@ -155,6 +157,20 @@ function ShareToCommunityDialog({ entry, onClose, authHeaders, onSuccess }: Shar
                 onChange={(e) => setDescription(e.target.value)}
                 autoFocus
               />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-medium">Tags (optional)</label>
+              <div className="flex items-center gap-2 flex-wrap">
+                <TagPicker
+                  mode="edit"
+                  selected={tags}
+                  onChange={(next) => setTags(next)}
+                />
+                <ActiveTagChips
+                  selected={tags}
+                  onRemove={(tag) => setTags((prev) => prev.filter((t) => t !== tag) as LibraryTag[])}
+                />
+              </div>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
