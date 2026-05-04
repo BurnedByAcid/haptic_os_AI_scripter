@@ -519,7 +519,7 @@ export default function AudioCleaner() {
             <Card className="bg-card/50 border-primary/20">
               <CardContent className="pt-5 flex flex-col sm:flex-row gap-3">
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   className="flex-1 gap-2"
                   onClick={togglePlayback}
                 >

@@ -399,7 +399,7 @@ export default function Player() {
                 <Button size="sm" className="h-9 px-4" onClick={handleUrlLoad}>Load</Button>
               </>
             ) : (
-              <Button variant="outline" className="h-9 relative px-4 text-sm">
+              <Button className="h-9 relative px-4 text-sm">
                 <span>Browse Files</span>
                 <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
               </Button>
@@ -608,7 +608,7 @@ export default function Player() {
                       )}
                     </div>
                   ) : (
-                    <Button variant="outline" size="sm" className="w-full relative text-xs h-8">
+                    <Button size="sm" className="w-full relative text-xs h-8">
                       <span>Load Script</span>
                       <input
                         type="file"

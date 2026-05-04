@@ -2084,7 +2084,7 @@ export default function Scripter() {
       <div ref={videoBlockRef} className={`flex flex-row rounded-lg border border-border/50 overflow-hidden min-h-0 ${vtAnalyzing ? "hidden" : ""}`} style={{ flex: 2 }}>
         {/* Left sidebar: load/import controls */}
         <div className="w-36 flex-shrink-0 bg-card/50 border-r border-border/50 flex flex-col gap-1.5 p-2">
-          <Button variant="secondary" size="sm" className="relative cursor-pointer w-full justify-start text-xs h-7">
+          <Button size="sm" className="relative cursor-pointer w-full justify-start text-xs h-7">
             <Upload className="mr-1.5 h-3 w-3 flex-shrink-0" />
             <span className="truncate">Load Video</span>
             <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
@@ -2303,10 +2303,10 @@ export default function Scripter() {
                         <span className="mr-2 text-base leading-none">▶</span>Use Video Audio
                       </Button>
                     )}
-                    <Button variant="secondary" size="sm" className="w-full" onClick={bdStartMic}>
+                    <Button size="sm" className="w-full" onClick={bdStartMic}>
                       <Mic className="mr-2 h-3.5 w-3.5" /> Use Microphone
                     </Button>
-                    <Button variant="secondary" size="sm" className="w-full relative cursor-pointer">
+                    <Button size="sm" className="w-full relative cursor-pointer">
                       <Upload className="mr-2 h-3.5 w-3.5" /><span>Upload Audio File</span>
                       <input type="file" accept="audio/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={bdStartFile} />
                     </Button>

@@ -418,7 +418,7 @@ export default function Library() {
                 className="bg-card"
               />
             </div>
-            <Button variant="outline" onClick={() => setShowUrlForm(v => !v)} data-testid="button-add-url">
+            <Button onClick={() => setShowUrlForm(v => !v)} data-testid="button-add-url">
               <Link className="h-4 w-4 mr-2" /> Add URL
             </Button>
             {hasFSA ? (
@@ -628,7 +628,6 @@ function UrlEntryCard({
 
               <CardFooter className="p-4 pt-2 gap-2">
                 <Button
-                  variant="secondary"
                   size="sm"
                   className="flex-1"
                   onClick={() => onOpen(entry)}
@@ -747,7 +746,6 @@ function FileEntryCard({
           </div>
           <CardFooter className="p-4 pt-2 gap-2">
             <Button
-              variant="secondary"
               size="sm"
               className="flex-1"
               onClick={() => onOpen(entry)}

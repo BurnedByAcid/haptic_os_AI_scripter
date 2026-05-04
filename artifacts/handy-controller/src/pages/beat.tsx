@@ -183,10 +183,10 @@ export default function Beat() {
                 </Button>
               ) : (
                 <>
-                  <Button variant="secondary" className="w-full" onClick={startMic}>
+                  <Button className="w-full" onClick={startMic}>
                     <Mic className="mr-2 h-4 w-4" /> Use Microphone
                   </Button>
-                  <Button variant="secondary" className="w-full relative cursor-pointer">
+                  <Button className="w-full relative cursor-pointer">
                     <Upload className="mr-2 h-4 w-4" /> <span>Upload Audio</span>
                     <input type="file" accept="audio/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={startFile} />
                   </Button>

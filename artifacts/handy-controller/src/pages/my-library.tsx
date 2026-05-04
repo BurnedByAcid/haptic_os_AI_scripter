@@ -1396,7 +1396,7 @@ export default function MyLibrary() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="flex-1 text-xs h-8 gap-1.5"
+                        className="flex-1 text-xs h-8 gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
                         onClick={() => handleDownload(entry)}
                       >
                         <Download className="h-3.5 w-3.5" /> Download

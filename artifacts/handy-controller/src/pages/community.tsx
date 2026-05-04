@@ -486,7 +486,7 @@ export default function Community() {
           </Button>
         ) : (
           <Link href="/upgrade">
-            <Button variant="outline" className="gap-2 opacity-70">
+            <Button className="gap-2">
               <Crown className="h-4 w-4 text-amber-400" />
               Upgrade to Share
             </Button>
@@ -718,7 +718,7 @@ export default function Community() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="flex-1 text-xs h-8 gap-1.5"
+                        className="flex-1 text-xs h-8 gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
                         onClick={() => handleDownload(s)}
                       >
                         <Download className="h-3.5 w-3.5" /> Download
