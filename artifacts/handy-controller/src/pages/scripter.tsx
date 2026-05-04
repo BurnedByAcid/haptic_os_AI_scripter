@@ -2872,6 +2872,7 @@ export default function Scripter() {
           drafts={resumeDrafts}
           onResume={handleResumeDraft}
           onSkip={() => setResumePickerOpen(false)}
+          onDeleted={() => setResumeDrafts((prev) => prev.slice(1))}
         />
       )}
 
