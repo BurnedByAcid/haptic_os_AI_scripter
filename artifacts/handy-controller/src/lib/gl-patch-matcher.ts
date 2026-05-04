@@ -15,6 +15,9 @@
  *   texImage2D without flipping stores source row-0 at GL y=0, so UV y=0 = visual top
  *   for both the video element and the Uint8Array from getImageData.  Using the same
  *   convention for both means the diff shader compares corresponding pixels correctly.
+ *
+ * Constructor accepts an optional existing canvas or OffscreenCanvas so the class
+ * can be used inside a Web Worker (where document.createElement is unavailable).
  */
 
 const VERT = `
@@ -101,10 +104,19 @@ export class GlPatchMatcher {
   private chain: Fbo[] = [];
   private pixel = new Uint8Array(4);
 
-  constructor() {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1; canvas.height = 1;
-    const gl = canvas.getContext("webgl");
+  /**
+   * @param canvas Optional canvas to use for the WebGL context.
+   *   Pass an OffscreenCanvas when constructing from a Web Worker
+   *   (where document.createElement is unavailable).
+   *   If omitted, a 1×1 DOM canvas is created automatically.
+   */
+  constructor(canvas?: HTMLCanvasElement | OffscreenCanvas) {
+    const cv: HTMLCanvasElement | OffscreenCanvas = canvas ?? (() => {
+      const c = document.createElement("canvas");
+      c.width = 1; c.height = 1;
+      return c;
+    })();
+    const gl = cv.getContext("webgl") as WebGLRenderingContext | null;
     if (!gl) throw new Error("WebGL unavailable");
     this.gl = gl;
 
@@ -162,8 +174,17 @@ export class GlPatchMatcher {
   /**
    * Compute RMS difference vs reference in 0–255 scale (matches CPU patchRms).
    * nx/ny/nw/nh: patch rectangle in normalised video coords (0–1, top-left origin).
+   *
+   * `source` may be an HTMLVideoElement (main thread) or an ImageBitmap (worker).
+   * Both are valid TexImageSource values accepted by texImage2D.
    */
-  computeRms(video: HTMLVideoElement, nx: number, ny: number, nw: number, nh: number): number {
+  computeRms(
+    source: HTMLVideoElement | ImageBitmap,
+    nx: number,
+    ny: number,
+    nw: number,
+    nh: number,
+  ): number {
     const gl = this.gl;
     if (this.chain.length === 0) throw new Error("call setReference first");
 
@@ -175,7 +196,9 @@ export class GlPatchMatcher {
     // consistent means the diff shader compares corresponding pixels correctly.
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
     gl.bindTexture(gl.TEXTURE_2D, this.videoTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+    // Cast needed: WebGL typings don't union HTMLVideoElement | ImageBitmap,
+    // but both are valid TexImageSource at runtime.
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source as TexImageSource);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
 

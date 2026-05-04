@@ -3,6 +3,7 @@
  *
  * Pipeline per frame:
  *   1. createImageBitmap(video) captures the current frame as an ImageBitmap.
+ *      (Skipped when an ImageBitmap is passed directly, e.g. from a Web Worker.)
  *   2. device.queue.copyExternalImageToTexture copies it into a regular
  *      texture_2d<f32> (TEXTURE_BINDING | COPY_DST | RENDER_ATTACHMENT).
  *   3. A compute dispatch (8×8 workgroups) reads patch pixels from the frame
@@ -170,9 +171,12 @@ export class WebGpuPatchMatcher {
   /**
    * Compute RMS difference vs reference in 0–255 scale (matches GlPatchMatcher / CPU patchRms).
    * nx/ny/nw/nh: patch rectangle in normalised video coords (0–1, top-left origin).
+   *
+   * `source` may be an HTMLVideoElement (main thread) or an ImageBitmap (worker / pre-captured).
+   * When an ImageBitmap is passed it is NOT closed here — the caller owns its lifetime.
    */
   async computeRms(
-    video: HTMLVideoElement,
+    source: HTMLVideoElement | ImageBitmap,
     nx: number,
     ny: number,
     nw: number,
@@ -182,8 +186,16 @@ export class WebGpuPatchMatcher {
     const ph = this.patchH;
     if (pw === 0 || ph === 0) throw new Error("call setReference first");
 
-    const vw = video.videoWidth  || 640;
-    const vh = video.videoHeight || 360;
+    // Capture the current frame into an ImageBitmap if needed.
+    // When the caller already holds an ImageBitmap (e.g. transferred from main thread
+    // to a Web Worker) we skip createImageBitmap and use it directly.
+    const isOwnedBitmap = source instanceof ImageBitmap;
+    const bmp: ImageBitmap = isOwnedBitmap
+      ? (source as ImageBitmap)
+      : await createImageBitmap(source as HTMLVideoElement);
+
+    const vw = bmp.width  || 640;
+    const vh = bmp.height || 360;
     const patchX = Math.round(nx * vw);
     const patchY = Math.round(ny * vh);
 
@@ -192,14 +204,9 @@ export class WebGpuPatchMatcher {
     const numPartials = wgX * wgY;
 
     if (numPartials > MAX_PARTIALS) {
+      if (!isOwnedBitmap) bmp.close();
       throw new Error(`Patch too large (${numPartials} workgroups > ${MAX_PARTIALS})`);
     }
-
-    // ── Capture the current video frame into a GPU texture ──────────────────
-    // createImageBitmap gives a snapshot of the current frame that can be
-    // uploaded via copyExternalImageToTexture into a regular texture_2d,
-    // which is valid as a compute shader texture binding.
-    const bmp = await createImageBitmap(video);
 
     if (bmp.width !== this.frameTexW || bmp.height !== this.frameTexH) {
       this.frameTex?.destroy();
@@ -220,7 +227,9 @@ export class WebGpuPatchMatcher {
       { texture: this.frameTex! },
       [bmp.width, bmp.height],
     );
-    bmp.close();
+
+    // Close only bitmaps we created ourselves; caller-owned bitmaps stay alive.
+    if (!isOwnedBitmap) bmp.close();
 
     // ── Upload uniform params ────────────────────────────────────────────────
     const paramsData = new Uint32Array([patchX, patchY, pw, ph, wgX]);

@@ -1620,43 +1620,140 @@ export default function Scripter() {
     setVtProgress(0);
     setVtPreviewPoints([]);
 
-    const { x, y, w, h } = vtZone;
+    // Outer try/finally guarantees setVtAnalyzing(false) on every exit path,
+    // including worker init failure, frame errors, and unexpected throws.
+    try {
+      await runAnalysisInner(video);
+    } catch (err) {
+      console.error("[VideoAnalysis] scan failed:", err);
+    } finally {
+      setVtAnalyzing(false);
+    }
+  };
+
+  const runAnalysisInner = async (video: HTMLVideoElement) => {
+    const { x, y, w, h } = vtZone!;
     const VW = video.videoWidth || 640;
     const VH = video.videoHeight || 360;
     const nx = x / VW, ny = y / VH, nw = w / VW, nh = h / VH;
 
     const startMs = vtStartTime * 1000;
-    const endMs = vtEndTime > 0 ? vtEndTime * 1000 : video.duration * 1000;
-    const stepMs = 1000 / 30;           // 30 fps analysis resolution
+    const endMs   = vtEndTime > 0 ? vtEndTime * 1000 : video.duration * 1000;
+    const stepMs  = 1000 / 30; // 30 fps analysis resolution
     const rangeMs = endMs - startMs;
-    const triggerTimes: number[] = [];
-    let lastState = false;
-    let lastTriggerMs = startMs - vtMinDelay; // ensures first trigger is never suppressed
 
-    const gl = glRef.current;
-    // Ensure the active matcher has the current reference (in case vtSampledPatch changed)
-    if (gl) {
-      try { gl.setReference(vtSampledPatch, w, h); } catch { /* ignore */ }
-    }
+    // ── Spin up the dedicated analysis worker ─────────────────────────────────
+    // The worker owns the full state machine: frame scheduling decisions (stepMs
+    // gating), RMS computation, trigger detection, and progress calculation.
+    //
+    // The main thread is intentionally a thin frame pump.  It performs only the
+    // DOM-bound work that cannot run in a worker:
+    //   • video seeking  (video.currentTime — HTMLVideoElement property)
+    //   • rVFC scheduling (video.requestVideoFrameCallback — HTMLVideoElement method)
+    //   • frame capture  (createImageBitmap(video) — requires live video element)
+    // Everything else lives in the worker.
+    const worker = new Worker(
+      new URL("../workers/frame-analysis.worker.ts", import.meta.url),
+      { type: "module" },
+    );
 
-    // gpuDemoted flips to true on the first GPU error; once set, all remaining
-    // frames in this scan use the CPU path so we don't spam warnings or retry a
-    // broken device hundreds of times.
-    let useGpu = gl !== null;
-    let gpuDemoted = false;
+    // ── Single centralised message handler ────────────────────────────────────
+    // Pending resolvers are set just before each postMessage and cleared on reply.
+    let resolveFrame:    (() => void)            | null = null;
+    let rejectFrame:     ((e: Error) => void)    | null = null;
+    let resolveComplete: ((t: number[]) => void) | null = null;
+    let rejectComplete:  ((e: Error) => void)    | null = null;
+    let resolveInit:     (() => void)            | null = null;
+    let rejectInit:      ((e: Error) => void)    | null = null;
+
+    const rejectAll = (err: Error) => {
+      rejectInit?.(err);     resolveInit     = null; rejectInit     = null;
+      rejectFrame?.(err);    resolveFrame    = null; rejectFrame    = null;
+      rejectComplete?.(err); resolveComplete = null; rejectComplete = null;
+    };
+
+    worker.onmessage = (e: MessageEvent) => {
+      switch (e.data.type as string) {
+        case "ready":
+          setAnalyzeMode(e.data.mode as "webgpu" | "webgl" | "cpu");
+          resolveInit?.(); resolveInit = null; rejectInit = null;
+          break;
+        case "progress":
+          // Worker emits this after analysing a frame — drives the progress badge.
+          setVtProgress(e.data.percent as number);
+          resolveFrame?.(); resolveFrame = null; rejectFrame = null;
+          break;
+        case "frame-skip":
+          // Worker decided this frame was too close to the previous analysed one;
+          // resolve so the main thread rVFC loop can continue without blocking.
+          resolveFrame?.(); resolveFrame = null; rejectFrame = null;
+          break;
+        case "complete":
+          resolveComplete?.(e.data.triggerTimes as number[]);
+          resolveComplete = null; rejectComplete = null;
+          break;
+        case "error":
+          rejectAll(new Error(e.data.message as string));
+          break;
+      }
+    };
+
+    // Reject all pending promises if the worker crashes or fails to load.
+    worker.onerror = (e) => {
+      rejectAll(new Error(`Worker error: ${e.message ?? "unknown"}`));
+    };
+    worker.onmessageerror = () => {
+      rejectAll(new Error("Worker message deserialisation error"));
+    };
+
+    // ── RPC helpers ───────────────────────────────────────────────────────────
+
+    // Send one frame bitmap; worker decides whether to analyse or skip it.
+    // Bitmap is transferred (zero-copy); worker closes it in either case.
+    const sendFrame = (bitmap: ImageBitmap, frameMs: number): Promise<void> =>
+      new Promise<void>((res, rej) => {
+        resolveFrame = res; rejectFrame = rej;
+        worker.postMessage({ type: "frame", bitmap, frameMs }, [bitmap]);
+      });
+
+    // Signal end of scan; receive the accumulated trigger times from the worker.
+    const collectResults = (): Promise<number[]> =>
+      new Promise<number[]>((res, rej) => {
+        resolveComplete = res; rejectComplete = rej;
+        worker.postMessage({ type: "end" });
+      });
+
+    // Initialise the worker: sets up GPU/CPU path and all scan parameters.
+    // Worker replies with { type: 'ready', mode } once it is ready.
+    await new Promise<void>((res, rej) => {
+      resolveInit = res; rejectInit = rej;
+      worker.postMessage({
+        type: "init",
+        refPatch: vtSampledPatch,
+        patchW: w, patchH: h,
+        startMs, endMs, rangeMs, stepMs,
+        tolerance: vtTolerance,
+        minDelay:  vtMinDelay,
+        nx, ny, nw, nh,
+      });
+    });
+
     const hasRvfc = "requestVideoFrameCallback" in HTMLVideoElement.prototype;
-    setAnalyzeMode(gpuMode);
 
     // Save video state so we can restore it after analysis
-    const savedRate    = video.playbackRate;
-    const savedMuted   = video.muted;
-    const savedTime    = video.currentTime;
-    const savedPaused  = video.paused;
+    const savedRate   = video.playbackRate;
+    const savedMuted  = video.muted;
+    const savedTime   = video.currentTime;
+    const savedPaused = video.paused;
+
+    let triggerTimes: number[] = [];
 
     try {
       if (hasRvfc) {
         // ─── FAST PATH: play at high speed, catch frames via rVFC ───────────
-        // Seek to start
+        // Main thread: seek → play → capture bitmap → send to worker (repeat).
+        // The worker decides which frames are worth analysing (stepMs gating)
+        // and replies with 'progress' (analysed) or 'frame-skip' (too close).
         video.currentTime = startMs / 1000;
         await new Promise<void>(res => {
           const fn = () => { video.removeEventListener("seeked", fn); res(); };
@@ -1666,8 +1763,7 @@ export default function Scripter() {
         video.muted = true;
         video.playbackRate = 16;
 
-        await new Promise<void>((resolve) => {
-          let lastAnalyzed = startMs - stepMs;
+        await new Promise<void>((resolve, reject) => {
           let done = false;
 
           const finish = () => {
@@ -1678,10 +1774,11 @@ export default function Scripter() {
             resolve();
           };
 
-          // Safety net: if the video hits its natural end the rVFC stops firing —
-          // without this the Promise would hang forever.
+          // Safety net: if the video hits its natural end the rVFC stops firing.
           video.addEventListener("ended", finish, { once: true });
 
+          // processFrame is the main-thread rVFC callback — kept intentionally
+          // thin.  The worker owns all frame scheduling and analysis decisions.
           const processFrame = async (_now: number, meta: { mediaTime: number }) => {
             if (done) return;
             const frameMs = meta.mediaTime * 1000;
@@ -1691,59 +1788,30 @@ export default function Scripter() {
               return;
             }
 
-            // Only analyse if we've advanced at least one step
-            if (frameMs - lastAnalyzed >= stepMs) {
-              try {
-                let rms: number;
-                if (useGpu && !gpuDemoted) {
-                  try {
-                    rms = await (gl!.computeRms(video, nx, ny, nw, nh) as Promise<number> | number);
-                  } catch (gpuErr) {
-                    // GPU device lost — demote for all remaining frames this scan
-                    console.warn("[VideoAnalysis] GPU error — demoting to CPU for rest of scan:", gpuErr);
-                    gpuDemoted = true;
-                    const off2d = document.createElement("canvas");
-                    off2d.width = w; off2d.height = h;
-                    const ctx2 = off2d.getContext("2d")!;
-                    ctx2.drawImage(video, x, y, w, h, 0, 0, w, h);
-                    rms = patchRms(toGray(ctx2.getImageData(0, 0, w, h).data), vtSampledPatch!);
-                  }
-                } else {
-                  // CPU path (no GPU, or GPU demoted after device loss)
-                  const off2d = document.createElement("canvas");
-                  off2d.width = w; off2d.height = h;
-                  const ctx2 = off2d.getContext("2d")!;
-                  ctx2.drawImage(video, x, y, w, h, 0, 0, w, h);
-                  rms = patchRms(toGray(ctx2.getImageData(0, 0, w, h).data), vtSampledPatch!);
-                }
-                const matched = rms < vtTolerance;
-                if (matched && !lastState && frameMs - lastTriggerMs >= vtMinDelay) {
-                  triggerTimes.push(frameMs);
-                  lastTriggerMs = frameMs;
-                }
-                lastState = matched;
-                lastAnalyzed = frameMs;
-              } catch (e) {
-                console.error("frame analysis error", e);
-                finish();
-                return;
-              }
-              setVtProgress(Math.min(99, Math.round(((frameMs - startMs) / rangeMs) * 100)));
+            try {
+              // createImageBitmap is DOM-only; must stay on main thread.
+              // Transfer the bitmap to the worker (zero-copy); it decides
+              // whether to analyse it or skip based on the stepMs window.
+              const bmp = await createImageBitmap(video);
+              await sendFrame(bmp, frameMs);
+            } catch (err) {
+              console.error("[VideoAnalysis] frame error:", err);
+              reject(err);
+              finish();
+              return;
             }
 
             (video as any).requestVideoFrameCallback(processFrame);
           };
 
           (video as any).requestVideoFrameCallback(processFrame);
-          video.play().catch(() => finish());
+          video.play().catch((err) => { reject(err); finish(); });
         });
 
       } else {
         // ─── FALLBACK: seek-based loop (works in all browsers) ──────────────
-        const off = document.createElement("canvas");
-        off.width = VW; off.height = VH;
-        const ctx = off.getContext("2d")!;
-
+        // Main thread drives seeking (video.currentTime is DOM-only).
+        // The worker receives each seeked frame and handles analysis.
         let t = startMs;
         while (t <= endMs) {
           video.currentTime = t / 1000;
@@ -1752,41 +1820,31 @@ export default function Scripter() {
             video.addEventListener("seeked", fn);
           });
 
-          let rms: number;
-          if (useGpu && !gpuDemoted) {
-            try {
-              rms = await (gl!.computeRms(video, nx, ny, nw, nh) as Promise<number> | number);
-            } catch (gpuErr) {
-              // GPU device lost — demote for all remaining frames this scan
-              console.warn("[VideoAnalysis] GPU error — demoting to CPU for rest of scan:", gpuErr);
-              gpuDemoted = true;
-              ctx.drawImage(video, 0, 0);
-              rms = patchRms(toGray(ctx.getImageData(x, y, w, h).data), vtSampledPatch!);
-            }
-          } else {
-            ctx.drawImage(video, 0, 0);
-            rms = patchRms(toGray(ctx.getImageData(x, y, w, h).data), vtSampledPatch!);
-          }
+          const bmp = await createImageBitmap(video);
+          await sendFrame(bmp, t);
 
-          const matched = rms < vtTolerance;
-          if (matched && !lastState && t - lastTriggerMs >= vtMinDelay) {
-            triggerTimes.push(t);
-            lastTriggerMs = t;
-          }
-          lastState = matched;
           t += stepMs;
-          setVtProgress(Math.round(((t - startMs) / rangeMs) * 100));
         }
       }
+
+      // Signal end of scan; worker replies with all accumulated trigger times.
+      triggerTimes = await collectResults();
+
     } finally {
       // Restore video to its previous state
       video.muted        = savedMuted;
       video.playbackRate = savedRate;
       video.currentTime  = savedTime;
       if (!savedPaused) video.play().catch(() => {});
+
+      // Tear down the analysis worker
+      worker.postMessage({ type: "destroy" });
+      worker.terminate();
     }
 
-    // Commit all detections at the neutral midpoint — cheap, one pos value for every hit.
+    // ── Post-processing ───────────────────────────────────────────────────────
+
+    // Commit all detections at the neutral midpoint — one pos value per trigger.
     setVtPreviewPoints(triggerTimes.map(time => ({
       id: crypto.randomUUID(),
       time,
@@ -1817,8 +1875,6 @@ export default function Scripter() {
     setVtPreviewPoints(prev =>
       prev.map((pt, i) => ({ ...pt, pos: i % 2 === 0 ? hi : lo }))
     );
-
-    setVtAnalyzing(false);
   };
 
   const commitPreviewPoints = () => {
