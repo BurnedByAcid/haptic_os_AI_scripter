@@ -64,7 +64,7 @@ const clerkAppearance = {
   options: {
     logoPlacement: "inside" as const,
     logoLinkUrl: basePath || "/",
-    logoImageUrl: `${window.location.origin}${basePath}/emblem.svg`,
+    logoImageUrl: `${window.location.origin}${basePath}/hapticos-logo.jpg`,
     socialButtonsPlacement: "top" as const,
     socialButtonsVariant: "blockButton" as const,
   },
