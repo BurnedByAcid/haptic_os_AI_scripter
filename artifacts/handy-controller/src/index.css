@@ -167,7 +167,7 @@
   }
 }
 
-@keyframes emblem-glow-pulse {
+@keyframes emblem-glow-disconnected {
   0%, 100% {
     filter: drop-shadow(0 0 5px rgba(200, 80, 240, 0.55)) drop-shadow(0 0 10px rgba(200, 80, 240, 0.25));
   }
@@ -176,8 +176,32 @@
   }
 }
 
+@keyframes emblem-glow-checking {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.55)) drop-shadow(0 0 10px rgba(245, 158, 11, 0.25));
+  }
+  50% {
+    filter: drop-shadow(0 0 9px rgba(252, 196, 25, 0.85)) drop-shadow(0 0 18px rgba(245, 158, 11, 0.45));
+  }
+}
+
+@keyframes emblem-glow-connected {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.55)) drop-shadow(0 0 10px rgba(34, 197, 94, 0.25));
+  }
+  50% {
+    filter: drop-shadow(0 0 9px rgba(74, 222, 128, 0.85)) drop-shadow(0 0 18px rgba(34, 197, 94, 0.45));
+  }
+}
+
 .emblem-glow {
-  animation: emblem-glow-pulse 3s ease-in-out infinite;
+  animation: emblem-glow-disconnected 3s ease-in-out infinite;
+}
+.emblem-glow--checking {
+  animation: emblem-glow-checking 1.5s ease-in-out infinite;
+}
+.emblem-glow--connected {
+  animation: emblem-glow-connected 3s ease-in-out infinite;
 }
 
 @layer utilities {
