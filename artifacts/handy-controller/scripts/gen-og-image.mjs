@@ -5,6 +5,7 @@ import path from 'path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, '..', 'public');
+const fontsDir = path.join(__dirname, 'fonts');
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
@@ -225,6 +226,16 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.
 const pngPath = path.join(publicDir, 'og-image.png');
 
 const resvg = new Resvg(svg, {
+  font: {
+    fontFiles: [
+      path.join(fontsDir, 'Inter-Regular.ttf'),
+      path.join(fontsDir, 'Inter-Medium.ttf'),
+      path.join(fontsDir, 'Inter-Bold.ttf'),
+    ],
+    loadSystemFonts: false,
+    sansSerifFamily: 'Inter',
+    defaultFontFamily: 'Inter',
+  },
   fitTo: { mode: 'width', value: 1200 },
 });
 
