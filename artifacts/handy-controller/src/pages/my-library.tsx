@@ -81,6 +81,7 @@ function ShareToCommunityDialog({ entry, onClose, authHeaders, onSuccess }: Shar
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const { toast } = useToast();
+  const { reportAction } = useBlockedReport();
 
   if (!entry) return null;
 
@@ -114,10 +115,16 @@ function ShareToCommunityDialog({ entry, onClose, authHeaders, onSuccess }: Shar
       onSuccess();
       setTimeout(() => { setSaved(false); onClose(); setDescription(""); }, 1200);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
       toast({
         title: "Could not share",
-        description: err instanceof Error ? err.message : "Unknown error",
+        description: msg,
         variant: "destructive",
+        action: reportAction({
+          kind: "community_submission",
+          item: entry?.video_url ?? entry?.title ?? "(submission)",
+          blockMessage: msg,
+        }),
       });
     } finally {
       setSaving(false);
