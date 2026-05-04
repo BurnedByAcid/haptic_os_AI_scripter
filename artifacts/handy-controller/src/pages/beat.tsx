@@ -7,6 +7,41 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Mic, Upload, Square } from "lucide-react";
 
+const BANDS = [
+  { label: "Sub",    lo: 20,    hi: 60    },
+  { label: "Bass",   lo: 60,    hi: 250   },
+  { label: "LowMid", lo: 250,   hi: 500   },
+  { label: "Mid",    lo: 500,   hi: 1000  },
+  { label: "UpMid",  lo: 1000,  hi: 2000  },
+  { label: "Prsnc",  lo: 2000,  hi: 4000  },
+  { label: "Brill",  lo: 4000,  hi: 6000  },
+  { label: "High",   lo: 6000,  hi: 8000  },
+  { label: "VHigh",  lo: 8000,  hi: 12000 },
+  { label: "UHigh",  lo: 12000, hi: 16000 },
+  { label: "Air",    lo: 16000, hi: 20000 },
+] as const;
+
+const NUM_BANDS = BANDS.length;
+const HISTORY_SIZE = 43;
+
+const BAND_COLORS = [
+  "#7c3aed",
+  "#8b36e8",
+  "#9d32e0",
+  "#b02ed8",
+  "#c02bcf",
+  "#ce29c4",
+  "#d928b6",
+  "#e228a6",
+  "#e82a95",
+  "#ec2d83",
+  "#ef3070",
+];
+
+function freqToBin(freq: number, sampleRate: number, fftSize: number): number {
+  return Math.round((freq / (sampleRate / 2)) * (fftSize / 2));
+}
+
 export default function Beat() {
   useFeatureTracking("beat");
   const { key, connected } = useHandy();
@@ -14,14 +49,21 @@ export default function Beat() {
   const [sensitivity, setSensitivity] = useState(1.5);
   const [bpm, setBpm] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
+
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | AudioBufferSourceNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastBeatTimeRef = useRef(0);
-  const energyHistoryRef = useRef<number[]>([]);
+  const bandHistoriesRef = useRef<number[][]>(
+    Array.from({ length: NUM_BANDS }, () => [])
+  );
   const beatIntervalHistoryRef = useRef<number[]>([]);
+  const sensitivityRef = useRef(sensitivity);
+
+  useEffect(() => {
+    sensitivityRef.current = sensitivity;
+  }, [sensitivity]);
 
   const startMic = async () => {
     try {
@@ -44,13 +86,13 @@ export default function Beat() {
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(ctx.destination);
-      
+
       const analyser = ctx.createAnalyser();
-      analyser.fftSize = 2048;
+      analyser.fftSize = 4096;
       source.connect(analyser);
       analyserRef.current = analyser;
       sourceRef.current = source;
-      
+
       source.start(0);
       setIsActive(true);
       loop();
@@ -64,9 +106,9 @@ export default function Beat() {
     audioCtxRef.current = ctx;
     const source = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 2048;
+    analyser.fftSize = 4096;
     source.connect(analyser);
-    
+
     sourceRef.current = source;
     analyserRef.current = analyser;
     loop();
@@ -81,6 +123,9 @@ export default function Beat() {
       sourceRef.current.mediaStream.getTracks().forEach(t => t.stop());
     }
     if (audioCtxRef.current) audioCtxRef.current.close();
+    bandHistoriesRef.current = Array.from({ length: NUM_BANDS }, () => []);
+    beatIntervalHistoryRef.current = [];
+    lastBeatTimeRef.current = 0;
   };
 
   useEffect(() => {
@@ -89,64 +134,109 @@ export default function Beat() {
 
   const loop = () => {
     if (!analyserRef.current || !canvasRef.current) return;
-    
+
     const analyser = analyserRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    const sampleRate = audioCtxRef.current?.sampleRate ?? 44100;
+    const fftSize = analyser.fftSize;
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteTimeDomainData(dataArray);
+    analyser.getByteFrequencyData(dataArray);
 
-    // Calc energy
-    let energy = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-      const val = (dataArray[i] - 128) / 128;
-      energy += val * val;
-    }
-    
-    const history = energyHistoryRef.current;
-    history.push(energy);
-    if (history.length > 43) history.shift(); // ~1 second at 43fps
-    
-    const avgEnergy = history.reduce((a,b) => a+b, 0) / history.length;
     const now = performance.now();
-    
-    if (energy > avgEnergy * sensitivity && now - lastBeatTimeRef.current > 250) {
+    const sens = sensitivityRef.current;
+
+    const bandEnergies: number[] = [];
+    const beatFired: boolean[] = [];
+
+    for (let b = 0; b < NUM_BANDS; b++) {
+      const loBin = Math.max(0, freqToBin(BANDS[b].lo, sampleRate, fftSize));
+      const hiBin = Math.min(dataArray.length - 1, freqToBin(BANDS[b].hi, sampleRate, fftSize));
+      const count = Math.max(1, hiBin - loBin + 1);
+
+      let energy = 0;
+      for (let i = loBin; i <= hiBin; i++) {
+        const v = dataArray[i] / 255;
+        energy += v * v;
+      }
+      energy /= count;
+
+      bandEnergies.push(energy);
+
+      const history = bandHistoriesRef.current[b];
+      history.push(energy);
+      if (history.length > HISTORY_SIZE) history.shift();
+
+      const avg = history.reduce((a, c) => a + c, 0) / history.length;
+      beatFired.push(energy > avg * sens && energy > 0.01);
+    }
+
+    const histories0 = bandHistoriesRef.current[0];
+    const histories1 = bandHistoriesRef.current[1];
+    const avg0 = histories0.length ? histories0.reduce((a, c) => a + c, 0) / histories0.length : 0;
+    const avg1 = histories1.length ? histories1.reduce((a, c) => a + c, 0) / histories1.length : 0;
+    const relStrength0 = avg0 > 0 ? bandEnergies[0] / avg0 : 0;
+    const relStrength1 = avg1 > 0 ? bandEnergies[1] / avg1 : 0;
+    const dominantBassIndex = relStrength0 >= relStrength1 ? 0 : 1;
+    const bassBeat = beatFired[dominantBassIndex];
+
+    if (bassBeat && now - lastBeatTimeRef.current > 250) {
       const interval = now - lastBeatTimeRef.current;
       if (interval > 0 && interval < 3000) {
         beatIntervalHistoryRef.current.push(interval);
         if (beatIntervalHistoryRef.current.length > 8) beatIntervalHistoryRef.current.shift();
-        const avgInterval = beatIntervalHistoryRef.current.reduce((a, b) => a + b, 0) / beatIntervalHistoryRef.current.length;
+        const avgInterval =
+          beatIntervalHistoryRef.current.reduce((a, b) => a + b, 0) /
+          beatIntervalHistoryRef.current.length;
         setBpm(Math.round(60000 / avgInterval));
       }
       lastBeatTimeRef.current = now;
+
       if (connected && key) {
         setHDSP(key, 100, 87);
         setTimeout(() => setHDSP(key, 0, 87), 120);
       }
-
-      ctx.fillStyle = "rgba(0, 229, 255, 0.25)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    } else {
-      ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
-      ctx.fillRect(0,0, canvas.width, canvas.height);
     }
 
-    // Draw wave
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "hsl(270,85%,60%)";
-    ctx.beginPath();
-    const sliceWidth = canvas.width * 1.0 / dataArray.length;
-    let x = 0;
-    for(let i = 0; i < dataArray.length; i++) {
-      const v = dataArray[i] / 128.0;
-      const y = v * canvas.height/2;
-      if(i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-      x += sliceWidth;
+    const globalBeat = bassBeat && now - lastBeatTimeRef.current < 50;
+
+    ctx.fillStyle = globalBeat ? "rgba(0, 229, 255, 0.15)" : "rgba(0, 0, 0, 0.35)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const padding = 12;
+    const gap = 6;
+    const totalGaps = gap * (NUM_BANDS - 1) + padding * 2;
+    const barWidth = (canvas.width - totalGaps) / NUM_BANDS;
+    const maxBarHeight = canvas.height - 36;
+
+    for (let b = 0; b < NUM_BANDS; b++) {
+      const x = padding + b * (barWidth + gap);
+      const energy = bandEnergies[b];
+      const barHeight = Math.min(maxBarHeight, energy * maxBarHeight * 6);
+      const y = canvas.height - 20 - barHeight;
+
+      const isBeat = beatFired[b];
+      const color = BAND_COLORS[b];
+
+      if (isBeat) {
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 16;
+      } else {
+        ctx.shadowBlur = 0;
+      }
+
+      ctx.fillStyle = isBeat ? "#ffffff" : color;
+      ctx.fillRect(x, y, barWidth, barHeight);
+
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = isBeat ? "#ffffff" : "rgba(180,160,220,0.7)";
+      ctx.font = `${Math.max(8, Math.min(11, barWidth - 2))}px sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(BANDS[b].label, x + barWidth / 2, canvas.height - 4);
     }
-    ctx.stroke();
 
     rafRef.current = requestAnimationFrame(loop);
   };
