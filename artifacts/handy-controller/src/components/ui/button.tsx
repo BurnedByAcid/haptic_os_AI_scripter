@@ -12,7 +12,7 @@ const buttonVariants = cva(
       variant: {
         default:
            // @replit: purple-to-magenta gradient with glow, no flat color
-           "bg-gradient-to-r from-[#A855F7] to-[#E040FB] text-white border-0 shadow-[0_0_18px_rgba(168,85,247,0.45)]",
+           "bg-gradient-to-r from-[#A855F7] to-[#E040FB] text-white border-0 shadow-[0_0_18px_rgba(168,85,247,0.45)] btn-gradient-shimmer",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm border-destructive-border",
         outline:
