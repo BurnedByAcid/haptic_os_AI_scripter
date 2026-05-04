@@ -73,20 +73,15 @@ const DEVICES = [
 type DeviceId = typeof DEVICES[number]["id"];
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: Home },
-  { href: "/player", label: "Player", icon: PlaySquare },
-  { href: "/scripter", label: "Scripter", icon: Mic },
-  { href: "/library", label: "My Library", icon: BookMarked },
-  { href: "/community", label: "Community", icon: Users },
-  { href: "/control", label: "Manual Controls", icon: Settings2 },
+  { href: "/",          label: "Dashboard",      icon: Home,      requiresPro: false },
+  { href: "/player",    label: "Player",          icon: PlaySquare, requiresPro: false },
+  { href: "/scripter",  label: "Scripter",        icon: Mic,       requiresPro: false },
+  { href: "/library",   label: "My Library",      icon: BookMarked, requiresPro: false },
+  { href: "/community", label: "Community",       icon: Users,     requiresPro: false },
+  { href: "/control",   label: "Manual Controls", icon: Settings2, requiresPro: false },
+  { href: "/games",     label: "Games",           icon: Gamepad2,  requiresPro: true  },
+  { href: "/beat",      label: "Live Audio",       icon: Activity,  requiresPro: true  },
 ];
-
-const PRO_NAV_ITEMS = [
-  { href: "/games",     label: "Games",      icon: Gamepad2 },
-  { href: "/beat",      label: "Live Audio",  icon: Activity },
-];
-
-const COMING_SOON_ITEMS: { href: string; label: string; icon: typeof Gamepad2 }[] = [];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -283,6 +278,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = location === item.href;
+              const locked = item.requiresPro && !isPro;
+
+              if (locked) {
+                return (
+                  <div
+                    key={item.href}
+                    className={`flex items-center gap-3 rounded-md cursor-not-allowed select-none ${
+                      collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
+                    }`}
+                    title={collapsed ? `${item.label} — subscribers only` : undefined}
+                    data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <Icon size={18} className="text-muted-foreground/35 flex-shrink-0" />
+                    {!collapsed && <span className="text-sm text-muted-foreground/35">{item.label}</span>}
+                  </div>
+                );
+              }
+
               return (
                 <Link key={item.href} href={item.href}>
                   <div
@@ -342,50 +355,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 )}
               </>
             )}
-
-            {/* Pro features */}
-            <div className={`mt-2 rounded-lg border border-border/40 bg-white/[0.04] space-y-0.5 ${collapsed ? "p-1" : "p-1.5"}`}>
-              {!collapsed && (
-                <p className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wider px-2 pt-1 pb-0.5">Pro</p>
-              )}
-              {PRO_NAV_ITEMS.map((item) => {
-                const Icon = item.icon;
-                const isActive = location === item.href;
-                if (isPro) {
-                  return (
-                    <Link key={item.href} href={item.href}>
-                      <div
-                        className={`flex items-center gap-3 rounded-md cursor-pointer transition-colors ${
-                          collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
-                        } ${
-                          isActive
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
-                        title={collapsed ? item.label : undefined}
-                        data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                      >
-                        <Icon size={18} className="flex-shrink-0" />
-                        {!collapsed && <span className="text-sm">{item.label}</span>}
-                      </div>
-                    </Link>
-                  );
-                }
-                return (
-                  <div
-                    key={item.href}
-                    className={`group/locked relative flex items-center gap-3 rounded-md cursor-not-allowed select-none ${
-                      collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
-                    }`}
-                    title={collapsed ? `${item.label} — subscribers only` : undefined}
-                    data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                  >
-                    <Icon size={18} className="text-muted-foreground/40 flex-shrink-0" />
-                    {!collapsed && <span className="text-sm text-muted-foreground/40">{item.label}</span>}
-                  </div>
-                );
-              })}
-            </div>
           </nav>
         </div>
 

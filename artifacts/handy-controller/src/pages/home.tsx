@@ -13,13 +13,13 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "";
 type CardState = "available" | "premium" | "coming-soon";
 
 const ALL_CARDS: { href: string; label: string; desc: string; icon: typeof PlaySquare; state: CardState }[] = [
-  { href: "/player",    label: "Video Player",   desc: "Sync local videos with scripts",       icon: PlaySquare, state: "available"    },
-  { href: "/control",   label: "Manual Control", desc: "Direct slider control",                 icon: Settings2,  state: "available"    },
-  { href: "/library",   label: "Library",        desc: "Manage your local files",               icon: Library,    state: "available"    },
-  { href: "/scripter",  label: "Scripter",       desc: "Create and edit Funscripts",            icon: Mic,        state: "available"    },
-  { href: "/games",     label: "Games",          desc: "Play games with haptic feedback",       icon: Gamepad2,      state: "premium"      },
-  { href: "/beat",      label: "Live Audio",     desc: "Audio-reactive haptics",                icon: Activity,      state: "premium"      },
-  { href: "/community", label: "Community",      desc: "Share and discover Funscripts",         icon: Users,         state: "premium"      },
+  { href: "/player",    label: "Video Player",   desc: "Sync local videos with scripts",   icon: PlaySquare, state: "available" },
+  { href: "/scripter",  label: "Scripter",       desc: "Create and edit Funscripts",       icon: Mic,        state: "available" },
+  { href: "/library",   label: "Library",        desc: "Manage your local files",           icon: Library,    state: "available" },
+  { href: "/community", label: "Community",      desc: "Share and discover Funscripts",    icon: Users,      state: "premium"   },
+  { href: "/control",   label: "Manual Controls", desc: "Direct slider control",           icon: Settings2,  state: "available" },
+  { href: "/games",     label: "Games",          desc: "Play games with haptic feedback",  icon: Gamepad2,   state: "premium"   },
+  { href: "/beat",      label: "Live Audio",     desc: "Audio-reactive haptics",           icon: Activity,   state: "premium"   },
 ];
 
 export default function Home() {
