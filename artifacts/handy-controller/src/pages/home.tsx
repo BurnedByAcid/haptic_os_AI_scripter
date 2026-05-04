@@ -53,64 +53,33 @@ export default function Home() {
           <p className="text-muted-foreground">Welcome to HapticOS.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="md:col-span-2 border-primary/20 bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle>Device Status</CardTitle>
-              <CardDescription>Current connection state</CardDescription>
-            </CardHeader>
-            <div className="px-6 pb-6">
-              <div className="flex items-center gap-4">
-                <div className={`h-16 w-16 rounded-full flex items-center justify-center ${
-                  checking ? "bg-yellow-500/20 text-yellow-500" :
-                  connected ? "bg-green-500/20 text-green-500 shadow-[0_0_30px_rgba(34,197,94,0.2)]" :
-                  "bg-red-500/20 text-red-500"
-                }`}>
-                  <Activity className={`h-8 w-8 ${checking ? "animate-pulse" : connected ? "" : "opacity-50"}`} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold">
-                    {checking ? "Checking..." : connected ? "Online & Ready" : "Offline"}
-                  </h3>
-                  <p className="text-muted-foreground">
-                    {connected
-                      ? "Your device is connected and ready to receive commands."
-                      : "Enter your connection key in the sidebar to connect."}
-                  </p>
-                </div>
+        <Card className="border-primary/20 bg-card/50 backdrop-blur">
+          <CardHeader>
+            <CardTitle>Device Status</CardTitle>
+            <CardDescription>Current connection state</CardDescription>
+          </CardHeader>
+          <div className="px-6 pb-6">
+            <div className="flex items-center gap-4">
+              <div className={`h-16 w-16 rounded-full flex items-center justify-center ${
+                checking ? "bg-yellow-500/20 text-yellow-500" :
+                connected ? "bg-green-500/20 text-green-500 shadow-[0_0_30px_rgba(34,197,94,0.2)]" :
+                "bg-red-500/20 text-red-500"
+              }`}>
+                <Activity className={`h-8 w-8 ${checking ? "animate-pulse" : connected ? "" : "opacity-50"}`} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold">
+                  {checking ? "Checking..." : connected ? "Online & Ready" : "Offline"}
+                </h3>
+                <p className="text-muted-foreground">
+                  {connected
+                    ? "Your device is connected and ready to receive commands."
+                    : "Enter your connection key in the sidebar to connect."}
+                </p>
               </div>
             </div>
-          </Card>
-
-          <Card className="bg-card/50 backdrop-blur">
-            <CardHeader>
-              <CardTitle>Quick Stats</CardTitle>
-            </CardHeader>
-            <div className="px-6 pb-6 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">Library Items</span>
-                <span className="font-mono font-bold text-primary">0</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">Plan</span>
-                <span className={`font-mono font-bold text-xs capitalize ${
-                  plan === "admin"      ? "text-yellow-400" :
-                  plan === "pro"        ? "text-primary" :
-                  plan === "subscriber" ? "text-primary" :
-                                          "text-muted-foreground"
-                }`}>{plan}</span>
-              </div>
-              {isFree && scripterUsed !== null && (
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground text-sm">Scripter today</span>
-                  <span className={`font-mono font-bold text-xs ${scripterUsed >= SCRIPTER_LIMIT ? "text-destructive" : "text-primary"}`}>
-                    {scripterUsed}/{SCRIPTER_LIMIT}
-                  </span>
-                </div>
-              )}
-            </div>
-          </Card>
-        </div>
+          </div>
+        </Card>
 
         {/* Scripter limit warning for free users */}
         {isFree && scripterUsed !== null && scripterUsed >= SCRIPTER_LIMIT && (
@@ -193,6 +162,37 @@ export default function Home() {
               );
             })}
           </div>
+        </div>
+
+        {/* Compact quick stats */}
+        <div className="flex items-center gap-4 px-1">
+          <span className="text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wider whitespace-nowrap">Quick Stats</span>
+          <div className="h-px flex-1 bg-border/40" />
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-muted-foreground">Plan</span>
+            <span className={`text-[11px] font-semibold font-mono capitalize ${
+              plan === "admin"      ? "text-yellow-400" :
+              plan === "pro"        ? "text-primary" :
+              plan === "subscriber" ? "text-primary" :
+                                      "text-muted-foreground"
+            }`}>{plan}</span>
+          </div>
+          <div className="h-3 w-px bg-border/60" />
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-muted-foreground">Library</span>
+            <span className="text-[11px] font-semibold font-mono text-primary">0</span>
+          </div>
+          {isFree && scripterUsed !== null && (
+            <>
+              <div className="h-3 w-px bg-border/60" />
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] text-muted-foreground">Scripter today</span>
+                <span className={`text-[11px] font-semibold font-mono ${scripterUsed >= SCRIPTER_LIMIT ? "text-destructive" : "text-primary"}`}>
+                  {scripterUsed}/{SCRIPTER_LIMIT}
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Upgrade CTA for free users */}
