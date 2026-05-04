@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2, BookmarkPlus, Link2 } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2, BookmarkPlus, Link2, Activity } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,7 @@ import { SaveScriptDialog } from "@/components/save-script-dialog";
 import { ResumeDraftPicker, ExitWarningDialog, type DraftSummary } from "@/components/scripter-drafts";
 import { useDirtyExitWarning } from "@/hooks/use-dirty-exit-warning";
 import { useLocation } from "wouter";
+import { AUDIO_CLEANER_SESSION_KEY } from "@/pages/audio-cleaner";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -430,6 +431,9 @@ export default function Scripter() {
   const bdCanvasRef = useRef<HTMLCanvasElement>(null);
   const [bdIsActive, setBdIsActive] = useState(false);
   const [bdBpm, setBdBpm] = useState(0);
+  const [bdFromCleaner, setBdFromCleaner] = useState<string | null>(() =>
+    sessionStorage.getItem(AUDIO_CLEANER_SESSION_KEY)
+  );
   const [bdSensitivity, setBdSensitivity] = useState(1.5);
   const [bdIsRecording, setBdIsRecording] = useState(false);
   const bdAudioCtxRef = useRef<AudioContext | null>(null);
@@ -650,10 +654,29 @@ export default function Scripter() {
       const source = ctx.createBufferSource();
       source.buffer = audioBuffer;
       bdSourceRef.current = source;
-      bdBuildFilters(ctx, source); // filtered audio → destination
+      bdBuildFilters(ctx, source);
       source.start(0);
       setBdIsActive(true);
       bdLoop();
+    } catch (err) { console.error(err); }
+  }, [bdLoop, bdBuildFilters]);
+
+  const bdLoadFromUrl = useCallback(async (url: string) => {
+    try {
+      const res = await fetch(url);
+      const arrayBuffer = await res.arrayBuffer();
+      const ctx = new AudioContext();
+      bdAudioCtxRef.current = ctx;
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      bdSourceRef.current = source;
+      bdBuildFilters(ctx, source);
+      source.start(0);
+      setBdIsActive(true);
+      bdLoop();
+      sessionStorage.removeItem(AUDIO_CLEANER_SESSION_KEY);
+      setBdFromCleaner(null);
     } catch (err) { console.error(err); }
   }, [bdLoop, bdBuildFilters]);
 
@@ -2207,6 +2230,30 @@ export default function Scripter() {
         <TabsContent value="beat" className="flex-1 flex gap-3 mt-3 min-h-0 overflow-hidden">
           {/* Spectrum canvas + band toggles */}
           <div className="flex-1 flex flex-col gap-2 min-h-0">
+            {/* Audio Cleaner handoff banner */}
+            {bdFromCleaner && (
+              <div className="flex-shrink-0 flex items-center gap-3 bg-primary/10 border border-primary/40 rounded-lg px-3 py-2">
+                <Activity className="h-4 w-4 text-primary flex-shrink-0" />
+                <span className="text-sm text-primary flex-1">Cleaned audio ready from Audio Cleaner</span>
+                <Button
+                  size="sm"
+                  className="h-7 text-xs gap-1.5 flex-shrink-0"
+                  onClick={() => bdLoadFromUrl(bdFromCleaner)}
+                >
+                  Load into Beat Detector
+                </Button>
+                <button
+                  className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                  onClick={() => {
+                    sessionStorage.removeItem(AUDIO_CLEANER_SESSION_KEY);
+                    setBdFromCleaner(null);
+                  }}
+                  title="Dismiss"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
             <div className="flex-1 bg-black rounded-lg border border-border/50 overflow-hidden relative min-h-0">
               <canvas ref={bdCanvasRef} className="w-full h-full absolute inset-0" width={800} height={300} />
               {!bdIsActive && (

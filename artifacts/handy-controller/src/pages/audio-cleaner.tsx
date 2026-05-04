@@ -1,10 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useLocation } from "wouter";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Scissors, Upload, Play, Pause, Download, X } from "lucide-react";
+import { Scissors, Upload, Play, Pause, Download, X, Activity } from "lucide-react";
+
+export const AUDIO_CLEANER_SESSION_KEY = "hc_bd_from_cleaner";
 
 // ─── WAV encoder ──────────────────────────────────────────────────────────────
 function encodeWav(buffer: AudioBuffer): Blob {
@@ -190,6 +193,7 @@ interface Options {
 }
 
 export default function AudioCleaner() {
+  const [, navigate] = useLocation();
   const [step, setStep] = useState<Step>("idle");
   const [progress, setProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState("");
@@ -355,6 +359,13 @@ export default function AudioCleaner() {
     URL.revokeObjectURL(url);
   }, [wavBlob, fileName]);
 
+  const sendToScripter = useCallback(() => {
+    if (!wavBlob) return;
+    const url = URL.createObjectURL(wavBlob);
+    sessionStorage.setItem(AUDIO_CLEANER_SESSION_KEY, url);
+    navigate("/scripter");
+  }, [wavBlob, navigate]);
+
   const reset = useCallback(() => {
     stopPlayback();
     audioCtxRef.current?.close();
@@ -514,24 +525,34 @@ export default function AudioCleaner() {
             </Card>
           )}
 
-          {/* Playback + download */}
+          {/* Playback + download + send to scripter */}
           {step === "done" && processedBuffer && (
             <Card className="bg-card/50 border-primary/20">
-              <CardContent className="pt-5 flex flex-col sm:flex-row gap-3">
+              <CardContent className="pt-5 flex flex-col gap-3">
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1 gap-2"
+                    onClick={togglePlayback}
+                  >
+                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                    {isPlaying ? "Pause" : "Play Preview"}
+                  </Button>
+                  <Button
+                    variant="outline-primary"
+                    className="flex-1 gap-2"
+                    onClick={handleDownload}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download WAV
+                  </Button>
+                </div>
                 <Button
-                  variant="outline"
-                  className="flex-1 gap-2"
-                  onClick={togglePlayback}
+                  className="w-full gap-2"
+                  onClick={sendToScripter}
                 >
-                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                  {isPlaying ? "Pause" : "Play Preview"}
-                </Button>
-                <Button
-                  className="flex-1 gap-2"
-                  onClick={handleDownload}
-                >
-                  <Download className="h-4 w-4" />
-                  Download WAV
+                  <Activity className="h-4 w-4" />
+                  Send to Scripter Beat Detector
                 </Button>
               </CardContent>
             </Card>
