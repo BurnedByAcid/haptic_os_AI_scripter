@@ -353,6 +353,7 @@ export default function Scripter() {
   const [vtMovementLimit, setVtMovementLimit] = useState(300);
   const [vtChosenRange, setVtChosenRange] = useState<[number, number]>([0, 100]);
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
+  const vtCancelRef = useRef(false);
   const [vtProgress, setVtProgress] = useState(0);
   const [vtStartTime, setVtStartTime] = useState(0);
   const [vtEndTime, setVtEndTime] = useState(0);
@@ -1639,10 +1640,16 @@ export default function Scripter() {
 
   const [analyzeMode, setAnalyzeMode] = useState<"webgpu" | "webgl" | "cpu">("cpu");
 
+  const cancelAnalysis = () => {
+    vtCancelRef.current = true;
+    if (videoRef.current) videoRef.current.pause();
+  };
+
   const runAnalysis = async () => {
     const video = videoRef.current;
     if (!video || !vtZone || !vtSampledPatch) return;
 
+    vtCancelRef.current = false;
     setVtAnalyzing(true);
     setVtProgress(0);
     setVtPreviewPoints([]);
@@ -1807,7 +1814,7 @@ export default function Scripter() {
           // processFrame is the main-thread rVFC callback — kept intentionally
           // thin.  The worker owns all frame scheduling and analysis decisions.
           const processFrame = async (_now: number, meta: { mediaTime: number }) => {
-            if (done) return;
+            if (done || vtCancelRef.current) { finish(); return; }
             const frameMs = meta.mediaTime * 1000;
 
             if (frameMs >= endMs) {
@@ -1840,12 +1847,14 @@ export default function Scripter() {
         // Main thread drives seeking (video.currentTime is DOM-only).
         // The worker receives each seeked frame and handles analysis.
         let t = startMs;
-        while (t <= endMs) {
+        while (t <= endMs && !vtCancelRef.current) {
           video.currentTime = t / 1000;
           await new Promise<void>(res => {
             const fn = () => { video.removeEventListener("seeked", fn); res(); };
             video.addEventListener("seeked", fn);
           });
+
+          if (vtCancelRef.current) break;
 
           const bmp = await createImageBitmap(video);
           await sendFrame(bmp, t);
@@ -1855,7 +1864,10 @@ export default function Scripter() {
       }
 
       // Signal end of scan; worker replies with all accumulated trigger times.
-      triggerTimes = await collectResults();
+      // Skipped when cancelled — partial results are discarded.
+      if (!vtCancelRef.current) {
+        triggerTimes = await collectResults();
+      }
 
     } finally {
       // Restore video to its previous state
@@ -1869,7 +1881,8 @@ export default function Scripter() {
       worker.terminate();
     }
 
-    // ── Post-processing ───────────────────────────────────────────────────────
+    // ── Post-processing (skipped on cancellation) ─────────────────────────────
+    if (vtCancelRef.current) return;
 
     // Commit all detections at the neutral midpoint — one pos value per trigger.
     setVtPreviewPoints(triggerTimes.map(time => ({
@@ -2615,6 +2628,15 @@ export default function Scripter() {
               {analyzeMode !== "cpu" && (
                 <p className="text-[10px] text-muted-foreground">{analyzeMode === "webgpu" ? "WebGPU compute shader — fastest path" : "WebGL shader"} + fast playback — up to 16× faster than seek-based CPU</p>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={cancelAnalysis}
+                data-testid="button-vt-cancel"
+              >
+                <X className="h-3.5 w-3.5 mr-1.5" />
+                Cancel
+              </Button>
             </div>
           )}
 
