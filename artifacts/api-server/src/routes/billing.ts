@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
 import { pool } from "../lib/db";
-import { getUncachableStripeClient, getStripeSecretKey } from "../lib/stripeClient";
+import { getUncachableStripeClient, getStripeWebhookSecret } from "../lib/stripeClient";
 import Stripe from "stripe";
 
 const router = Router();
@@ -211,14 +211,13 @@ export async function handleBillingWebhook(req: Request, res: Response): Promise
 
   let event: Stripe.Event;
   try {
-    const secretKey = await getStripeSecretKey();
-    const stripe = new Stripe(secretKey);
-    const sigStr = Array.isArray(sig) ? sig[0] : sig;
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+    const webhookSecret = await getStripeWebhookSecret();
     if (!webhookSecret) {
-      res.status(500).json({ error: "STRIPE_WEBHOOK_SECRET not configured" });
+      res.status(500).json({ error: "Stripe webhook secret not configured" });
       return;
     }
+    const stripe = await getUncachableStripeClient();
+    const sigStr = Array.isArray(sig) ? sig[0] : sig;
     event = stripe.webhooks.constructEvent(payload, sigStr, webhookSecret);
   } catch (err) {
     console.error("Webhook signature verification failed:", err);

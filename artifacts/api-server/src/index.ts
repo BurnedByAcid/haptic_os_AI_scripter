@@ -1,7 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { runMigrations } from "stripe-replit-sync";
-import { getStripeSecretKey, createStripeSync } from "./lib/stripeClient";
+import { getStripeSync } from "./lib/stripeClient";
 import { pool } from "./lib/db";
 
 const rawPort = process.env["PORT"];
@@ -27,11 +27,10 @@ async function initStripe() {
 
   try {
     logger.info("Initializing Stripe schema...");
-    await runMigrations({ databaseUrl });
+    await runMigrations({ databaseUrl, schema: "stripe" });
     logger.info("Stripe schema ready");
 
-    const secretKey = await getStripeSecretKey();
-    const stripeSync = createStripeSync(secretKey);
+    const stripeSync = await getStripeSync();
 
     const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
     logger.info({ url: `${webhookBaseUrl}/api/billing/webhook` }, "Setting up managed webhook...");
