@@ -56,7 +56,7 @@ router.get("/scripter-drafts/:slot", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
   const slot = parseSlot(req.params.slot);
-  if (slot === null) { res.status(400).json({ error: "Invalid slot (must be 1, 2, or 3)" }); return; }
+  if (slot === null) { res.status(400).json({ error: "Invalid slot — only 1 draft slot is available." }); return; }
   try {
     await pruneExpired(auth.userId);
     const { rows } = await pool.query(
@@ -73,7 +73,7 @@ router.get("/scripter-drafts/:slot", async (req: Request, res: Response) => {
 
 /**
  * PUT /api/scripter-drafts/:slot — upsert a draft.
- * Subscriber-tier required (free users get 403). Drafts cap at 3 slots and
+ * Subscriber-tier required (free users get 403). Drafts cap at MAX_SLOTS (1) and
  * expire 10 days after the last write. Both `name` and `funscript_json` are
  * re-validated on every write — never trust previously-stored values.
  */
@@ -81,7 +81,7 @@ router.put("/scripter-drafts/:slot", writeLimiter, async (req: Request, res: Res
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
   const slot = parseSlot(req.params.slot);
-  if (slot === null) { res.status(400).json({ error: "Invalid slot (must be 1, 2, or 3)" }); return; }
+  if (slot === null) { res.status(400).json({ error: "Invalid slot — only 1 draft slot is available." }); return; }
 
   try {
     const plan = await getPlan(auth.userId);
@@ -113,8 +113,8 @@ router.put("/scripter-drafts/:slot", writeLimiter, async (req: Request, res: Res
 
     await pruneExpired(auth.userId);
 
-    // Enforce 3-slot cap server-side: if this slot doesn't exist yet, count
-    // active drafts and block if the user already has 3 in different slots.
+    // Enforce slot cap server-side: if this slot doesn't exist yet, count
+    // active drafts and block if the user already has MAX_SLOTS in different slots.
     const { rows: existing } = await pool.query(
       `SELECT slot FROM scripter_drafts WHERE user_id = $1`,
       [auth.userId],
@@ -156,7 +156,7 @@ router.delete("/scripter-drafts/:slot", writeLimiter, async (req: Request, res: 
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
   const slot = parseSlot(req.params.slot);
-  if (slot === null) { res.status(400).json({ error: "Invalid slot (must be 1, 2, or 3)" }); return; }
+  if (slot === null) { res.status(400).json({ error: "Invalid slot — only 1 draft slot is available." }); return; }
   try {
     const plan = await getPlan(auth.userId);
     if (!SUBSCRIBER_PLANS.has(plan)) {
