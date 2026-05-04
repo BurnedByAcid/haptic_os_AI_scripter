@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts --host 0.0.0.0",
-    "prebuild": "node scripts/gen-og-image.mjs",
+    "sync-fonts": "node scripts/sync-fonts.mjs",
+    "prebuild": "node scripts/sync-fonts.mjs && node scripts/gen-og-image.mjs",
     "build": "vite build --config vite.config.ts",
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "generate:og-image": "node scripts/gen-og-image.mjs"
+    "generate:og-image": "node scripts/sync-fonts.mjs && node scripts/gen-og-image.mjs"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
