@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Scissors } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
@@ -81,6 +81,7 @@ const NAV_ITEMS = [
   { href: "/control",   label: "Manual Controls", icon: Settings2, requiresPro: false },
   { href: "/games",     label: "Games",           icon: Gamepad2,  requiresPro: true  },
   { href: "/beat",      label: "Live Audio",       icon: Activity,  requiresPro: true  },
+  { href: "/audio-cleaner", label: "Audio Cleaner",  icon: Scissors,  requiresPro: true  },
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {

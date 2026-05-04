@@ -25,6 +25,7 @@ import Community from "@/pages/community";
 import Upgrade from "@/pages/upgrade";
 import Admin from "@/pages/admin";
 import MyLibrary from "@/pages/my-library";
+import AudioCleaner from "@/pages/audio-cleaner";
 
 const queryClient = new QueryClient();
 
@@ -147,6 +148,7 @@ function Router() {
       <Route path="/library"       component={() => <ProtectedRoute component={MyLibrary} />} />
       <Route path="/games"     component={() => <ProtectedRoute component={Games} />} />
       <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
+      <Route path="/audio-cleaner" component={() => <ProtectedRoute component={AudioCleaner} />} />
       <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
       <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
       <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
