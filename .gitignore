@@ -41,6 +41,16 @@ testem.log
 .DS_Store
 Thumbs.db
 
+# Backup and temp files
+*.bak
+*.tmp
+*.temp
+*.orig
+*.backup
+*.swp
+*.swo
+*~
+
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
