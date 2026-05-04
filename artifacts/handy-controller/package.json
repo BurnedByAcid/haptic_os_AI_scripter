@@ -51,6 +51,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
+    "@webgpu/types": "^0.1.69",
     "@workspace/api-client-react": "workspace:*",
     "@workspace/validation": "workspace:*",
     "class-variance-authority": "catalog:",
