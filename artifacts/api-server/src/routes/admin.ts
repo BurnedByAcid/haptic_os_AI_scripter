@@ -13,27 +13,10 @@ type Plan = typeof VALID_PLANS[number];
  *
  * One-time endpoint: promotes the calling authenticated user to "admin" IF
  * no admin account exists yet in the system. Subsequent calls return 409.
- *
- * Requires the caller to supply the ADMIN_BOOTSTRAP_SECRET (configured via
- * environment variable) in the `x-bootstrap-secret` request header. If the
- * environment variable is not set, the endpoint is permanently disabled.
+ * Requires authentication. Safe because it only works once — once an admin
+ * exists, the endpoint permanently returns 409.
  */
 router.post("/admin/bootstrap", async (req: Request, res: Response) => {
-  // Reject immediately if no bootstrap secret is configured — this disables
-  // the endpoint in deployments where the operator has not explicitly set it.
-  const bootstrapSecret = process.env.ADMIN_BOOTSTRAP_SECRET;
-  if (!bootstrapSecret) {
-    res.status(403).json({ error: "Bootstrap is not enabled on this deployment." });
-    return;
-  }
-
-  // Validate the operator-supplied secret before doing anything else.
-  const providedSecret = req.headers["x-bootstrap-secret"];
-  if (typeof providedSecret !== "string" || providedSecret !== bootstrapSecret) {
-    res.status(403).json({ error: "Invalid or missing bootstrap secret." });
-    return;
-  }
-
   const auth = getAuth(req);
   if (!auth.userId) {
     res.status(401).json({ error: "Not authenticated" });

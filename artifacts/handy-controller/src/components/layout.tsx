@@ -163,7 +163,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {collapsed ? (
             <div className="flex flex-col items-center gap-3">
               {/* Purple Fusion icon */}
-              <img src="/emblem.svg" alt="HapticOS" className="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
+              <img src="/emblem.svg" alt="HapticOS" className="h-8 w-8 flex-shrink-0" />
               {/* Connection dot */}
               <div
                 className={`h-3 w-3 rounded-full flex-shrink-0 ${
@@ -186,7 +186,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
-                  <img src="/emblem.svg" alt="HapticOS" className="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
+                  <img src="/emblem.svg" alt="HapticOS" className="h-8 w-8 flex-shrink-0" />
                   <h1 className="text-xl font-bold tracking-tight whitespace-nowrap">
                     <span className="text-[#C850F0]">Haptic</span><span className="text-white">OS</span>
                   </h1>
