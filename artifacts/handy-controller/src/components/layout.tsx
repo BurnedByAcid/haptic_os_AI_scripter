@@ -304,7 +304,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
                     } ${
                       isActive
-                        ? "bg-primary/10 text-primary font-medium"
+                        ? "bg-gradient-to-r from-[#A855F7]/20 to-[#E040FB]/10 text-[#C850F0] font-medium shadow-[inset_0_0_0_1px_rgba(168,85,247,0.2)]"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                     title={collapsed ? item.label : undefined}
@@ -327,7 +327,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
                       } ${
                         location === "/upgrade"
-                          ? "bg-primary/10 text-primary font-medium"
+                          ? "bg-gradient-to-r from-[#A855F7]/20 to-[#E040FB]/10 text-[#C850F0] font-medium shadow-[inset_0_0_0_1px_rgba(168,85,247,0.2)]"
                           : "text-primary/70 hover:bg-primary/10 hover:text-primary"
                       }`}
                       title={collapsed ? "Upgrade to Pro" : undefined}

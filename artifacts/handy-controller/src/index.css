@@ -159,6 +159,12 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 1px #A855F7, 0 0 14px rgba(168, 85, 247, 0.35), 0 0 28px rgba(224, 64, 251, 0.15);
+  }
 }
 
 @keyframes emblem-glow-pulse {
