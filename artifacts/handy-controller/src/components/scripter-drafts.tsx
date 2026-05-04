@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Crown, Loader2 } from "lucide-react";
+import { Crown, Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const API = import.meta.env.VITE_API_URL ?? "";
@@ -282,13 +282,49 @@ export function ResumeDraftPicker({
   drafts,
   onResume,
   onSkip,
+  onDeleted,
 }: {
   drafts: DraftSummary[];
   onResume: (slot: number) => void;
   onSkip: () => void;
+  onDeleted?: () => void;
 }) {
+  const { getToken } = useAuth();
+  const { toast } = useToast();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   if (drafts.length === 0) return null;
   const d = drafts[0];
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const token = await getToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(`${API}/api/scripter-drafts/${d.slot}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? "Delete failed");
+      }
+      toast({ title: "Draft deleted" });
+      onDeleted?.();
+      onSkip();
+    } catch (err) {
+      toast({
+        title: "Couldn't delete draft",
+        description: err instanceof Error ? err.message : "Network error",
+        variant: "destructive",
+      });
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onSkip} />
@@ -310,14 +346,55 @@ export function ResumeDraftPicker({
             {formatExpiry(d.expires_at)}
           </div>
         </button>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onSkip} data-testid="button-skip-resume">
-            Start fresh
-          </Button>
-          <Button size="sm" onClick={() => onResume(d.slot)}>
-            Resume draft
-          </Button>
-        </div>
+
+        {confirmDelete ? (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 space-y-2">
+            <p className="text-sm font-medium text-destructive">Delete this draft?</p>
+            <p className="text-xs text-muted-foreground">This cannot be undone.</p>
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDelete}
+                disabled={deleting}
+                data-testid="button-confirm-delete-draft"
+              >
+                {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                Yes, delete
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+                data-testid="button-cancel-delete-draft"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => setConfirmDelete(true)}
+              data-testid="button-delete-draft"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Delete draft
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={onSkip} data-testid="button-skip-resume">
+                Start fresh
+              </Button>
+              <Button size="sm" onClick={() => onResume(d.slot)}>
+                Resume draft
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
