@@ -27,15 +27,19 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 const STORAGE_KEY = "scripter_session_v1";
 
-/** 7 EQ bands — label, Hz range, display colour */
+/** 11 EQ bands — label, Hz range, display colour */
 const BD_BANDS: { label: string; range: [number, number]; color: string }[] = [
-  { label: "Sub",      range: [20,    60],   color: "#6366f1" },
-  { label: "Bass",     range: [60,    250],  color: "#8b5cf6" },
-  { label: "Lo-Mid",   range: [250,   500],  color: "#0ea5e9" },
-  { label: "Mid",      range: [500,   2000], color: "#a855f7" },
-  { label: "Hi-Mid",   range: [2000,  4000], color: "#10b981" },
-  { label: "Presence", range: [4000,  6000], color: "#f59e0b" },
-  { label: "Air",      range: [6000, 20000], color: "#ef4444" },
+  { label: "Sub",     range: [20,     60],   color: "#6366f1" },
+  { label: "Bass",    range: [60,    250],   color: "#8b5cf6" },
+  { label: "Lo-Mid",  range: [250,   500],   color: "#7c3aed" },
+  { label: "Mid",     range: [500,   1000],  color: "#a855f7" },
+  { label: "Up-Mid",  range: [1000,  2000],  color: "#c026d3" },
+  { label: "Prsnc",   range: [2000,  4000],  color: "#0ea5e9" },
+  { label: "Brill",   range: [4000,  6000],  color: "#10b981" },
+  { label: "High",    range: [6000,  8000],  color: "#84cc16" },
+  { label: "V-High",  range: [8000,  12000], color: "#eab308" },
+  { label: "U-High",  range: [12000, 16000], color: "#f59e0b" },
+  { label: "Air",     range: [16000, 20000], color: "#ef4444" },
 ];
 
 /** 10 zoom levels: half-window in seconds (2 s → 60 s). Index 0 = max zoom. */
@@ -390,8 +394,8 @@ export default function Scripter() {
   const bdBeatPosRef = useRef(0); // alternates 0 ↔ 100
   const [bdPointsAdded, setBdPointsAdded] = useState(0);
 
-  const [bdBandEnabled, setBdBandEnabled] = useState<boolean[]>(() => Array(7).fill(true));
-  const bdBandEnabledRef = useRef<boolean[]>(Array(7).fill(true));
+  const [bdBandEnabled, setBdBandEnabled] = useState<boolean[]>(() => Array(11).fill(true));
+  const bdBandEnabledRef = useRef<boolean[]>(Array(11).fill(true));
   const bdFilterGainsRef = useRef<GainNode[]>([]); // one GainNode per band, gates audio to destination
 
   useEffect(() => { bdSensitivityRef.current = bdSensitivity; }, [bdSensitivity]);
@@ -2012,13 +2016,13 @@ export default function Scripter() {
               <span className="text-border">·</span>
               <button
                 className="text-muted-foreground hover:text-primary transition-colors"
-                onClick={() => setBdBandEnabled(Array(7).fill(true))}
+                onClick={() => setBdBandEnabled(Array(11).fill(true))}
               >All</button>
               <span className="text-border">|</span>
               {[
-                { label: "Kick", mask: [true,true,false,false,false,false,false] },
-                { label: "Snare", mask: [false,false,true,true,false,false,false] },
-                { label: "Hi-hat", mask: [false,false,false,false,false,true,true] },
+                { label: "Kick",   mask: [true,true,false,false,false,false,false,false,false,false,false] },
+                { label: "Snare",  mask: [false,false,true,true,true,false,false,false,false,false,false] },
+                { label: "Hi-hat", mask: [false,false,false,false,false,false,false,true,true,true,true] },
               ].map(preset => (
                 <button
                   key={preset.label}
