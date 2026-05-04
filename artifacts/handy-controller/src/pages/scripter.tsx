@@ -1807,13 +1807,10 @@ export default function Scripter() {
   }
 
   return (
-    <div className="p-4 h-full flex flex-col max-w-[1600px] mx-auto gap-3">
+    <div className="p-2 px-3 h-full flex flex-col max-w-[1600px] mx-auto gap-2">
       {/* Header */}
       <div className="flex justify-between items-center flex-shrink-0">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Scripter</h1>
-          <p className="text-muted-foreground text-sm">Create and edit Funscripts.</p>
-        </div>
+        <h1 className="text-lg font-bold tracking-tight">Scripter</h1>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -1830,44 +1827,50 @@ export default function Scripter() {
             }}
             data-testid="button-new-script"
           >
-            <FilePlus className="mr-2 h-4 w-4" /> New Script
+            <FilePlus className="mr-1.5 h-3.5 w-3.5" /> New Script
           </Button>
           <Button size="sm" onClick={() => setSaveDialogOpen(true)} disabled={points.length === 0} data-testid="button-export-script">
-            <BookmarkPlus className="mr-2 h-4 w-4" /> Save Script
+            <BookmarkPlus className="mr-1.5 h-3.5 w-3.5" /> Save Script
           </Button>
         </div>
       </div>
 
       {/* ── Shared video player — takes 2/3 of available height ── */}
-      <div ref={videoBlockRef} className={`flex flex-col rounded-lg border border-border/50 overflow-hidden min-h-0 ${vtAnalyzing ? "hidden" : ""}`} style={{ flex: 2 }}>
-        {/* Toolbar */}
-        <div className="bg-card/50 border-b border-border px-3 py-2 flex gap-2 items-center flex-shrink-0 flex-wrap">
-          <Button variant="secondary" size="sm" className="relative cursor-pointer">
-            <span>Load Video</span>
+      <div ref={videoBlockRef} className={`flex flex-row rounded-lg border border-border/50 overflow-hidden min-h-0 ${vtAnalyzing ? "hidden" : ""}`} style={{ flex: 2 }}>
+        {/* Left sidebar: load/import controls */}
+        <div className="w-36 flex-shrink-0 bg-card/50 border-r border-border/50 flex flex-col gap-1.5 p-2">
+          <Button variant="secondary" size="sm" className="relative cursor-pointer w-full justify-start text-xs h-7">
+            <Upload className="mr-1.5 h-3 w-3 flex-shrink-0" />
+            <span className="truncate">Load Video</span>
             <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
           </Button>
           <Button
             variant="outline"
             size="sm"
+            className="w-full justify-start text-xs h-7"
             onClick={() => { setUrlError(null); setUrlDialogOpen(true); }}
             data-testid="button-paste-video-url"
           >
-            <Link2 className="mr-2 h-4 w-4" /> Paste URL
+            <Link2 className="mr-1.5 h-3 w-3 flex-shrink-0" /> Paste URL
           </Button>
-          <Button variant="outline" size="sm" className="relative cursor-pointer" data-testid="button-import-funscript">
-            <Upload className="mr-2 h-4 w-4" /><span>Import .funscript</span>
+          <Button variant="outline" size="sm" className="relative cursor-pointer w-full justify-start text-xs h-7" data-testid="button-import-funscript">
+            <Download className="mr-1.5 h-3 w-3 flex-shrink-0" /><span className="truncate">Import .funscript</span>
             <input type="file" accept=".funscript,.json,application/json" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImportFunscript} />
           </Button>
-          <label className="flex items-center gap-2 text-sm cursor-pointer ml-auto">
-            <input
-              type="checkbox"
-              checked={realtimeTest}
-              onChange={e => setRealtimeTest(e.target.checked)}
-              className="rounded border-border bg-black"
-            />
-            Real-time Test (Handy)
-          </label>
+          <div className="mt-auto pt-2 border-t border-border/50">
+            <label className="flex items-center gap-1.5 text-[11px] cursor-pointer leading-tight">
+              <input
+                type="checkbox"
+                checked={realtimeTest}
+                onChange={e => setRealtimeTest(e.target.checked)}
+                className="rounded border-border bg-black flex-shrink-0"
+              />
+              Real-time Test
+            </label>
+          </div>
         </div>
+        {/* Video + controls */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {/* Video */}
         <div ref={videoContainerRef} className="flex-1 min-h-0 bg-black relative">
           <video
@@ -1919,7 +1922,7 @@ export default function Scripter() {
           )}
         </div>
         {/* Controls bar */}
-        <div className="bg-card/60 border-t border-border/50 px-3 py-2 flex-shrink-0">
+        <div className="bg-card/60 border-t border-border/50 px-3 py-1.5 flex-shrink-0">
           <VideoControlBar
             videoRef={videoRef}
             containerRef={videoBlockRef}
@@ -1927,6 +1930,7 @@ export default function Scripter() {
             markers={[...points].sort((a, b) => a.time - b.time).map(p => p.time)}
           />
         </div>
+        </div>{/* end Video + controls */}
       </div>
 
       {/* ── Tabs — collapsible tool panel ── */}
