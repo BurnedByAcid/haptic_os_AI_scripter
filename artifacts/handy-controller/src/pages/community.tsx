@@ -717,8 +717,8 @@ export default function Community() {
                     <div className="flex gap-2">
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="flex-1 text-xs h-8 gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
+                        variant="outline-primary"
+                        className="flex-1 text-xs h-8 gap-1.5"
                         onClick={() => handleDownload(s)}
                       >
                         <Download className="h-3.5 w-3.5" /> Download
