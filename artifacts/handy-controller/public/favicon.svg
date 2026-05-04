@@ -10,8 +10,12 @@
       <stop offset="100%" stop-color="#8B20C0"/>
     </linearGradient>
     <filter id="waveGlow" x="-30%" y="-80%" width="160%" height="260%">
-      <feGaussianBlur stdDeviation="5" result="blur1"/>
-      <feGaussianBlur stdDeviation="10" result="blur2"/>
+      <feGaussianBlur stdDeviation="5" result="blur1">
+        <animate attributeName="stdDeviation" values="4;7;4" dur="3s" repeatCount="indefinite"/>
+      </feGaussianBlur>
+      <feGaussianBlur stdDeviation="10" result="blur2">
+        <animate attributeName="stdDeviation" values="8;14;8" dur="3s" repeatCount="indefinite"/>
+      </feGaussianBlur>
       <feMerge>
         <feMergeNode in="blur2"/>
         <feMergeNode in="blur1"/>

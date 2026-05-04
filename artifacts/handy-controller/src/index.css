@@ -161,6 +161,19 @@
   }
 }
 
+@keyframes emblem-glow-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px rgba(200, 80, 240, 0.55)) drop-shadow(0 0 10px rgba(200, 80, 240, 0.25));
+  }
+  50% {
+    filter: drop-shadow(0 0 9px rgba(220, 100, 255, 0.85)) drop-shadow(0 0 18px rgba(200, 80, 240, 0.45));
+  }
+}
+
+.emblem-glow {
+  animation: emblem-glow-pulse 3s ease-in-out infinite;
+}
+
 @layer utilities {
   input[type="search"]::-webkit-search-cancel-button { @apply hidden; }
   [contenteditable][data-placeholder]:empty::before {
