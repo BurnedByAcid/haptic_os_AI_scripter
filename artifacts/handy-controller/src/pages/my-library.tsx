@@ -1320,6 +1320,7 @@ export default function MyLibrary() {
                       <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={cancelEdit} disabled={updateMutation.isPending} data-testid={`button-cancel-edit-${entry.id}`}>
                         <X className="h-3.5 w-3.5 mr-1" />Cancel
                       </Button>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -1409,122 +1410,6 @@ export default function MyLibrary() {
                           primaryIcon={<RefreshCw className="h-3.5 w-3.5" />}
                           primaryVariant="secondary"
                         />
-                      ) : null}
-                    </div>
-
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="w-full text-xs h-7 gap-1.5 text-muted-foreground hover:text-primary"
-                      onClick={() => setScriptsEntry(entry)}
-                      data-testid={`button-manage-scripts-${entry.id}`}
-                    >
-                      <FileJson className="h-3 w-3" /> Manage funscripts
-                      {(() => {
-                        const count = entry.script_count ?? 0;
-                        const cap = isPro ? 5 : 1;
-                        const atCap = count >= cap;
-                        const nearCap = isPro && count >= cap - 1 && !atCap;
-                        return (
-                          <span
-                            className={`ml-1 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium tabular-nums border ${
-                              atCap
-                                ? "bg-amber-400/10 text-amber-400 border-amber-400/30"
-                                : nearCap
-                                  ? "bg-amber-400/5 text-amber-300/90 border-amber-400/20"
-                                  : "bg-muted/40 text-muted-foreground border-border/40"
-                            }`}
-                            title={`${count} of ${cap} script${cap === 1 ? "" : "s"} attached`}
-                            data-testid={`badge-script-count-${entry.id}`}
-                          >
-                            {count} / {cap}
-                          </span>
-                        );
-                      })()}
-                    </Button>
-
-                    <div className="flex gap-2">
-                      {isPro && entry.video_url ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="flex-1 text-xs h-7 gap-1.5 text-muted-foreground hover:text-primary"
-                          onClick={() => setShareEntry(entry)}
-                        >
-                          <Globe className="h-3 w-3" /> Share to Community
-                        </Button>
-                      ) : !isPro && entry.video_url ? (
-                        <Link href="/upgrade" className="flex-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="w-full text-xs h-7 gap-1.5 text-muted-foreground/50"
-                          >
-                            <Crown className="h-3 w-3 text-amber-400" /> Share (Pro)
-                          </Button>
-                        </Link>
-                      ) : null}
-
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-xs h-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        disabled={deletingId === entry.id}
-                        onClick={() => {
-                          if (window.confirm(`Delete "${entry.title}"?`)) {
-                            setDeletingId(entry.id);
-                            deleteMutation.mutate(entry.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </>
-                )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground shrink-0"
-                        onClick={() => openEdit(entry)}
-                        data-testid={`button-edit-${entry.id}`}
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center gap-1 text-[11px] text-muted-foreground mt-auto">
-                      <Clock className="h-3 w-3" />
-                      {timeAgo(entry.created_at)}
-                    </div>
-
-                    <div className="flex gap-2 flex-wrap">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-xs h-8 gap-1.5"
-                        onClick={() => handleDownload(entry)}
-                      >
-                        <Download className="h-3.5 w-3.5" /> Download
-                      </Button>
-
-                      {entry.video_url ? (
-                        <Button
-                          size="sm"
-                          className="flex-1 text-xs h-8 gap-1.5"
-                          onClick={() => handlePlay(entry)}
-                        >
-                          <Play className="h-3.5 w-3.5" /> Play
-                        </Button>
-                      ) : entry.local_file_path ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="flex-1 text-xs h-8 gap-1.5"
-                          onClick={() => handleRegrantAccess(entry)}
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" /> Re-grant Access
-                        </Button>
                       ) : null}
                     </div>
 

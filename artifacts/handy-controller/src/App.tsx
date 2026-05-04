@@ -65,7 +65,7 @@ const clerkAppearance = {
   options: {
     logoPlacement: "inside" as const,
     logoLinkUrl: basePath || "/",
-    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+    logoImageUrl: `${window.location.origin}${basePath}/logo.jpg`,
     socialButtonsPlacement: "top" as const,
     socialButtonsVariant: "blockButton" as const,
   },
@@ -105,7 +105,7 @@ const clerkAppearance = {
     formFieldRow: "",
     main: "",
     logoBox: "flex justify-center",
-    logoImage: "h-10 w-auto",
+    logoImage: "h-16 w-auto",
     footerAction: "",
   },
 };
