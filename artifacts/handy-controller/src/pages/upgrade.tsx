@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
-import { Crown, Check, Zap, Lock, ShieldCheck, Loader2, Settings, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { Crown, Check, Zap, ShieldCheck, Loader2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useAuth } from "@clerk/react";
 import { useToast } from "@/hooks/use-toast";
-import { useLocation } from "wouter";
+
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 const FREE_FEATURES = [
   "Video Player with Funscript sync",
@@ -19,38 +20,18 @@ const SUBSCRIBER_FEATURES = [
   "Unlimited Scripter sessions",
   "Games with haptic feedback",
   "Live Audio reactive haptics",
-  "AI-powered control sessions",
   "Community sharing & discovery",
   "Priority support",
   "Early access to new features",
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
-
 export default function Upgrade() {
   const { plan } = useSubscription();
   const { getToken } = useAuth();
   const { toast } = useToast();
-  const [location] = useLocation();
   const [bootstrapping, setBootstrapping] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("success") === "1") {
-      toast({
-        title: "Subscription activated!",
-        description: "Welcome to Subscriber. Reload the page if features don't appear yet.",
-      });
-    } else if (params.get("canceled") === "1") {
-      toast({
-        title: "Checkout canceled",
-        description: "You can subscribe any time from this page.",
-        variant: "destructive",
-      });
-    }
-  }, [location]);
+  const isPaidOrAdmin = plan === "pro" || plan === "admin" || plan === "subscriber";
 
   const claimAdmin = async () => {
     setBootstrapping(true);
@@ -65,11 +46,7 @@ export default function Upgrade() {
         toast({ title: "Admin access granted!", description: "Reloading your session…" });
         window.location.href = "/";
       } else {
-        toast({
-          title: "Could not claim admin",
-          description: data.error ?? "Unknown error",
-          variant: "destructive",
-        });
+        toast({ title: "Could not claim admin", description: data.error ?? "Unknown error", variant: "destructive" });
       }
     } catch (e) {
       toast({ title: "Error", description: String(e), variant: "destructive" });
@@ -78,66 +55,13 @@ export default function Upgrade() {
     }
   };
 
-  const handleSubscribe = async () => {
-    setCheckoutLoading(true);
-    try {
-      const token = await getToken();
-      const res = await fetch(`${API_BASE}/api/billing/checkout`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      const data = await res.json() as { url?: string; error?: string };
-      if (!res.ok || !data.url) {
-        toast({
-          title: "Checkout failed",
-          description: data.error ?? "Could not open checkout",
-          variant: "destructive",
-        });
-        return;
-      }
-      window.location.href = data.url;
-    } catch (e) {
-      toast({ title: "Error", description: String(e), variant: "destructive" });
-    } finally {
-      setCheckoutLoading(false);
-    }
-  };
-
-  const handleManageSubscription = async () => {
-    setPortalLoading(true);
-    try {
-      const token = await getToken();
-      const res = await fetch(`${API_BASE}/api/billing/portal`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      const data = await res.json() as { url?: string; error?: string };
-      if (!res.ok || !data.url) {
-        toast({
-          title: "Portal failed",
-          description: data.error ?? "Could not open subscription portal",
-          variant: "destructive",
-        });
-        return;
-      }
-      window.location.href = data.url;
-    } catch (e) {
-      toast({ title: "Error", description: String(e), variant: "destructive" });
-    } finally {
-      setPortalLoading(false);
-    }
-  };
-
-  const isSubscriber = plan === "subscriber";
-  const isPaidOrAdmin = plan === "pro" || plan === "admin" || plan === "subscriber";
-
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-8">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Choose your plan</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Plans</h1>
         <p className="text-muted-foreground">
           {plan === "free"
-            ? "Unlock the full HapticOS experience with a subscription."
+            ? "Unlock the full HapticOS experience."
             : plan === "subscriber"
             ? "You're subscribed — enjoy full access!"
             : plan === "pro"
@@ -246,45 +170,21 @@ export default function Upgrade() {
                 {f}
               </div>
             ))}
-            <div className="pt-2 space-y-2">
+            <div className="pt-2">
               {isPaidOrAdmin ? (
-                <>
-                  <Button className="w-full" disabled>
-                    <Crown className="h-4 w-4 mr-1.5" />
-                    {plan === "admin" ? "Admin — all features" : "Already subscribed"}
-                  </Button>
-                  {isSubscriber && (
-                    <Button
-                      variant="outline"
-                      className="w-full gap-1.5"
-                      onClick={handleManageSubscription}
-                      disabled={portalLoading}
-                    >
-                      {portalLoading
-                        ? <><Loader2 className="h-4 w-4 animate-spin" /> Opening…</>
-                        : <><Settings className="h-4 w-4" /> Manage Subscription</>}
-                    </Button>
-                  )}
-                </>
-              ) : (
-                <Button
-                  className="w-full gap-1.5"
-                  onClick={handleSubscribe}
-                  disabled={checkoutLoading}
-                >
-                  {checkoutLoading
-                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Opening checkout…</>
-                    : <><Crown className="h-4 w-4" /> Subscribe — $9.99/mo</>}
+                <Button className="w-full" disabled>
+                  <Crown className="h-4 w-4 mr-1.5" />
+                  {plan === "admin" ? "Admin — all features" : "Already subscribed"}
                 </Button>
+              ) : (
+                <div className="rounded-lg border border-border/40 bg-muted/30 p-3 flex items-center gap-2.5 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4 flex-shrink-0" />
+                  <span>Billing coming soon — contact us to get early access.</span>
+                </div>
               )}
             </div>
           </div>
         </Card>
-      </div>
-
-      <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground">
-        <AlertCircle className="h-3.5 w-3.5" />
-        <span>Payments are processed securely via Stripe. Cancel any time from the portal.</span>
       </div>
     </div>
   );
