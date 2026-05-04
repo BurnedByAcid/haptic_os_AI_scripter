@@ -6,6 +6,7 @@ import { useAuth } from "@clerk/react";
 import { Link } from "wouter";
 import { setHDSP } from "@/lib/handyApi";
 import { GlPatchMatcher } from "@/lib/gl-patch-matcher";
+import { WebGpuPatchMatcher } from "@/lib/webgpu-patch-matcher";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -358,17 +359,43 @@ export default function Scripter() {
   const [vtPreviewPoints, setVtPreviewPoints] = useState<Point[]>([]);
 
   // ─── GPU patch matcher ───
-  const glRef = useRef<GlPatchMatcher | null>(null);
-  const [gpuAvail, setGpuAvail] = useState(false);
+  // Holds whichever matcher was successfully initialised: WebGPU > WebGL > none.
+  const glRef = useRef<WebGpuPatchMatcher | GlPatchMatcher | null>(null);
+  // "webgpu" | "webgl" | "cpu" — determines the badge label and computeRms path.
+  const [gpuMode, setGpuMode] = useState<"webgpu" | "webgl" | "cpu">("cpu");
+  const gpuAvail = gpuMode !== "cpu";
   useEffect(() => {
-    try {
-      glRef.current = new GlPatchMatcher();
-      setGpuAvail(true);
-    } catch {
+    let cancelled = false;
+    (async () => {
+      // ── Try WebGPU first ──
+      try {
+        const wgpu = await WebGpuPatchMatcher.create();
+        if (cancelled) { wgpu.destroy(); return; }
+        glRef.current = wgpu;
+        setGpuMode("webgpu");
+        console.log("[VideoAnalysis] GPU path: WebGPU");
+        return;
+      } catch { /* fall through */ }
+
+      // ── Fall back to WebGL ──
+      try {
+        glRef.current = new GlPatchMatcher();
+        if (cancelled) { glRef.current.destroy(); glRef.current = null; return; }
+        setGpuMode("webgl");
+        console.log("[VideoAnalysis] GPU path: WebGL");
+        return;
+      } catch { /* fall through */ }
+
+      // ── CPU-only ──
       glRef.current = null;
-      setGpuAvail(false);
-    }
-    return () => { glRef.current?.destroy(); glRef.current = null; };
+      setGpuMode("cpu");
+      console.log("[VideoAnalysis] GPU path: CPU");
+    })();
+    return () => {
+      cancelled = true;
+      glRef.current?.destroy();
+      glRef.current = null;
+    };
   }, []);
 
   // ─── Beat Detector state ───
@@ -1549,7 +1576,7 @@ export default function Scripter() {
     const rgba = ctx.getImageData(x, y, w, h).data;
     const gray = toGray(rgba);
     setVtSampledPatch(gray);
-    // Feed the reference into the GPU matcher so it's ready for analysis
+    // Feed the reference into whichever matcher is active
     try { glRef.current?.setReference(gray, w, h); } catch { /* ignore */ }
   };
 
@@ -1583,7 +1610,7 @@ export default function Scripter() {
     [50, 50], //   0 — last resort
   ];
 
-  const [analyzeMode, setAnalyzeMode] = useState<"gpu" | "cpu">("cpu");
+  const [analyzeMode, setAnalyzeMode] = useState<"webgpu" | "webgl" | "cpu">("cpu");
 
   const runAnalysis = async () => {
     const video = videoRef.current;
@@ -1607,14 +1634,18 @@ export default function Scripter() {
     let lastTriggerMs = startMs - vtMinDelay; // ensures first trigger is never suppressed
 
     const gl = glRef.current;
-    // Ensure the GPU matcher has the current reference (in case vtSampledPatch changed)
+    // Ensure the active matcher has the current reference (in case vtSampledPatch changed)
     if (gl) {
       try { gl.setReference(vtSampledPatch, w, h); } catch { /* ignore */ }
     }
 
-    const useGpu = gl !== null;
+    // gpuDemoted flips to true on the first GPU error; once set, all remaining
+    // frames in this scan use the CPU path so we don't spam warnings or retry a
+    // broken device hundreds of times.
+    let useGpu = gl !== null;
+    let gpuDemoted = false;
     const hasRvfc = "requestVideoFrameCallback" in HTMLVideoElement.prototype;
-    setAnalyzeMode(useGpu ? "gpu" : "cpu");
+    setAnalyzeMode(gpuMode);
 
     // Save video state so we can restore it after analysis
     const savedRate    = video.playbackRate;
@@ -1651,7 +1682,7 @@ export default function Scripter() {
           // without this the Promise would hang forever.
           video.addEventListener("ended", finish, { once: true });
 
-          const processFrame = (_now: number, meta: { mediaTime: number }) => {
+          const processFrame = async (_now: number, meta: { mediaTime: number }) => {
             if (done) return;
             const frameMs = meta.mediaTime * 1000;
 
@@ -1664,10 +1695,21 @@ export default function Scripter() {
             if (frameMs - lastAnalyzed >= stepMs) {
               try {
                 let rms: number;
-                if (useGpu) {
-                  rms = gl!.computeRms(video, nx, ny, nw, nh);
+                if (useGpu && !gpuDemoted) {
+                  try {
+                    rms = await (gl!.computeRms(video, nx, ny, nw, nh) as Promise<number> | number);
+                  } catch (gpuErr) {
+                    // GPU device lost — demote for all remaining frames this scan
+                    console.warn("[VideoAnalysis] GPU error — demoting to CPU for rest of scan:", gpuErr);
+                    gpuDemoted = true;
+                    const off2d = document.createElement("canvas");
+                    off2d.width = w; off2d.height = h;
+                    const ctx2 = off2d.getContext("2d")!;
+                    ctx2.drawImage(video, x, y, w, h, 0, 0, w, h);
+                    rms = patchRms(toGray(ctx2.getImageData(0, 0, w, h).data), vtSampledPatch!);
+                  }
                 } else {
-                  // rVFC without GPU — use 2D canvas cropped to patch
+                  // CPU path (no GPU, or GPU demoted after device loss)
                   const off2d = document.createElement("canvas");
                   off2d.width = w; off2d.height = h;
                   const ctx2 = off2d.getContext("2d")!;
@@ -1711,8 +1753,16 @@ export default function Scripter() {
           });
 
           let rms: number;
-          if (useGpu) {
-            rms = gl!.computeRms(video, nx, ny, nw, nh);
+          if (useGpu && !gpuDemoted) {
+            try {
+              rms = await (gl!.computeRms(video, nx, ny, nw, nh) as Promise<number> | number);
+            } catch (gpuErr) {
+              // GPU device lost — demote for all remaining frames this scan
+              console.warn("[VideoAnalysis] GPU error — demoting to CPU for rest of scan:", gpuErr);
+              gpuDemoted = true;
+              ctx.drawImage(video, 0, 0);
+              rms = patchRms(toGray(ctx.getImageData(x, y, w, h).data), vtSampledPatch!);
+            }
           } else {
             ctx.drawImage(video, 0, 0);
             rms = patchRms(toGray(ctx.getImageData(x, y, w, h).data), vtSampledPatch!);
@@ -2471,16 +2521,16 @@ export default function Scripter() {
             <div className="flex-1 flex flex-col items-center justify-center gap-4 px-8">
               <div className="flex items-center gap-2">
                 <p className="text-sm text-muted-foreground">Scanning video for pattern matches…</p>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${analyzeMode === "gpu" ? "border-primary/60 text-primary bg-primary/10" : "border-muted-foreground/40 text-muted-foreground"}`}>
-                  {analyzeMode === "gpu" ? "⚡ GPU" : "CPU"}
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${analyzeMode !== "cpu" ? "border-primary/60 text-primary bg-primary/10" : "border-muted-foreground/40 text-muted-foreground"}`}>
+                  {analyzeMode === "webgpu" ? "⚡ WebGPU" : analyzeMode === "webgl" ? "⚡ WebGL" : "CPU"}
                 </span>
               </div>
               <div className="w-full max-w-md">
                 <Progress value={vtProgress} className="h-3" />
               </div>
               <p className="text-2xl font-mono font-bold text-primary">{vtProgress}%</p>
-              {analyzeMode === "gpu" && (
-                <p className="text-[10px] text-muted-foreground">WebGL shader + fast playback — up to 16× faster than seek-based CPU</p>
+              {analyzeMode !== "cpu" && (
+                <p className="text-[10px] text-muted-foreground">{analyzeMode === "webgpu" ? "WebGPU compute shader — fastest path" : "WebGL shader"} + fast playback — up to 16× faster than seek-based CPU</p>
               )}
             </div>
           )}
@@ -2616,8 +2666,8 @@ export default function Scripter() {
                       {vtAnalyzing ? `Analyzing... ${vtProgress}%` : "Analyze Video"}
                     </Button>
                     <div className="flex justify-end">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${gpuAvail ? "border-primary/50 text-primary bg-primary/10" : "border-muted-foreground/30 text-muted-foreground"}`}>
-                        {gpuAvail ? "⚡ GPU-accelerated" : "CPU mode"}
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${gpuMode === "webgpu" ? "border-primary/50 text-primary bg-primary/10" : gpuMode === "webgl" ? "border-primary/40 text-primary/80 bg-primary/5" : "border-muted-foreground/30 text-muted-foreground"}`}>
+                        {gpuMode === "webgpu" ? "⚡ WebGPU" : gpuMode === "webgl" ? "⚡ WebGL" : "CPU mode"}
                       </span>
                     </div>
                   </div>
