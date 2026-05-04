@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Crown, Check, Zap, Lock, ShieldCheck, Loader2, Settings, AlertCircle } from "lucide-react";
+import { Crown, Check, Zap, Loader2, Settings, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -32,7 +32,6 @@ export default function Upgrade() {
   const { getToken } = useAuth();
   const { toast } = useToast();
   const [location] = useLocation();
-  const [bootstrapping, setBootstrapping] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
 
@@ -51,32 +50,6 @@ export default function Upgrade() {
       });
     }
   }, [location]);
-
-  const claimAdmin = async () => {
-    setBootstrapping(true);
-    try {
-      const token = await getToken();
-      const res = await fetch(`${API_BASE}/api/admin/bootstrap`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json() as { message?: string; error?: string };
-      if (res.ok) {
-        toast({ title: "Admin access granted!", description: "Reloading your session…" });
-        window.location.href = "/";
-      } else {
-        toast({
-          title: "Could not claim admin",
-          description: data.error ?? "Unknown error",
-          variant: "destructive",
-        });
-      }
-    } catch (e) {
-      toast({ title: "Error", description: String(e), variant: "destructive" });
-    } finally {
-      setBootstrapping(false);
-    }
-  };
 
   const handleSubscribe = async () => {
     setCheckoutLoading(true);
@@ -145,38 +118,6 @@ export default function Upgrade() {
             : "Admin account — all features unlocked."}
         </p>
       </div>
-
-      {plan === "free" && (
-        <Card className="border-yellow-500/30 bg-yellow-500/5 max-w-2xl mx-auto">
-          <CardHeader>
-            <div className="flex items-start gap-3">
-              <div className="h-9 w-9 rounded-full bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <ShieldCheck className="h-5 w-5 text-yellow-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-base text-yellow-300">First-time setup — claim admin access</CardTitle>
-                <CardDescription className="text-xs mt-1 leading-relaxed">
-                  If no admin account exists yet, you can claim it right now. This unlocks every
-                  feature and lets you manage other users' plans from the Admin Panel. Only works
-                  once — the first person to click gets it.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <div className="px-6 pb-5">
-            <Button
-              onClick={claimAdmin}
-              disabled={bootstrapping}
-              className="gap-2 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30 hover:border-yellow-500/50"
-              variant="outline"
-            >
-              {bootstrapping
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> Claiming…</>
-                : <><ShieldCheck className="h-4 w-4" /> Claim Admin Access</>}
-            </Button>
-          </div>
-        </Card>
-      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
         {/* Free tier */}

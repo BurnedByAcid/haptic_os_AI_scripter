@@ -13,9 +13,27 @@ type Plan = typeof VALID_PLANS[number];
  *
  * One-time endpoint: promotes the calling authenticated user to "admin" IF
  * no admin account exists yet in the system. Subsequent calls return 409.
- * No body required — just a valid Clerk session token.
+ *
+ * Requires the caller to supply the ADMIN_BOOTSTRAP_SECRET (configured via
+ * environment variable) in the `x-bootstrap-secret` request header. If the
+ * environment variable is not set, the endpoint is permanently disabled.
  */
 router.post("/admin/bootstrap", async (req: Request, res: Response) => {
+  // Reject immediately if no bootstrap secret is configured — this disables
+  // the endpoint in deployments where the operator has not explicitly set it.
+  const bootstrapSecret = process.env.ADMIN_BOOTSTRAP_SECRET;
+  if (!bootstrapSecret) {
+    res.status(403).json({ error: "Bootstrap is not enabled on this deployment." });
+    return;
+  }
+
+  // Validate the operator-supplied secret before doing anything else.
+  const providedSecret = req.headers["x-bootstrap-secret"];
+  if (typeof providedSecret !== "string" || providedSecret !== bootstrapSecret) {
+    res.status(403).json({ error: "Invalid or missing bootstrap secret." });
+    return;
+  }
+
   const auth = getAuth(req);
   if (!auth.userId) {
     res.status(401).json({ error: "Not authenticated" });
@@ -24,37 +42,50 @@ router.post("/admin/bootstrap", async (req: Request, res: Response) => {
 
   const client = clerkClient;
 
-  // Check if any admin already exists by scanning users
-  // (Clerk doesn't support metadata filtering, so we page through users)
-  let offset = 0;
-  const limit = 100;
-  let adminFound = false;
+  // Acquire a Postgres advisory lock (key 1) to make the check-and-promote
+  // sequence atomic. Only one concurrent bootstrap request can proceed at a
+  // time; all others block until the lock is released at the end of the
+  // database session (pg_advisory_unlock or connection close).
+  const db = await pool.connect();
+  try {
+    await db.query("SELECT pg_advisory_lock(1)");
 
-  outer: while (true) {
-    const page = await client.users.getUserList({ limit, offset });
-    for (const u of page.data) {
-      if ((u.publicMetadata as Record<string, unknown>)?.plan === "admin") {
-        adminFound = true;
-        break outer;
+    // Check if any admin already exists by scanning users
+    // (Clerk doesn't support metadata filtering, so we page through users)
+    let offset = 0;
+    const limit = 100;
+    let adminFound = false;
+
+    outer: while (true) {
+      const page = await client.users.getUserList({ limit, offset });
+      for (const u of page.data) {
+        if ((u.publicMetadata as Record<string, unknown>)?.plan === "admin") {
+          adminFound = true;
+          break outer;
+        }
       }
+      if (page.data.length < limit) break;
+      offset += limit;
     }
-    if (page.data.length < limit) break;
-    offset += limit;
-  }
 
-  if (adminFound) {
-    res.status(409).json({
-      error: "An admin account already exists. Contact your admin to upgrade your plan.",
+    if (adminFound) {
+      res.status(409).json({
+        error: "An admin account already exists. Contact your admin to upgrade your plan.",
+      });
+      return;
+    }
+
+    // Promote this user to admin
+    await client.users.updateUserMetadata(auth.userId, {
+      publicMetadata: { plan: "admin" },
     });
-    return;
+
+    res.json({ message: "You have been granted admin access.", plan: "admin" });
+  } finally {
+    // Always release the advisory lock and return the connection to the pool.
+    await db.query("SELECT pg_advisory_unlock(1)");
+    db.release();
   }
-
-  // Promote this user to admin
-  await client.users.updateUserMetadata(auth.userId, {
-    publicMetadata: { plan: "admin" },
-  });
-
-  res.json({ message: "You have been granted admin access.", plan: "admin" });
 });
 
 /**
