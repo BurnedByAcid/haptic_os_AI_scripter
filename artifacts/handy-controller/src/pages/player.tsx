@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useFeatureTracking } from "@/hooks/use-analytics";
 import { useHandy } from "@/hooks/use-handy";
 import { syncEngine, hsspEngine, Funscript, HSSPStatus } from "@/lib/scriptSync";
 import { setHDSP, stopDevice } from "@/lib/handyApi";
@@ -97,6 +98,7 @@ function SyncBadge({ status }: { status: HSSPStatus }) {
 }
 
 export default function Player() {
+  useFeatureTracking("player");
   const { key, connected } = useHandy();
   const { toast } = useToast();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);

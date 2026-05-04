@@ -1,5 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
+import { pool } from "../lib/db";
+import { getUncachableStripeClient } from "../lib/stripeClient";
 
 const router: IRouter = Router();
 
@@ -111,6 +113,125 @@ router.post("/admin/set-plan", async (req: Request, res: Response) => {
     userId: targetUser.id,
     plan,
   });
+});
+
+/**
+ * GET /api/admin/analytics
+ * Returns aggregated stats for the admin dashboard.
+ * Requires admin plan.
+ */
+router.get("/admin/analytics", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const caller = await clerkClient.users.getUser(auth.userId);
+  if ((caller.publicMetadata as Record<string, unknown>)?.plan !== "admin") {
+    res.status(403).json({ error: "Admin access required" }); return;
+  }
+
+  try {
+    const [
+      userPlans,
+      newUsers,
+      content,
+      featureUsage,
+    ] = await Promise.all([
+      // User plan breakdown
+      pool.query<{ plan: string; count: string }>(`
+        SELECT plan, COUNT(*) AS count FROM users GROUP BY plan ORDER BY count DESC
+      `),
+      // New users in last 7 and 30 days
+      pool.query<{ period: string; count: string }>(`
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')  AS last_7,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS last_30
+        FROM users
+      `),
+      // Content counts
+      pool.query<Record<string, string>>(`
+        SELECT
+          (SELECT COUNT(*) FROM scripter_sessions)    AS scripter_sessions,
+          (SELECT COUNT(*) FROM community_scripts)    AS community_scripts,
+          (SELECT COALESCE(SUM(view_count),0) FROM community_scripts) AS community_views,
+          (SELECT COUNT(*) FROM community_ratings)    AS community_ratings,
+          (SELECT COUNT(*) FROM community_favorites)  AS community_favorites,
+          (SELECT COUNT(*) FROM private_library)      AS library_entries
+      `),
+      // Feature usage (all time and last 30 days)
+      pool.query<{ feature: string; total: string; last_30: string }>(`
+        SELECT
+          feature,
+          COUNT(*)                                                            AS total,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')   AS last_30
+        FROM analytics_events
+        GROUP BY feature
+        ORDER BY total DESC
+      `),
+    ]);
+
+    // Build plan map
+    const byPlan: Record<string, number> = {};
+    let totalUsers = 0;
+    for (const row of userPlans.rows) {
+      byPlan[row.plan] = parseInt(row.count, 10);
+      totalUsers += parseInt(row.count, 10);
+    }
+
+    // Early bird coupon
+    let earlyBird: Record<string, unknown> = { configured: false };
+    const couponId = process.env.STRIPE_EARLY_BIRD_COUPON_ID;
+    if (couponId) {
+      try {
+        const stripe = await getUncachableStripeClient();
+        const coupon = await stripe.coupons.retrieve(couponId);
+        earlyBird = {
+          configured: true,
+          couponId: coupon.id,
+          percentOff: coupon.percent_off,
+          timesRedeemed: coupon.times_redeemed,
+          maxRedemptions: coupon.max_redemptions,
+          remaining: (coupon.max_redemptions ?? 0) - coupon.times_redeemed,
+          valid: coupon.valid,
+        };
+      } catch {
+        earlyBird = { configured: true, error: "Could not fetch coupon" };
+      }
+    }
+
+    // Build feature map
+    const features: Record<string, { total: number; last30: number }> = {};
+    for (const row of featureUsage.rows) {
+      features[row.feature] = {
+        total: parseInt(row.total, 10),
+        last30: parseInt(row.last_30, 10),
+      };
+    }
+
+    const c = content.rows[0];
+    const nu = newUsers.rows[0] as unknown as { last_7: string; last_30: string };
+
+    res.json({
+      users: {
+        total: totalUsers,
+        byPlan,
+        newLast7Days: parseInt(nu.last_7, 10),
+        newLast30Days: parseInt(nu.last_30, 10),
+      },
+      content: {
+        scripterSessions:      parseInt(c.scripter_sessions, 10),
+        communityScripts:      parseInt(c.community_scripts, 10),
+        communityViews:        parseInt(c.community_views, 10),
+        communityRatings:      parseInt(c.community_ratings, 10),
+        communityFavorites:    parseInt(c.community_favorites, 10),
+        libraryEntries:        parseInt(c.library_entries, 10),
+      },
+      features,
+      earlyBird,
+    });
+  } catch (err) {
+    console.error("admin/analytics error:", err);
+    res.status(500).json({ error: "Failed to load analytics" });
+  }
 });
 
 export default router;

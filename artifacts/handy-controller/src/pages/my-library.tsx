@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useFeatureTracking } from "@/hooks/use-analytics";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/react";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -873,6 +874,7 @@ function PlayScriptMenu({
 }
 
 export default function MyLibrary() {
+  useFeatureTracking("library");
   const { getToken } = useAuth();
   const { isPro } = useSubscription();
   const qc = useQueryClient();

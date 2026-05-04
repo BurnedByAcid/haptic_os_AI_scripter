@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from "react";
+import { useFeatureTracking } from "@/hooks/use-analytics";
 import { useHandy } from "@/hooks/use-handy";
 import { setHDSP } from "@/lib/handyApi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 export default function Games() {
+  useFeatureTracking("games");
   const { key, connected } = useHandy();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);

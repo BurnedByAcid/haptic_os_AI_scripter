@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useFeatureTracking } from "@/hooks/use-analytics";
 import { useHandy } from "@/hooks/use-handy";
 import { setHAMP, setHDSP, stopDevice } from "@/lib/handyApi";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Square, Move } from "lucide-react";
 
 export default function Control() {
+  useFeatureTracking("control");
   const { key, connected, battery } = useHandy();
   const [speed, setSpeed] = useState(0);
   const [min, setMin] = useState(0);

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useFeatureTracking } from "@/hooks/use-analytics";
 import { useHandy } from "@/hooks/use-handy";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useAuth } from "@clerk/react";
@@ -63,6 +64,7 @@ interface Point {
 }
 
 export default function Scripter() {
+  useFeatureTracking("scripter");
   const { key, connected } = useHandy();
   const { isFree, isLoaded: planLoaded } = useSubscription();
   const isSubscriber = planLoaded && !isFree;

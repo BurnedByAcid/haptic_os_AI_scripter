@@ -11,6 +11,7 @@ import communityRouter from "./community";
 import blockReportsRouter from "./block-reports";
 import scripterDraftsRouter from "./scripter-drafts";
 import scripterSessionsRouter from "./scripter-sessions";
+import analyticsRouter from "./analytics";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(communityRouter);
 router.use(blockReportsRouter);
 router.use(scripterDraftsRouter);
 router.use(scripterSessionsRouter);
+router.use(analyticsRouter);
 
 export default router;

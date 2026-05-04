@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useFeatureTracking } from "@/hooks/use-analytics";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth, useUser } from "@clerk/react";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -129,6 +130,7 @@ function EggplantButton({
 }
 
 export default function Community() {
+  useFeatureTracking("community");
   const { user } = useUser();
   const { getToken } = useAuth();
   const { isPro } = useSubscription();

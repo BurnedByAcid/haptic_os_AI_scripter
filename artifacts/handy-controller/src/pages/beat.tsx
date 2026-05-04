@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useFeatureTracking } from "@/hooks/use-analytics";
 import { useHandy } from "@/hooks/use-handy";
 import { setHDSP } from "@/lib/handyApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Mic, Upload, Square } from "lucide-react";
 
 export default function Beat() {
+  useFeatureTracking("beat");
   const { key, connected } = useHandy();
   const [isActive, setIsActive] = useState(false);
   const [sensitivity, setSensitivity] = useState(1.5);
