@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
 import {
   FIELD_LIMITS,
@@ -40,14 +41,15 @@ router.get("/scripts/:id", async (req: Request, res: Response) => {
 
 router.post("/scripts", writeLimiter, scriptUploadLimiter, async (req: Request, res: Response) => {
   // Payload size guard (10 MB — express.json() limit set in app.ts)
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
   try {
     const {
       title: rawTitle,
       description: rawDescription,
       video_url: rawVideoUrl,
       script_json: rawScriptJson,
-      author_id: rawAuthorId,
-      author_name: rawAuthorName,
       tags: rawTags,
     } = req.body as Record<string, unknown>;
 
@@ -61,12 +63,20 @@ router.post("/scripts", writeLimiter, scriptUploadLimiter, async (req: Request, 
       return;
     }
 
+    // Derive author_name from trusted DB record — never trust client-supplied value
+    const { rows: userRows } = await pool.query(
+      `SELECT username FROM users WHERE clerk_id = $1`,
+      [auth.userId]
+    );
+    const author_name = (userRows[0] as { username: string } | undefined)?.username;
+    if (!author_name) { res.status(400).json({ error: "User profile not found. Complete onboarding first." }); return; }
+
     // Sanitize text fields
     const title = sanitizeText(rawTitle);
     const description = sanitizeText(rawDescription ?? "");
-    const author_name = sanitizeText(rawAuthorName ?? "") || "Anonymous";
     const tags = sanitizeText(rawTags ?? "");
-    const author_id = typeof rawAuthorId === "string" ? rawAuthorId.slice(0, 128) : null;
+    // Identity always comes from the verified session, never from the request body
+    const author_id = auth.userId;
     const video_url = typeof rawVideoUrl === "string" ? rawVideoUrl.trim() : "";
     const script_json_str = typeof rawScriptJson === "string" ? rawScriptJson : JSON.stringify(rawScriptJson);
 
@@ -75,7 +85,6 @@ router.post("/scripts", writeLimiter, scriptUploadLimiter, async (req: Request, 
     if (!title) errors.push("title is required after sanitization.");
     if (title.length > FIELD_LIMITS.title) errors.push(`title must be ≤ ${FIELD_LIMITS.title} chars.`);
     if (description.length > FIELD_LIMITS.description) errors.push(`description must be ≤ ${FIELD_LIMITS.description} chars.`);
-    if (author_name.length > FIELD_LIMITS.author_name) errors.push(`author_name must be ≤ ${FIELD_LIMITS.author_name} chars.`);
     if (tags.length > FIELD_LIMITS.tags) errors.push(`tags must be ≤ ${FIELD_LIMITS.tags} chars.`);
 
     // URL validation
@@ -112,12 +121,13 @@ router.post("/scripts", writeLimiter, scriptUploadLimiter, async (req: Request, 
 });
 
 router.delete("/scripts/:id", writeLimiter, async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
   try {
-    const { author_id } = req.body as { author_id?: string };
-    if (!author_id) { res.status(401).json({ error: "Unauthorized" }); return; }
     const { rowCount } = await pool.query(
       `DELETE FROM shared_scripts WHERE id = $1 AND author_id = $2`,
-      [req.params.id, author_id]
+      [req.params.id, auth.userId]
     );
     if (!rowCount) { res.status(404).json({ error: "Not found or not your script" }); return; }
     res.json({ ok: true });
