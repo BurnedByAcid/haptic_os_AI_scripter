@@ -167,36 +167,38 @@
   }
 }
 
-@keyframes btn-shimmer-sweep {
-  0%   { transform: translateX(-160%) skewX(-18deg); opacity: 0; }
-  30%  { opacity: 1; }
-  100% { transform: translateX(160%) skewX(-18deg); opacity: 0; }
-}
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes btn-shimmer-sweep {
+    0%   { transform: translateX(-160%) skewX(-18deg); opacity: 0; }
+    30%  { opacity: 1; }
+    100% { transform: translateX(160%) skewX(-18deg); opacity: 0; }
+  }
 
-@keyframes emblem-glow-disconnected {
-  0%, 100% {
-    filter: drop-shadow(0 0 5px rgba(200, 80, 240, 0.55)) drop-shadow(0 0 10px rgba(200, 80, 240, 0.25));
+  @keyframes emblem-glow-disconnected {
+    0%, 100% {
+      filter: drop-shadow(0 0 5px rgba(200, 80, 240, 0.55)) drop-shadow(0 0 10px rgba(200, 80, 240, 0.25));
+    }
+    50% {
+      filter: drop-shadow(0 0 9px rgba(220, 100, 255, 0.85)) drop-shadow(0 0 18px rgba(200, 80, 240, 0.45));
+    }
   }
-  50% {
-    filter: drop-shadow(0 0 9px rgba(220, 100, 255, 0.85)) drop-shadow(0 0 18px rgba(200, 80, 240, 0.45));
-  }
-}
 
-@keyframes emblem-glow-checking {
-  0%, 100% {
-    filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.55)) drop-shadow(0 0 10px rgba(245, 158, 11, 0.25));
+  @keyframes emblem-glow-checking {
+    0%, 100% {
+      filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.55)) drop-shadow(0 0 10px rgba(245, 158, 11, 0.25));
+    }
+    50% {
+      filter: drop-shadow(0 0 9px rgba(252, 196, 25, 0.85)) drop-shadow(0 0 18px rgba(245, 158, 11, 0.45));
+    }
   }
-  50% {
-    filter: drop-shadow(0 0 9px rgba(252, 196, 25, 0.85)) drop-shadow(0 0 18px rgba(245, 158, 11, 0.45));
-  }
-}
 
-@keyframes emblem-glow-connected {
-  0%, 100% {
-    filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.55)) drop-shadow(0 0 10px rgba(34, 197, 94, 0.25));
-  }
-  50% {
-    filter: drop-shadow(0 0 9px rgba(74, 222, 128, 0.85)) drop-shadow(0 0 18px rgba(34, 197, 94, 0.45));
+  @keyframes emblem-glow-connected {
+    0%, 100% {
+      filter: drop-shadow(0 0 5px rgba(34, 197, 94, 0.55)) drop-shadow(0 0 10px rgba(34, 197, 94, 0.25));
+    }
+    50% {
+      filter: drop-shadow(0 0 9px rgba(74, 222, 128, 0.85)) drop-shadow(0 0 18px rgba(34, 197, 94, 0.45));
+    }
   }
 }
 
@@ -216,16 +218,18 @@
   opacity: 1;
 }
 
-.emblem-glow-layer--disconnected {
-  animation: emblem-glow-disconnected 3s ease-in-out infinite;
-}
+@media (prefers-reduced-motion: no-preference) {
+  .emblem-glow-layer--disconnected {
+    animation: emblem-glow-disconnected 3s ease-in-out infinite;
+  }
 
-.emblem-glow-layer--checking {
-  animation: emblem-glow-checking 1s ease-in-out infinite;
-}
+  .emblem-glow-layer--checking {
+    animation: emblem-glow-checking 1s ease-in-out infinite;
+  }
 
-.emblem-glow-layer--connected {
-  animation: emblem-glow-connected 3s ease-in-out infinite;
+  .emblem-glow-layer--connected {
+    animation: emblem-glow-connected 3s ease-in-out infinite;
+  }
 }
 
 @layer utilities {
@@ -267,9 +271,6 @@
     overflow: hidden;
     transition: filter 0.2s ease, box-shadow 0.2s ease;
   }
-  .btn-gradient-shimmer:hover {
-    filter: brightness(1.1);
-  }
   .btn-gradient-shimmer::before {
     content: "";
     position: absolute;
@@ -283,7 +284,12 @@
     transform: translateX(-160%) skewX(-18deg);
     pointer-events: none;
   }
-  .btn-gradient-shimmer:hover::before {
-    animation: btn-shimmer-sweep 0.65s ease-in-out forwards;
+  @media (prefers-reduced-motion: no-preference) {
+    .btn-gradient-shimmer:hover {
+      filter: brightness(1.1);
+    }
+    .btn-gradient-shimmer:hover::before {
+      animation: btn-shimmer-sweep 0.65s ease-in-out forwards;
+    }
   }
 }
