@@ -4,7 +4,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Activity, Crown, Gamepad2, Library, Lock, Mic, PlaySquare, Settings2, Sparkles, Users } from "lucide-react";
+import { Activity, Crown, Gamepad2, Library, Lock, Mic, PlaySquare, Settings2, Users } from "lucide-react";
 import { useAuth } from "@clerk/react";
 import { useState, useEffect } from "react";
 
@@ -19,7 +19,6 @@ const ALL_CARDS: { href: string; label: string; desc: string; icon: typeof PlayS
   { href: "/scripter",  label: "Scripter",       desc: "Create and edit Funscripts",            icon: Mic,        state: "available"    },
   { href: "/games",     label: "Games",          desc: "Play games with haptic feedback",       icon: Gamepad2,      state: "premium"      },
   { href: "/beat",      label: "Live Audio",     desc: "Audio-reactive haptics",                icon: Activity,      state: "premium"      },
-  { href: "/ai",        label: "AI Control",     desc: "Voice-controlled interactive sessions", icon: Sparkles,      state: "premium"      },
   { href: "/community", label: "Community",      desc: "Share and discover Funscripts",         icon: Users,         state: "premium"      },
 ];
 
@@ -91,10 +90,6 @@ export default function Home() {
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground text-sm">Library Items</span>
                 <span className="font-mono font-bold text-primary">0</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground text-sm">AI Credits</span>
-                <span className="font-mono font-bold text-primary">{localStorage.getItem("handy_ai_credits") || "10"}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground text-sm">Plan</span>

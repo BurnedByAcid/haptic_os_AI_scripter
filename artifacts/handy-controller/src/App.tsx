@@ -18,7 +18,6 @@ import Library from "@/pages/library";
 import Games from "@/pages/games";
 import Beat from "@/pages/beat";
 import Scripter from "@/pages/scripter";
-import AI from "@/pages/ai";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
 import OnboardingPage from "@/pages/onboarding";
@@ -149,7 +148,6 @@ function Router() {
       <Route path="/games"     component={() => <ProtectedRoute component={Games} />} />
       <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
       <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
-      <Route path="/ai"        component={() => <ProtectedRoute component={AI} />} />
       <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
       <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
       <Route path="/admin"        component={() => <ProtectedRoute component={Admin} />} />
