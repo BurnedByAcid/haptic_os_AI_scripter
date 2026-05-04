@@ -18,8 +18,7 @@ import { validateVideoUrl } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
 import { VideoControlBar } from "@/components/video-control-bar";
 import { SaveScriptDialog } from "@/components/save-script-dialog";
-import { ScripterDrafts, ResumeDraftPicker, ExitWarningDialog, type DraftSummary } from "@/components/scripter-drafts";
-import { ScripterSessions } from "@/components/scripter-sessions";
+import { ResumeDraftPicker, ExitWarningDialog, type DraftSummary } from "@/components/scripter-drafts";
 import { useDirtyExitWarning } from "@/hooks/use-dirty-exit-warning";
 import { useLocation } from "wouter";
 
@@ -90,7 +89,6 @@ export default function Scripter() {
 
   // ─── Draft / exit warning state ───
   const [activeDraftSlot, setActiveDraftSlot] = useState<number | null>(null);
-  const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [resumeDrafts, setResumeDrafts] = useState<DraftSummary[]>([]);
   const [resumePickerOpen, setResumePickerOpen] = useState(false);
   const [exitDialogOpen, setExitDialogOpen] = useState(false);
@@ -1824,7 +1822,6 @@ export default function Scripter() {
                 setPoints(empty);
                 setSelectedIds(new Set());
                 setActiveDraftSlot(null);
-                setActiveSessionId(null);
                 try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
                 markClean(empty);
               }
@@ -1837,32 +1834,6 @@ export default function Scripter() {
             <BookmarkPlus className="mr-2 h-4 w-4" /> Save Script
           </Button>
         </div>
-      </div>
-
-      {/* ── Sessions panel + Drafts panel ── */}
-      <div className="flex-shrink-0 flex flex-col gap-2">
-        <ScripterSessions
-          isSubscriber={isSubscriber}
-          planLoaded={planLoaded}
-          dirty={dirty}
-          buildFunscriptJson={buildFunscriptJson}
-          applyFunscriptJson={applyFunscriptJson}
-          onSaved={markClean}
-          suggestedName={videoFileName ? videoFileName.replace(/\.[^/.]+$/, "") : undefined}
-          activeSessionId={activeSessionId}
-          onActiveSessionChange={setActiveSessionId}
-        />
-        <ScripterDrafts
-          isSubscriber={isSubscriber}
-          planLoaded={planLoaded}
-          buildFunscriptJson={buildFunscriptJson}
-          applyFunscriptJson={applyFunscriptJson}
-          onSaved={markClean}
-          suggestedName={videoFileName ? videoFileName.replace(/\.[^/.]+$/, "") : undefined}
-          autosaveDirty={dirty && points.length > 0}
-          activeSlot={activeDraftSlot}
-          onActiveSlotChange={setActiveDraftSlot}
-        />
       </div>
 
       {/* ── Shared video player — takes 2/3 of available height ── */}
@@ -2727,6 +2698,8 @@ export default function Scripter() {
       <ExitWarningDialog
         open={exitDialogOpen}
         isFree={isFree}
+        buildFunscriptJson={buildFunscriptJson}
+        draftName={videoFileName ? videoFileName.replace(/\.[^/.]+$/, "") : "Unfinished script"}
         onStay={handleExitCancel}
         onLeave={handleExitConfirm}
       />

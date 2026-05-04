@@ -6,7 +6,7 @@ import { writeLimiter } from "../middlewares/rateLimiters";
 
 const router = Router();
 
-const MAX_SLOTS = 3;
+const MAX_SLOTS = 1;
 const TTL_DAYS = 10;
 const NAME_MAX = 120;
 const JSON_MAX_BYTES = 10 * 1024 * 1024;
