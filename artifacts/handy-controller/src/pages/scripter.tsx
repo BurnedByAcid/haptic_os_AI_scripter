@@ -371,6 +371,33 @@ export default function Scripter() {
       try {
         const wgpu = await WebGpuPatchMatcher.create();
         if (cancelled) { wgpu.destroy(); return; }
+
+        // If the GPU device is lost after initialisation (GPU reset, mobile
+        // background, driver crash), tear down the matcher and re-initialise
+        // the fallback chain so future scans still work.
+        wgpu.onLost = () => {
+          // Don't touch state after the component has unmounted.
+          if (cancelled) {
+            wgpu.destroy();
+            return;
+          }
+          if (glRef.current === wgpu) {
+            wgpu.destroy();
+            glRef.current = null;
+          }
+          // Attempt WebGL first, then CPU
+          try {
+            const gl = new GlPatchMatcher();
+            glRef.current = gl;
+            setGpuMode("webgl");
+            console.log("[VideoAnalysis] GPU path: WebGL (after WebGPU device loss)");
+          } catch {
+            glRef.current = null;
+            setGpuMode("cpu");
+            console.log("[VideoAnalysis] GPU path: CPU (after WebGPU device loss)");
+          }
+        };
+
         glRef.current = wgpu;
         setGpuMode("webgpu");
         console.log("[VideoAnalysis] GPU path: WebGPU");

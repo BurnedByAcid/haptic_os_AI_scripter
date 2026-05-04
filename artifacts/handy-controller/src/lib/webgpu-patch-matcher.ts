@@ -87,6 +87,15 @@ export class WebGpuPatchMatcher {
   private patchW = 0;
   private patchH = 0;
   private refCapacity = 0;
+  /** Set to true when the GPUDevice fires its "lost" event permanently. */
+  private _lost = false;
+
+  /**
+   * Called when the GPUDevice is permanently lost (GPU reset, tab backgrounded
+   * on mobile, driver crash, etc.).  The caller should destroy this matcher and
+   * reinitialise the fallback chain (WebGL → CPU).
+   */
+  onLost: (() => void) | null = null;
 
   private constructor(
     device: GPUDevice,
@@ -145,6 +154,17 @@ export class WebGpuPatchMatcher {
       device, pipeline, refBuffer, partialsBuffer, stagingBuffer, paramsBuffer,
     );
     matcher.refCapacity = initialRefCap;
+
+    // Attach a permanent-loss listener.  device.lost is a Promise that resolves
+    // (never rejects) when the GPU device is irrecoverably gone.  Mark the
+    // matcher dead immediately so in-flight computeRms calls throw fast instead
+    // of hanging on mapAsync, then notify the caller.
+    device.lost.then((info: { reason: string; message: string }) => {
+      console.warn(`[WebGpuPatchMatcher] Device lost (reason: ${info.reason}): ${info.message}`);
+      matcher._lost = true;
+      matcher.onLost?.();
+    });
+
     return matcher;
   }
 
@@ -182,6 +202,7 @@ export class WebGpuPatchMatcher {
     nw: number,
     nh: number,
   ): Promise<number> {
+    if (this._lost) throw new Error("WebGPU device lost");
     const pw = this.patchW;
     const ph = this.patchH;
     if (pw === 0 || ph === 0) throw new Error("call setReference first");
