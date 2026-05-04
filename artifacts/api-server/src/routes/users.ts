@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
 import { pool } from "../lib/db";
+import { getUncachableStripeClient } from "../lib/stripeClient";
 
 const router = Router();
 
@@ -40,7 +41,9 @@ router.get("/users/check-username", async (req: Request, res: Response) => {
 
 /**
  * POST /api/users/onboard
- * Body: { username: string, ageVerified: boolean }
+ * Body: { username: string }
+ * Age verification is confirmed via Clerk privateMetadata (set by the
+ * Stripe Identity flow). The ageVerified body field is ignored.
  * Requires a valid Clerk session.
  */
 router.post("/users/onboard", async (req: Request, res: Response) => {
@@ -50,13 +53,13 @@ router.post("/users/onboard", async (req: Request, res: Response) => {
     return;
   }
 
-  const { username, ageVerified } = req.body as {
-    username?: unknown;
-    ageVerified?: unknown;
-  };
+  const { username } = req.body as { username?: unknown };
 
-  if (ageVerified !== true) {
-    res.status(400).json({ error: "Age verification is required." });
+  // Verify age was confirmed via Stripe Identity
+  const clerkUser = await clerkClient.users.getUser(auth.userId);
+  const priv = clerkUser.privateMetadata as Record<string, unknown>;
+  if (priv?.identityVerified !== true) {
+    res.status(400).json({ error: "Age verification required. Please complete identity verification first." });
     return;
   }
 

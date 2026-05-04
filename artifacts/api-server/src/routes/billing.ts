@@ -10,6 +10,91 @@ const SUBSCRIBER_PRICE_ID = process.env.STRIPE_PRICE_ID ?? "";
 const APP_URL = process.env.APP_URL ?? `https://${process.env.REPLIT_DOMAINS?.split(",")[0] ?? "localhost"}`;
 
 /**
+ * POST /api/billing/start-verification
+ * Creates a Stripe Identity VerificationSession and stores the session ID in
+ * the user's Clerk privateMetadata. Returns the hosted verification URL.
+ * Requires auth.
+ */
+router.post("/billing/start-verification", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+
+  try {
+    const stripe = await getUncachableStripeClient();
+    const session = await stripe.identity.verificationSessions.create({
+      type: "document",
+      metadata: { clerkId: auth.userId },
+      options: {
+        document: {
+          require_live_capture: true,
+          require_matching_selfie: true,
+        },
+      },
+      return_url: `${APP_URL}/onboarding?step=verify-return`,
+    });
+
+    await clerkClient.users.updateUserMetadata(auth.userId, {
+      privateMetadata: { identitySessionId: session.id },
+    });
+
+    res.json({ url: session.url });
+  } catch (err) {
+    console.error("start-verification error:", err);
+    res.status(500).json({ error: "Failed to start identity verification. Ensure Stripe Identity is enabled in your Stripe dashboard." });
+  }
+});
+
+/**
+ * GET /api/billing/verification-status
+ * Checks the status of the user's Stripe Identity session (stored in
+ * Clerk privateMetadata). If the session is verified, marks
+ * identityVerified: true in privateMetadata.
+ * Requires auth.
+ */
+router.get("/billing/verification-status", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+
+  try {
+    const clerkUser = await clerkClient.users.getUser(auth.userId);
+    const priv = clerkUser.privateMetadata as Record<string, unknown>;
+    const sessionId = priv?.identitySessionId as string | undefined;
+
+    if (!sessionId) {
+      res.json({ status: "not_started", verified: false });
+      return;
+    }
+
+    const stripe = await getUncachableStripeClient();
+    const session = await stripe.identity.verificationSessions.retrieve(sessionId);
+
+    if (session.metadata?.clerkId !== auth.userId) {
+      res.status(403).json({ error: "Session does not belong to this user" });
+      return;
+    }
+
+    const verified = session.status === "verified";
+
+    if (verified) {
+      await clerkClient.users.updateUserMetadata(auth.userId, {
+        privateMetadata: { identitySessionId: null, identityVerified: true },
+      });
+    }
+
+    res.json({ status: session.status, verified });
+  } catch (err) {
+    console.error("verification-status error:", err);
+    res.status(500).json({ error: "Failed to check verification status" });
+  }
+});
+
+/**
  * POST /api/billing/checkout
  * Creates a Stripe Checkout session and returns the URL.
  * Requires auth.
@@ -152,6 +237,15 @@ export async function handleBillingWebhook(req: Request, res: Response): Promise
       const sub = event.data.object as Stripe.Subscription;
       const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
       await setPlanByCustomerId(customerId, "free");
+    } else if (event.type === "identity.verification_session.verified") {
+      const session = event.data.object as Stripe.Identity.VerificationSession;
+      const clerkId = session.metadata?.clerkId;
+      if (clerkId) {
+        await clerkClient.users.updateUserMetadata(clerkId, {
+          privateMetadata: { identitySessionId: null, identityVerified: true },
+        });
+        console.log(`Identity verified for user ${clerkId} via webhook`);
+      }
     }
   } catch (err) {
     console.error("Webhook processing error:", err);
