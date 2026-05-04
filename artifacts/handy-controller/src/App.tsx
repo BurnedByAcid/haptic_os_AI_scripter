@@ -105,7 +105,7 @@ const clerkAppearance = {
     formFieldRow: "",
     main: "",
     logoBox: "flex justify-center",
-    logoImage: "h-16 w-auto",
+    logoImage: "h-12 w-auto",
     footerAction: "",
   },
 };

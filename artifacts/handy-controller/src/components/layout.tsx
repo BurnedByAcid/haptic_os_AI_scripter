@@ -194,6 +194,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
                   <img src="/logo.jpg" alt="HapticOS" className="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
+                  <h1 className="text-xl font-bold tracking-tight whitespace-nowrap">
+                    <span className="text-[#C850F0]">Haptic</span><span className="text-white">OS</span>
+                  </h1>
                 </div>
                 <div className="flex items-center gap-2">
                   {battery !== undefined && connected && (
