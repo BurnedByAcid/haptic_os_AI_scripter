@@ -137,14 +137,37 @@ router.post("/billing/checkout", async (req: Request, res: Response) => {
       return;
     }
 
-    const session = await stripe.checkout.sessions.create({
+    // Check if the early-bird coupon (50% off first month, first 100 customers) is still valid
+    const earlyBirdCouponId = process.env.STRIPE_EARLY_BIRD_COUPON_ID;
+    const discounts: { coupon: string }[] = [];
+    if (earlyBirdCouponId) {
+      try {
+        const coupon = await stripe.coupons.retrieve(earlyBirdCouponId);
+        if (coupon.valid) {
+          discounts.push({ coupon: earlyBirdCouponId });
+        }
+      } catch {
+        // Coupon not found or expired — proceed without it
+      }
+    }
+
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
       payment_method_types: ["card"],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
+      subscription_data: {
+        trial_period_days: 7,
+      },
       success_url: `${APP_URL}/upgrade?success=1`,
       cancel_url: `${APP_URL}/upgrade?canceled=1`,
-    });
+    };
+
+    if (discounts.length > 0) {
+      sessionParams.discounts = discounts;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     res.json({ url: session.url });
   } catch (err) {

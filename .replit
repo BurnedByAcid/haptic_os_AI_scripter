@@ -43,3 +43,4 @@ channel = "stable-25_05"
 [userenv.shared]
 VITE_CLERK_PUBLISHABLE_KEY = "pk_test_dXNhYmxlLWdvYmJsZXItNjUuY2xlcmsuYWNjb3VudHMuZGV2JA"
 STRIPE_PRICE_ID = "price_1TTEywLm1BrqnliEgrgiPMZx"
+STRIPE_EARLY_BIRD_COUPON_ID = "HAPTICOS_EARLY_BIRD_50"
