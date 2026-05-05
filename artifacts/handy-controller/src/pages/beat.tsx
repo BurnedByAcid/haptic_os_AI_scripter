@@ -5,7 +5,9 @@ import { setHDSP } from "@/lib/handyApi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Mic, Upload, Square } from "lucide-react";
+import AudioCleaner from "@/pages/audio-cleaner";
 
 export default function Beat() {
   useFeatureTracking("beat");
@@ -156,75 +158,88 @@ export default function Beat() {
       <div className="flex justify-between items-end">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Live Audio</h1>
-          <p className="text-muted-foreground">Audio-reactive haptic feedback.</p>
+          <p className="text-muted-foreground">Audio-reactive haptic feedback and audio processing.</p>
         </div>
         {!connected && <div className="text-destructive font-medium text-sm">Device Not Connected</div>}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-2 bg-black border-border/50 overflow-hidden relative min-h-[300px]">
-          <canvas ref={canvasRef} className="w-full h-full absolute inset-0" width={800} height={400} />
-          {!isActive && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10 text-muted-foreground">
-              Select an input source to begin
-            </div>
-          )}
-        </Card>
+      <Tabs defaultValue="beat">
+        <TabsList className="mb-6">
+          <TabsTrigger value="beat">Beat Detector</TabsTrigger>
+          <TabsTrigger value="cleaner">Audio Cleaner</TabsTrigger>
+        </TabsList>
 
-        <div className="space-y-6">
-          <Card className="bg-card/50 border-primary/20">
-            <CardHeader>
-              <CardTitle>Input Source</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isActive ? (
-                <Button variant="destructive" className="w-full" onClick={stop}>
-                  <Square className="mr-2 h-4 w-4" /> Stop Audio
-                </Button>
-              ) : (
-                <>
-                  <Button className="w-full" onClick={startMic}>
-                    <Mic className="mr-2 h-4 w-4" /> Use Microphone
-                  </Button>
-                  <Button className="w-full relative cursor-pointer">
-                    <Upload className="mr-2 h-4 w-4" /> <span>Upload Audio</span>
-                    <input type="file" accept="audio/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={startFile} />
-                  </Button>
-                </>
+        <TabsContent value="beat">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="md:col-span-2 bg-black border-border/50 overflow-hidden relative min-h-[300px]">
+              <canvas ref={canvasRef} className="w-full h-full absolute inset-0" width={800} height={400} />
+              {!isActive && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10 text-muted-foreground">
+                  Select an input source to begin
+                </div>
               )}
-            </CardContent>
-          </Card>
+            </Card>
 
-          <Card className="bg-card/50 border-primary/30">
-            <CardHeader>
-              <CardTitle>BPM</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center">
-              <span className="text-5xl font-bold font-mono text-primary" data-testid="bpm-display">
-                {bpm > 0 ? bpm : "—"}
-              </span>
-              <span className="text-xs text-muted-foreground mt-1">beats per minute</span>
-            </CardContent>
-          </Card>
+            <div className="space-y-6">
+              <Card className="bg-card/50 border-primary/20">
+                <CardHeader>
+                  <CardTitle>Input Source</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isActive ? (
+                    <Button variant="destructive" className="w-full" onClick={stop}>
+                      <Square className="mr-2 h-4 w-4" /> Stop Audio
+                    </Button>
+                  ) : (
+                    <>
+                      <Button className="w-full" onClick={startMic}>
+                        <Mic className="mr-2 h-4 w-4" /> Use Microphone
+                      </Button>
+                      <Button className="w-full relative cursor-pointer">
+                        <Upload className="mr-2 h-4 w-4" /> <span>Upload Audio</span>
+                        <input type="file" accept="audio/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={startFile} />
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
 
-          <Card className="bg-card/50 border-border/50">
-            <CardHeader>
-              <CardTitle>Sensitivity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between mb-4">
-                <span className="text-sm text-muted-foreground">Threshold Mult</span>
-                <span className="font-mono text-primary">{sensitivity.toFixed(1)}x</span>
-              </div>
-              <Slider
-                min={1.0} max={3.0} step={0.1}
-                value={[sensitivity]}
-                onValueChange={v => setSensitivity(v[0])}
-              />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+              <Card className="bg-card/50 border-primary/30">
+                <CardHeader>
+                  <CardTitle>BPM</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center">
+                  <span className="text-5xl font-bold font-mono text-primary" data-testid="bpm-display">
+                    {bpm > 0 ? bpm : "—"}
+                  </span>
+                  <span className="text-xs text-muted-foreground mt-1">beats per minute</span>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/50 border-border/50">
+                <CardHeader>
+                  <CardTitle>Sensitivity</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex justify-between mb-4">
+                    <span className="text-sm text-muted-foreground">Threshold Mult</span>
+                    <span className="font-mono text-primary">{sensitivity.toFixed(1)}x</span>
+                  </div>
+                  <Slider
+                    min={1.0} max={3.0} step={0.1}
+                    value={[sensitivity]}
+                    onValueChange={v => setSensitivity(v[0])}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="cleaner">
+          <AudioCleaner />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -319,3 +319,9 @@
     }
   }
 }
+
+/* ─── Pulsing icon suppression ────────────────────────────────────────────── */
+[data-no-pulse] .pulse-icon,
+[data-no-pulse] .animate-pulse {
+  animation: none !important;
+}

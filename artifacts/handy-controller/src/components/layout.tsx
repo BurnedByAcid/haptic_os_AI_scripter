@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { ToastAction } from "@/components/ui/toast";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Scissors, type LucideIcon } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Settings, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -10,6 +10,8 @@ import { useUser, useClerk, Show } from "@clerk/react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { PlanBadge } from "@/components/plan-badge";
 import { useSubscription } from "@/hooks/use-subscription";
+import { useAppSettings, type Theme, type ScriptOutputFiletype } from "@/hooks/use-app-settings";
+
 
 // ─── Supported devices ────────────────────────────────────────────────────────
 // "native" devices work directly via this app's API.
@@ -89,7 +91,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/control",   label: "Manual Controls", icon: Settings2, requiresPro: false },
   { href: "/games",     label: "Games",           icon: Gamepad2,  requiresPro: true  },
   { href: "/beat",      label: "Live Audio",       icon: Activity,  requiresPro: true  },
-  { href: "/audio-cleaner", label: "Audio Cleaner",  icon: Scissors,  requiresPro: true  },
 ];
 
 // ─── Device mode constants ─────────────────────────────────────────────────────
@@ -111,6 +112,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { signOut, openSignIn } = useClerk();
   const [collapsed, setCollapsed] = useState(false);
   const { isAdmin, isPro, plan } = useSubscription();
+  const appSettings = useAppSettings();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // ─── Device mode watcher ──────────────────────────────────────────────────
   // Track last interaction time so we can auto-navigate if the user is idle.
@@ -490,6 +493,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
+          {/* Settings gear button */}
+          <div className={`mt-1 ${collapsed ? "px-1.5" : "px-2"}`}>
+            <button
+              className={`flex items-center gap-3 rounded-md cursor-pointer transition-colors w-full text-muted-foreground hover:bg-muted hover:text-foreground ${
+                collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
+              }`}
+              title={collapsed ? "Settings" : undefined}
+              onClick={() => setSettingsOpen(true)}
+            >
+              <Settings size={18} className="flex-shrink-0" />
+              {!collapsed && <span className="text-sm">Settings</span>}
+            </button>
+          </div>
+
         {/* User account section */}
         <div className={`border-t border-border flex-shrink-0 ${collapsed ? "p-2" : "p-3"}`}>
           <Show when="signed-in">
@@ -577,6 +594,94 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+
+      {/* App Settings modal */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5 text-primary" />
+              App Settings
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              Preferences are saved automatically and persist across refreshes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-2">
+            {/* Color scheme */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Color Scheme</p>
+              <div className="flex gap-2">
+                {(["system", "light", "dark"] as Theme[]).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => appSettings.setTheme(t)}
+                    className={`flex-1 rounded-md border px-3 py-2 text-sm capitalize transition-colors ${
+                      appSettings.theme === t
+                        ? "border-primary bg-primary/10 text-primary font-medium"
+                        : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Pulsing icons */}
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-foreground">Pulsing Icons</p>
+                <p className="text-xs text-muted-foreground">Animated icon effects throughout the app</p>
+              </div>
+              <button
+                role="switch"
+                aria-checked={appSettings.pulsingIcons}
+                onClick={() => appSettings.setPulsingIcons(!appSettings.pulsingIcons)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors focus:outline-none ${
+                  appSettings.pulsingIcons ? "bg-primary" : "bg-muted"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition-transform ${
+                    appSettings.pulsingIcons ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Script output filetype */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Script Output Filetype</p>
+              <select
+                value={appSettings.scriptOutputFiletype}
+                onChange={e => appSettings.setScriptOutputFiletype(e.target.value as ScriptOutputFiletype)}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="funscript">.funscript</option>
+                <option value="csv">.csv</option>
+              </select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 text-sm"
+              onClick={() => {
+                appSettings.resetAll();
+                toast({ title: "Settings reset to defaults", duration: 2000 });
+              }}
+            >
+              Reset all to default
+            </Button>
+            <Button onClick={() => setSettingsOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Privacy handle dialog — shown once on first sign-in */}
       <Dialog open={handleDialogOpen} onOpenChange={setHandleDialogOpen}>

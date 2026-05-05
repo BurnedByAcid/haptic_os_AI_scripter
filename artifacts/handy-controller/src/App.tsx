@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
 import { HandyProvider } from "@/contexts/handy-context";
 import { BlockedReportProvider } from "@/contexts/blocked-report-context";
+import { AppSettingsContext, useAppSettingsProvider } from "@/hooks/use-app-settings";
 
 import Home from "@/pages/home";
 import Player from "@/pages/player";
@@ -25,7 +26,6 @@ import Community from "@/pages/community";
 import Upgrade from "@/pages/upgrade";
 import Admin from "@/pages/admin";
 import MyLibrary from "@/pages/my-library";
-import AudioCleaner from "@/pages/audio-cleaner";
 
 const queryClient = new QueryClient();
 
@@ -148,7 +148,7 @@ function Router() {
       <Route path="/library"       component={() => <ProtectedRoute component={MyLibrary} />} />
       <Route path="/games"     component={() => <ProtectedRoute component={Games} />} />
       <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
-      <Route path="/audio-cleaner" component={() => <ProtectedRoute component={AudioCleaner} />} />
+      <Route path="/audio-cleaner" component={() => <Redirect to="/beat" />} />
       <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
       <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
       <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
@@ -156,6 +156,15 @@ function Router() {
 
       <Route component={NotFound} />
     </Switch>
+  );
+}
+
+function AppSettingsProvider({ children }: { children: React.ReactNode }) {
+  const value = useAppSettingsProvider();
+  return (
+    <AppSettingsContext.Provider value={value}>
+      {children}
+    </AppSettingsContext.Provider>
   );
 }
 
@@ -175,14 +184,16 @@ function ClerkProviderWithRouter() {
     >
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <HandyProvider>
-            <BlockedReportProvider>
-              <Layout>
-                <Router />
-              </Layout>
-              <Toaster />
-            </BlockedReportProvider>
-          </HandyProvider>
+          <AppSettingsProvider>
+            <HandyProvider>
+              <BlockedReportProvider>
+                <Layout>
+                  <Router />
+                </Layout>
+                <Toaster />
+              </BlockedReportProvider>
+            </HandyProvider>
+          </AppSettingsProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </ClerkProvider>
