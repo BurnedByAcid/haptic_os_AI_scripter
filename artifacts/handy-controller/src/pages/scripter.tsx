@@ -641,8 +641,32 @@ export default function Scripter() {
     ctx.fillStyle = "rgba(0,0,0,0.18)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const bandW = canvas.width / BD_BANDS.length;
+    // ── Compute per-band widths ───────────────────────────────────────────────
+    // Enabled bands expand to fill the space freed by disabled bands.
+    // When all or none are enabled every band gets equal width.
+    const enabledCount = enabled.filter(Boolean).length;
+    const uniformW     = canvas.width / BD_BANDS.length;
+    const allEqual     = enabledCount === 0 || enabledCount === BD_BANDS.length;
+    const disabledW    = allEqual ? uniformW : Math.max(14, uniformW * 0.28);
+    const totalDisW    = disabledW * (BD_BANDS.length - enabledCount);
+    const expandedW    = allEqual ? uniformW : (canvas.width - totalDisW) / enabledCount;
+
+    const bwArr: number[] = BD_BANDS.map((_, b) => allEqual ? uniformW : (enabled[b] ? expandedW : disabledW));
+    const bxArr: number[] = [];
+    let xCursor = 0;
+    for (let b = 0; b < BD_BANDS.length; b++) { bxArr.push(xCursor); xCursor += bwArr[b]; }
+
+    // ── Threshold level for beat detection ────────────────────────────────────
+    // Beat fires when energy > avgEnergy * sensitivity.
+    // energy ≈ (bandAvg/255)²  →  threshold amplitude = sqrt(avgEnergy * sensitivity) * 255
+    // We cap at canvas.height so the line stays in frame even at extreme sensitivity.
+    const usingCleanerPath = cleanBand !== null && anyCleanerOn;
+    const thresholdAmpNorm = Math.min(1, Math.sqrt(Math.max(0, avgEnergy) * bdSensitivityRef.current));
+    const thresholdY       = canvas.height - thresholdAmpNorm * canvas.height;
+
     for (let b = 0; b < BD_BANDS.length; b++) {
+      const bx = bxArr[b];
+      const bw = bwArr[b];
       const startBin = Math.max(0, Math.round(BD_BANDS[b].range[0] / hzPerBin));
       const endBin   = Math.min(binCount - 1, Math.round(BD_BANDS[b].range[1] / hzPerBin));
       const numBins  = Math.max(1, endBin - startBin + 1);
@@ -653,42 +677,94 @@ export default function Scripter() {
       for (let i = startBin; i <= endBin; i++) sum += freqData[i];
       const avg = sum / numBins;
 
-      // Cleaning band gets a subtle tinted background
-      if (isCleanBand) {
-        ctx.fillStyle = BD_BANDS[b].color + "18";
-        ctx.fillRect(b * bandW, 0, bandW, canvas.height);
+      // Background tint
+      if (isCleanBand || (enabled[b] && !allEqual)) {
+        ctx.fillStyle = BD_BANDS[b].color + (isCleanBand ? "22" : "0d");
+        ctx.fillRect(bx, 0, bw, canvas.height);
       }
 
-      // Draw sub-bar columns within each band section
-      const subBarW = Math.max(1, (bandW - 2) / numBins);
-      for (let i = startBin; i <= endBin; i++) {
-        const barH = (freqData[i] / 255) * canvas.height;
-        const bx = b * bandW + (i - startBin) * subBarW;
-        ctx.fillStyle = enabled[b] ? BD_BANDS[b].color + "cc" : "#1a1a1a";
-        ctx.fillRect(bx, canvas.height - barH, subBarW - 0.5, barH);
-      }
-
-      // Band average level indicator (bright top bar)
       if (enabled[b]) {
+        // Sub-bar columns
+        const subBarW = Math.max(1, (bw - 2) / numBins);
+        for (let i = startBin; i <= endBin; i++) {
+          const barH = (freqData[i] / 255) * canvas.height;
+          const sx = bx + (i - startBin) * subBarW;
+          ctx.fillStyle = BD_BANDS[b].color + "cc";
+          ctx.fillRect(sx, canvas.height - barH, subBarW - 0.5, barH);
+        }
+
+        // Band average level indicator (bright top bar)
         const levelH = (avg / 255) * canvas.height;
         ctx.fillStyle = BD_BANDS[b].color;
-        ctx.fillRect(b * bandW + 1, canvas.height - levelH - 2, bandW - 4, 3);
+        ctx.fillRect(bx + 1, canvas.height - levelH - 2, bw - 4, 3);
+
+        // ── Threshold line — only in band-energy mode (not cleaner path) ──────
+        // Shows the amplitude level a beat requires, so the user can see
+        // how close the signal is to triggering.
+        if (!usingCleanerPath && bw > 20) {
+          ctx.save();
+          ctx.strokeStyle = "rgba(255,255,255,0.70)";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([5, 3]);
+          ctx.beginPath();
+          ctx.moveTo(bx + 2, thresholdY);
+          ctx.lineTo(bx + bw - 2, thresholdY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          // Small "▸ threshold" label pinned to the right end of the line
+          if (bw > 56) {
+            ctx.fillStyle = "rgba(255,255,255,0.55)";
+            ctx.font = "9px sans-serif";
+            ctx.textAlign = "right";
+            ctx.fillText("threshold", bx + bw - 4, thresholdY - 3);
+          }
+          ctx.restore();
+        }
+      } else {
+        // Disabled band: very dim bars
+        const subBarW = Math.max(1, (bw - 1) / numBins);
+        for (let i = startBin; i <= endBin; i++) {
+          const barH = (freqData[i] / 255) * canvas.height;
+          const sx = bx + (i - startBin) * subBarW;
+          ctx.fillStyle = "#1a1a1a";
+          ctx.fillRect(sx, canvas.height - barH, subBarW - 0.5, barH);
+        }
       }
 
-      // Cleaning band: draw a distinct ring border + "Cleaning" label
+      // Band label — rotated on narrow disabled bands, horizontal on wide ones
+      const label = BD_BANDS[b].label;
+      ctx.save();
+      if (!enabled[b] && bw < 30) {
+        // Rotate label 90° so it fits the narrow strip
+        ctx.fillStyle = "rgba(255,255,255,0.22)";
+        ctx.font = "9px sans-serif";
+        ctx.textAlign = "center";
+        ctx.translate(bx + bw / 2, canvas.height - 4);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText(label, -(canvas.height / 2 - 8), 0);
+      } else if (!allEqual) {
+        // Horizontal label at the bottom for wide bands
+        ctx.fillStyle = enabled[b] ? BD_BANDS[b].color + "99" : "rgba(255,255,255,0.22)";
+        ctx.font = `${enabled[b] ? "bold " : ""}9px sans-serif`;
+        ctx.textAlign = "center";
+        ctx.fillText(label, bx + bw / 2, canvas.height - 4);
+      }
+      ctx.restore();
+
+      // Cleaning band: distinct ring border + label
       if (isCleanBand) {
         ctx.strokeStyle = BD_BANDS[b].color;
         ctx.lineWidth = 2;
-        ctx.strokeRect(b * bandW + 1, 1, bandW - 2, canvas.height - 2);
+        ctx.strokeRect(bx + 1, 1, bw - 2, canvas.height - 2);
         ctx.fillStyle = BD_BANDS[b].color;
         ctx.font = "bold 9px sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(anyCleanerOn ? "Cleaning" : "Isolated", b * bandW + bandW / 2, 14);
+        ctx.fillText(anyCleanerOn ? "Cleaning" : "Isolated", bx + bw / 2, 14);
       }
 
       // Divider
       ctx.fillStyle = "rgba(255,255,255,0.06)";
-      ctx.fillRect(b * bandW, 0, 1, canvas.height);
+      ctx.fillRect(bx, 0, 1, canvas.height);
     }
 
     // Beat flash overlay
