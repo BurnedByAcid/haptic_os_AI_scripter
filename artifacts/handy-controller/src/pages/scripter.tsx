@@ -1520,13 +1520,18 @@ export default function Scripter() {
       ctx.strokeRect(x, y, w, h);
       ctx.fillStyle = "rgba(168,85,247,0.18)";
       ctx.fillRect(x, y, w, h);
-      // Dimension label
+      // Dimension label — shows MIN/MAX suffix when a drag clamp is active
+      const MIN_VID = 10, MAX_VID = 50;
+      const isDragging = vtDragLiveRef.current !== null;
+      const wSuffix = isDragging ? (w <= MIN_VID ? " MIN" : w >= MAX_VID ? " MAX" : "") : "";
+      const hSuffix = isDragging ? (h <= MIN_VID ? " MIN" : h >= MAX_VID ? " MAX" : "") : "";
+      const label = `${w}${wSuffix}×${h}${hSuffix}`;
       const fontSize = Math.max(10, Math.round(canvas.width / 70));
       ctx.font = `bold ${fontSize}px monospace`;
       ctx.fillStyle = "hsl(270,85%,60%)";
       ctx.shadowColor = "#000";
       ctx.shadowBlur = 3;
-      ctx.fillText(`${w}×${h}`, x + w + 3, y + fontSize);
+      ctx.fillText(label, x + w + 3, y + fontSize);
       ctx.shadowBlur = 0;
     }
   }, [vtZone]);
