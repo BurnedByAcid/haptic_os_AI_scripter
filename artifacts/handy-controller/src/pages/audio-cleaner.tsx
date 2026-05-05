@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Scissors, Upload, Play, Pause, Download, X, Activity, Square, RefreshCw, RotateCcw } from "lucide-react";
 import { applyVocalRemoval, applyImpactSuppression, applyScreamSuppression } from "@/lib/audio-dsp";
+import { useToast } from "@/hooks/use-toast";
 
 export const AUDIO_CLEANER_SESSION_KEY = "hc_bd_from_cleaner";
 
@@ -90,6 +91,7 @@ interface Options {
 
 export default function AudioCleaner() {
   const [, navigate] = useLocation();
+  const { toast } = useToast();
   const [step, setStep] = useState<Step>("idle");
   const [progress, setProgress] = useState(0);
   const [statusMsg, setStatusMsg] = useState("");
@@ -156,6 +158,7 @@ export default function AudioCleaner() {
       setStatusMsg("");
       setProcessedBuffer(null);
       setWavBlob(null);
+      toast({ title: "Processing cancelled", duration: 2000 });
     };
 
     setStep("extracting");
@@ -249,7 +252,7 @@ export default function AudioCleaner() {
       setErrorMsg(err instanceof Error ? err.message : "Unknown error");
       setStep("error");
     }
-  }, [options, loadFFmpeg, stopPlayback]);
+  }, [options, loadFFmpeg, stopPlayback, toast]);
 
   const handleFileSelect = useCallback((file: File | null | undefined) => {
     if (!file) return;
