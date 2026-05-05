@@ -199,6 +199,7 @@ export default function Scripter() {
   const [urlDialogOpen, setUrlDialogOpen] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [urlResolving, setUrlResolving] = useState(false);
   const { toast } = useToast();
   const { openBlockedReport } = useBlockedReport();
   const [currentTime, setCurrentTime] = useState(0);
@@ -1382,42 +1383,59 @@ export default function Scripter() {
     }
   };
 
-  const handleLoadVideoUrl = () => {
+  const handleLoadVideoUrl = async () => {
     const trimmed = urlInput.trim();
-    if (!trimmed) {
-      setUrlError("Please paste a video URL.");
-      return;
-    }
+    if (!trimmed) { setUrlError("Please paste a video URL."); return; }
     const err = validateVideoUrl(trimmed);
-    if (err) {
-      setUrlError(err.message);
-      return;
-    }
-    // Only direct video URLs (.mp4/.webm/.ogg/.mov) can be analyzed by the
-    // <video> element. Embed hosts like YouTube/Vimeo serve HTML pages, not
-    // raw video, so they cannot be used for funscript generation here.
+    if (err) { setUrlError(err.message); return; }
+
     let parsed: URL;
-    try {
-      parsed = new URL(trimmed);
-    } catch {
-      setUrlError("That doesn't look like a valid URL.");
-      return;
+    try { parsed = new URL(trimmed); } catch {
+      setUrlError("That doesn't look like a valid URL."); return;
     }
+
+    // Direct video file URL — no resolution needed; load immediately.
     const isDirectVideo = /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(parsed.pathname);
-    if (!isDirectVideo) {
-      setUrlError(
-        "Only direct video file URLs (.mp4, .webm, .ogg, .mov) work in the Scripter. Embed pages like YouTube or Vimeo can't be analyzed — please download the video and load the file, or paste a direct video link."
-      );
+    if (isDirectVideo) {
+      const name = decodeURIComponent(parsed.pathname.split("/").pop() || "video");
+      setVideoUrl(trimmed);
+      setVideoFileName(name);
+      setUrlDialogOpen(false);
+      setUrlInput("");
+      setUrlError(null);
+      toast({ title: "Video loaded", description: name });
       return;
     }
-    // Derive a friendly file name from the URL pathname.
-    const name = decodeURIComponent(parsed.pathname.split("/").pop() || "video");
-    setVideoUrl(trimmed);
-    setVideoFileName(name);
-    setUrlDialogOpen(false);
-    setUrlInput("");
+
+    // Page URL — resolve via yt-dlp on the backend then proxy through our server
+    // so crossOrigin="anonymous" + canvas frame capture works for analysis.
+    setUrlResolving(true);
     setUrlError(null);
-    toast({ title: "Video loaded", description: name });
+    try {
+      const token = await getToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(
+        `${API_BASE}/api/video/resolve?url=${encodeURIComponent(trimmed)}`,
+        { headers }
+      );
+      const data = await res.json() as { token?: string; title?: string; error?: string };
+      if (!res.ok || !data.token) {
+        setUrlError(data.error ?? "Could not resolve that URL. Try a direct .mp4 link or load a file.");
+        return;
+      }
+      const proxyUrl = `${API_BASE}/api/video/stream/${data.token}`;
+      setVideoUrl(proxyUrl);
+      setVideoFileName(data.title ?? "video");
+      setUrlDialogOpen(false);
+      setUrlInput("");
+      setUrlError(null);
+      toast({ title: "Video loaded", description: data.title ?? trimmed });
+    } catch {
+      setUrlError("Network error resolving URL. Please try again.");
+    } finally {
+      setUrlResolving(false);
+    }
   };
 
   const handleImportFunscript = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3235,24 +3253,34 @@ export default function Scripter() {
       </Tabs>
 
       {/* ── Paste Video URL Dialog ── */}
-      <Dialog open={urlDialogOpen} onOpenChange={(open) => { setUrlDialogOpen(open); if (!open) { setUrlInput(""); setUrlError(null); } }}>
+      <Dialog open={urlDialogOpen} onOpenChange={(open) => { if (urlResolving) return; setUrlDialogOpen(open); if (!open) { setUrlInput(""); setUrlError(null); } }}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Load video from URL</DialogTitle>
             <DialogDescription>
-              Paste a direct video link (.mp4, .webm, .ogg, .mov). Embed pages like YouTube or Vimeo can't be analyzed for funscript generation.
+              Paste any video page URL or a direct file link (.mp4, .webm, .ogg, .mov). Page URLs from supported sites are resolved automatically.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
             <Input
               type="url"
-              placeholder="https://example.com/video.mp4"
+              placeholder="https://example.com/video.mp4 or page URL"
               value={urlInput}
               onChange={(e) => { setUrlInput(e.target.value); if (urlError) setUrlError(null); }}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleLoadVideoUrl(); } }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleLoadVideoUrl(); } }}
               autoFocus
+              disabled={urlResolving}
               data-testid="input-video-url"
             />
+            {urlResolving && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <svg className="animate-spin h-4 w-4 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                Resolving video URL…
+              </div>
+            )}
             {urlError && (
               <div className="space-y-1">
                 <p className="text-sm text-destructive" data-testid="text-url-error">{urlError}</p>
@@ -3273,12 +3301,14 @@ export default function Scripter() {
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              Note: the video host must allow cross-origin playback. If loading fails, download the file and use Load Video instead.
+              Supported: direct video files and most video hosting sites. If a site blocks the resolver, download the file and use Load Video instead.
             </p>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setUrlDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleLoadVideoUrl} data-testid="button-load-video-url">Load Video</Button>
+            <Button variant="ghost" onClick={() => setUrlDialogOpen(false)} disabled={urlResolving}>Cancel</Button>
+            <Button onClick={() => void handleLoadVideoUrl()} disabled={urlResolving} data-testid="button-load-video-url">
+              {urlResolving ? "Resolving…" : "Load Video"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

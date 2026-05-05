@@ -12,6 +12,7 @@ import blockReportsRouter from "./block-reports";
 import scripterDraftsRouter from "./scripter-drafts";
 import scripterSessionsRouter from "./scripter-sessions";
 import analyticsRouter from "./analytics";
+import videoRouter from "./video";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(blockReportsRouter);
 router.use(scripterDraftsRouter);
 router.use(scripterSessionsRouter);
 router.use(analyticsRouter);
+router.use(videoRouter);
 
 export default router;

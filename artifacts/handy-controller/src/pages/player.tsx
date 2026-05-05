@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useAuth } from "@clerk/react";
 import { useFeatureTracking } from "@/hooks/use-analytics";
 import { useHandy } from "@/hooks/use-handy";
 import { syncEngine, hsspEngine, Funscript, HSSPStatus } from "@/lib/scriptSync";
@@ -12,6 +13,8 @@ import { VideoControlBar } from "@/components/video-control-bar";
 import { useToast } from "@/hooks/use-toast";
 import { validateAndParseFunscriptFile } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
+
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 function parseFunscript(json: unknown): Funscript {
   if (typeof json !== "object" || json === null) throw new Error("Not an object");
@@ -100,6 +103,7 @@ function SyncBadge({ status }: { status: HSSPStatus }) {
 export default function Player() {
   useFeatureTracking("player");
   const { key, connected, recordAppModeChange } = useHandy();
+  const { getToken } = useAuth();
   const { toast } = useToast();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoMode, setVideoMode] = useState<VideoMode>("file");
@@ -144,46 +148,67 @@ export default function Player() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load item passed from Library
+  // Load item passed from Library / Community.
+  // Runs once on mount. For unknown page URLs (e.g. txxx.com, spankbang.com) we
+  // resolve via yt-dlp rather than falling back to a broken iframe embed.
   useEffect(() => {
     const pendingVideoUrl = localStorage.getItem("handy_pending_video_url");
-    const pendingScript = localStorage.getItem("handy_pending_script");
-    if (pendingVideoUrl) {
-      // blob: and file: URLs are always local video sources — skip embed detection
-      if (pendingVideoUrl.startsWith("blob:") || pendingVideoUrl.startsWith("file:")) {
-        setVideoUrl(pendingVideoUrl);
-        setEmbedUrl(null);
-        setVideoMode("file");
-      } else {
-        const detected = detectEmbedUrl(pendingVideoUrl);
-        if (detected) {
-          if (detected.mode === "url") {
-            setVideoUrl(detected.embedUrl);
-            setEmbedUrl(null);
-            setVideoMode("url");
-          } else {
-            setEmbedUrl(detected.embedUrl);
-            setVideoUrl(null);
-            setVideoMode("embed");
-          }
-        } else {
-          setVideoUrl(pendingVideoUrl);
-          setEmbedUrl(null);
-          setVideoMode("file");
-        }
-      }
-      localStorage.removeItem("handy_pending_video_url");
-      localStorage.removeItem("handy_pending_video_name");
-    }
+    const pendingScript   = localStorage.getItem("handy_pending_script");
+
+    localStorage.removeItem("handy_pending_video_url");
+    localStorage.removeItem("handy_pending_video_name");
+    localStorage.removeItem("handy_pending_script");
+    localStorage.removeItem("handy_pending_script_name");
+
     if (pendingScript) {
       try {
         const script = parseFunscript(JSON.parse(pendingScript));
         setScripts([script, null, null, null]);
         setActiveScriptIdx(0);
       } catch (e) { console.error("Invalid funscript from library:", e); }
-      localStorage.removeItem("handy_pending_script");
-      localStorage.removeItem("handy_pending_script_name");
     }
+
+    if (!pendingVideoUrl) return;
+
+    // Local blob / file references — use as-is
+    if (pendingVideoUrl.startsWith("blob:") || pendingVideoUrl.startsWith("file:")) {
+      setVideoUrl(pendingVideoUrl);
+      setEmbedUrl(null);
+      setVideoMode("file");
+      return;
+    }
+
+    const detected = detectEmbedUrl(pendingVideoUrl);
+    if (!detected) return; // malformed URL
+
+    if (detected.mode === "url") {
+      // Direct video file
+      setVideoUrl(detected.embedUrl);
+      setEmbedUrl(null);
+      setVideoMode("url");
+      return;
+    }
+
+    if (detected.embedUrl !== pendingVideoUrl) {
+      // Known embed platform — rewritten to embed URL
+      setEmbedUrl(detected.embedUrl);
+      setVideoUrl(null);
+      setVideoMode("embed");
+      return;
+    }
+
+    // Unknown page URL — resolve via yt-dlp for direct playback (async)
+    void (async () => {
+      setUrlResolving(true);
+      const cdnUrl = await resolvePageUrl(pendingVideoUrl);
+      setUrlResolving(false);
+      if (cdnUrl) {
+        setVideoUrl(cdnUrl);
+        setEmbedUrl(null);
+        setVideoMode("url");
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const activeScript = scripts[activeScriptIdx];
@@ -254,18 +279,68 @@ export default function Player() {
     if (file) { setVideoUrl(URL.createObjectURL(file)); setVideoMode("file"); setEmbedUrl(null); }
   };
 
-  const handleUrlLoad = () => {
-    const detected = detectEmbedUrl(urlInput.trim());
-    if (!detected) return;
+  const [urlResolving, setUrlResolving] = useState(false);
+
+  // Resolve a page URL to a direct CDN URL via yt-dlp on the backend.
+  // Returns the CDN URL on success, or null on failure (toast shown).
+  const resolvePageUrl = useCallback(async (pageUrl: string): Promise<string | null> => {
+    try {
+      const token = await getToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(
+        `${API_BASE}/api/video/resolve?url=${encodeURIComponent(pageUrl)}`,
+        { headers }
+      );
+      const data = await res.json() as { cdnUrl?: string; error?: string };
+      if (!res.ok || !data.cdnUrl) {
+        toast({
+          title: "Couldn't resolve video URL",
+          description: data.error ?? "Paste a direct .mp4 link or load a file instead.",
+          variant: "destructive",
+        });
+        return null;
+      }
+      return data.cdnUrl;
+    } catch {
+      toast({ title: "Network error resolving video URL", variant: "destructive" });
+      return null;
+    }
+  }, [getToken, toast]);
+
+  const handleUrlLoad = async () => {
+    const raw = urlInput.trim();
+    if (!raw) return;
+
+    const detected = detectEmbedUrl(raw);
+    if (!detected) return; // malformed URL
+
+    // Direct video file (.mp4 / .webm / etc.) — load immediately.
     if (detected.mode === "url") {
       setVideoUrl(detected.embedUrl);
       setEmbedUrl(null);
       setVideoMode("url");
-    } else {
+      return;
+    }
+
+    // Known embed platform: detectEmbedUrl rewrote the URL to an embed form.
+    if (detected.embedUrl !== raw) {
       setEmbedUrl(detected.embedUrl);
       setVideoUrl(null);
       setVideoMode("embed");
+      return;
     }
+
+    // Unknown page URL — try yt-dlp resolution for direct playback.
+    setUrlResolving(true);
+    const cdnUrl = await resolvePageUrl(raw);
+    setUrlResolving(false);
+    if (cdnUrl) {
+      setVideoUrl(cdnUrl);
+      setEmbedUrl(null);
+      setVideoMode("url");
+    }
+    // If resolution fails, resolvePageUrl already shows a toast.
   };
 
   const { reportAction } = useBlockedReport();

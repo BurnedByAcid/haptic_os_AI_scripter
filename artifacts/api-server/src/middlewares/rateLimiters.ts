@@ -25,6 +25,9 @@ const SCRIPT_UPLOAD_MAX = intFromEnv("RATE_LIMIT_SCRIPT_UPLOAD_MAX", 20);
 const WRITE_WINDOW_MS = intFromEnv("RATE_LIMIT_WRITE_WINDOW_MS", 60 * 1000);
 const WRITE_MAX = intFromEnv("RATE_LIMIT_WRITE_MAX", 60);
 
+const VIDEO_RESOLVE_WINDOW_MS = intFromEnv("RATE_LIMIT_VIDEO_RESOLVE_WINDOW_MS", 60 * 1000);
+const VIDEO_RESOLVE_MAX = intFromEnv("RATE_LIMIT_VIDEO_RESOLVE_MAX", 10);
+
 export const scriptUploadLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: SCRIPT_UPLOAD_WINDOW_MS,
   limit: SCRIPT_UPLOAD_MAX,
@@ -45,5 +48,16 @@ export const writeLimiter: RateLimitRequestHandler = rateLimit({
   keyGenerator: clientKey,
   message: {
     error: "Too many requests. Please slow down and try again shortly.",
+  },
+});
+
+export const videoResolveLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: VIDEO_RESOLVE_WINDOW_MS,
+  limit: VIDEO_RESOLVE_MAX,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  keyGenerator: clientKey,
+  message: {
+    error: "Too many video resolve requests. Please wait a minute before trying again.",
   },
 });
