@@ -18,6 +18,7 @@ import {
   isRemoteUrl,
   storeFileHandle,
 } from "@/lib/file-handle-store";
+import { useAppSettings } from "@/hooks/use-app-settings";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 
@@ -51,6 +52,8 @@ export function SaveScriptDialog({
   const { getToken } = useAuth();
   const { isPro, isLoaded: planLoaded } = useSubscription();
   const { toast } = useToast();
+  const { scriptOutputFiletype } = useAppSettings();
+  const exportExt = scriptOutputFiletype === "csv" ? "csv" : "funscript";
 
   const [mode, setMode] = useState<SaveMode>("idle");
   const [title, setTitle] = useState(suggestedTitle);
@@ -213,7 +216,7 @@ export function SaveScriptDialog({
             >
               <div className="flex items-center gap-2 font-semibold">
                 <Download className="h-4 w-4 text-primary" />
-                Download .funscript
+                Download .{exportExt}
               </div>
               <span className="text-xs text-muted-foreground font-normal">
                 Save the file directly to your computer.

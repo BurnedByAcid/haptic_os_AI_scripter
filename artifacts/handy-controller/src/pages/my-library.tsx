@@ -1446,7 +1446,7 @@ export default function MyLibrary() {
                         className="flex-1 text-xs h-8 gap-1.5"
                         onClick={() => handleDownload(entry)}
                       >
-                        <Download className="h-3.5 w-3.5" /> Download
+                        <Download className="h-3.5 w-3.5" /> Download .{scriptOutputFiletype === "csv" ? "csv" : "funscript"}
                       </Button>
 
                       {entry.video_url ? (
