@@ -220,10 +220,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const displaySub  = handle ? "private handle" : (user?.primaryEmailAddress?.emailAddress ?? "");
 
   const handleSaveKey = () => {
-    // updateKey() persists the key and runs a bounded retry burst. If all
-    // attempts fail it stops silently (no toast) per product requirement —
-    // the sidebar status dot already reflects connection state.
-    updateKey(inputKey);
+    const trimmed = inputKey.trim();
+    if (trimmed !== inputKey) setInputKey(trimmed);
+    updateKey(trimmed, () => {
+      toast({
+        title: "Connection failed",
+        description: "Couldn't connect to your Handy — make sure it's powered on and your key is correct (handyfeeling.com/my-handy).",
+        variant: "destructive",
+      });
+    });
   };
 
   const emblemGlowState = checking ? "checking" : connected ? "connected" : "disconnected";
@@ -374,6 +379,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     type="password"
                     value={inputKey}
                     onChange={e => setInputKey(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") handleSaveKey(); }}
                     placeholder={device.placeholder}
                     className="h-8 text-xs font-mono"
                     data-testid="input-connection-key"

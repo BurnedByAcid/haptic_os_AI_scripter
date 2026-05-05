@@ -30,7 +30,7 @@ export interface ModeChangedEvent {
 
 interface HandyContextType extends HandyStatus {
   key: string;
-  updateKey: (k: string) => void;
+  updateKey: (k: string, onFailure?: () => void) => void;
   /** Current device mode: 0=HAMP, 1=HDSP, 2=HSSP. undefined if unknown. */
   mode: number | undefined;
   /**
@@ -221,12 +221,11 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
     };
   }, [key, checkOnce]);
 
-  // Called when the user clicks Save next to the connection key. Persists the
-  // new key, then runs up to SAVE_MAX_ATTEMPTS attempts spaced by
-  // SAVE_RETRY_SPACING_MS. If all attempts fail the burst stops silently —
-  // no error toast — and the SSE stream (started by the key-change effect
-  // above) will take over for ongoing status.
-  const updateKey = useCallback((newKey: string) => {
+  // Called when the user clicks Save (or presses Enter) next to the connection
+  // key. Persists the new key, then runs up to SAVE_MAX_ATTEMPTS attempts
+  // spaced by SAVE_RETRY_SPACING_MS. If all attempts fail the optional
+  // onFailure callback is invoked (used by layout.tsx to show an error toast).
+  const updateKey = useCallback((newKey: string, onFailure?: () => void) => {
     localStorage.setItem("handy_connection_key", newKey);
     setKey(newKey);
     setConnected(false);
@@ -242,7 +241,11 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current) return;
       attempts += 1;
       const ok = await checkOnce(newKey);
-      if (ok || attempts >= SAVE_MAX_ATTEMPTS || !mountedRef.current) return;
+      if (ok) return;
+      if (attempts >= SAVE_MAX_ATTEMPTS || !mountedRef.current) {
+        if (!ok && mountedRef.current) onFailure?.();
+        return;
+      }
       setTimeout(() => { void tryOnce(); }, SAVE_RETRY_SPACING_MS);
     };
     void tryOnce();
