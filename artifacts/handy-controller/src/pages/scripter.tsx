@@ -1811,6 +1811,8 @@ export default function Scripter() {
   ];
 
   const [analyzeMode, setAnalyzeMode] = useState<"webgpu" | "webgl" | "cpu">("cpu");
+  const analyzeModeRef = useRef<"webgpu" | "webgl" | "cpu">("cpu");
+  const [finalAnalyzeMode, setFinalAnalyzeMode] = useState<"webgpu" | "webgl" | "cpu">("cpu");
 
   const cancelAnalysis = () => {
     vtCancelRef.current = true;
@@ -1910,13 +1912,17 @@ export default function Scripter() {
 
     worker.onmessage = (e: MessageEvent) => {
       switch (e.data.type as string) {
-        case "ready":
-          setAnalyzeMode(e.data.mode as "webgpu" | "webgl" | "cpu");
+        case "ready": {
+          const readyMode = e.data.mode as "webgpu" | "webgl" | "cpu";
+          analyzeModeRef.current = readyMode;
+          setAnalyzeMode(readyMode);
           resolveInit?.(); resolveInit = null; rejectInit = null;
           break;
+        }
         case "mode-changed": {
           const newMode = e.data.mode as "webgpu" | "webgl" | "cpu";
           const lostMode = e.data.reason as string;
+          analyzeModeRef.current = newMode;
           setAnalyzeMode(newMode);
           toast({
             title: `${lostMode === "webgpu" ? "WebGPU" : "WebGL"} lost — switched to CPU`,
@@ -2154,6 +2160,11 @@ export default function Scripter() {
 
     // Auto-download raw funscript: every detection at the neutral midpoint.
     downloadRawFunscript(triggerTimes, "video-analysis");
+
+    // Snapshot the final GPU/CPU mode so the post-scan badge reflects what was
+    // actually used for the majority of the scan (not the live analyzeMode,
+    // which could be reset by a subsequent scan's 'ready' message).
+    setFinalAnalyzeMode(analyzeModeRef.current);
 
     // Commit all detections at the neutral midpoint — one pos value per trigger.
     setVtPreviewPoints(triggerTimes.map(time => ({
@@ -3181,8 +3192,8 @@ export default function Scripter() {
                     <div className="space-y-2 p-3 bg-primary/10 border border-primary/30 rounded-lg">
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-medium text-primary">{vtPreviewPoints.length} points ready — preview in Timeline Editor</p>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${analyzeMode === "webgpu" ? "border-primary/50 text-primary bg-primary/10" : analyzeMode === "webgl" ? "border-primary/40 text-primary/80 bg-primary/5" : "border-muted-foreground/30 text-muted-foreground"}`}>
-                          {analyzeMode === "webgpu" ? "⚡ Analyzed with WebGPU" : analyzeMode === "webgl" ? "⚡ Analyzed with WebGL" : "Analyzed with CPU"}
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border ${finalAnalyzeMode === "webgpu" ? "border-primary/50 text-primary bg-primary/10" : finalAnalyzeMode === "webgl" ? "border-primary/40 text-primary/80 bg-primary/5" : "border-muted-foreground/30 text-muted-foreground"}`}>
+                          {finalAnalyzeMode === "webgpu" ? "⚡ Analyzed with WebGPU" : finalAnalyzeMode === "webgl" ? "⚡ Analyzed with WebGL" : "Analyzed with CPU"}
                         </span>
                       </div>
                       <div className="flex gap-2">
