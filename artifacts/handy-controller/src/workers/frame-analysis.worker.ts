@@ -228,7 +228,7 @@ async function handleFrame(bitmap: ImageBitmap, frameMs: number): Promise<void> 
     // ── Emit progress to main thread ──────────────────────────────────────
     // frameMs is echoed so the main thread can resolve the correct pipeline slot.
     const percent = Math.min(99, Math.round(((frameMs - startMs) / rangeMs) * 100));
-    self.postMessage({ type: "progress", percent, frameMs });
+    self.postMessage({ type: "progress", percent, frameMs, markerCount: triggerTimes.length });
 
   } catch (err) {
     bitmap.close();

@@ -384,6 +384,7 @@ export default function Scripter() {
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
   const vtCancelRef = useRef(false);
   const [vtProgress, setVtProgress] = useState(0);
+  const [vtMarkerCount, setVtMarkerCount] = useState(0);
   const [vtStartTime, setVtStartTime] = useState(0);
   const [vtEndTime, setVtEndTime] = useState(0);
   const [vtPreviewPoints, setVtPreviewPoints] = useState<Point[]>([]);
@@ -1848,6 +1849,7 @@ export default function Scripter() {
     vtCancelRef.current = false;
     setVtAnalyzing(true);
     setVtProgress(0);
+    setVtMarkerCount(0);
     setVtPreviewPoints([]);
 
     // Outer try/finally guarantees setVtAnalyzing(false) on every exit path,
@@ -1957,6 +1959,7 @@ export default function Scripter() {
           // Worker finished analysing a frame — drive the progress badge and
           // unblock the corresponding pipeline slot.
           setVtProgress(e.data.percent as number);
+          if (e.data.markerCount !== undefined) setVtMarkerCount(e.data.markerCount as number);
           const p = pendingFrames.get(e.data.frameMs as number);
           if (p) { pendingFrames.delete(e.data.frameMs as number); p.resolve(); }
           releaseSlot();
@@ -3062,6 +3065,9 @@ export default function Scripter() {
                 <Progress value={vtProgress} className="h-3" />
               </div>
               <p className="text-2xl font-mono font-bold text-primary">{vtProgress}%</p>
+              <p className="text-sm text-muted-foreground">
+                {`${vtMarkerCount} marker${vtMarkerCount === 1 ? "" : "s"} found`}
+              </p>
               {analyzeMode !== "cpu" && (
                 <p className="text-[10px] text-muted-foreground">{analyzeMode === "webgpu" ? "WebGPU compute shader — fastest path" : "WebGL shader"} + fast playback — up to 16× faster than seek-based CPU</p>
               )}
