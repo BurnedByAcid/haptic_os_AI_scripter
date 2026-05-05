@@ -26,6 +26,7 @@ const SUBSCRIBER_FEATURES = [
 ];
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
+const FALLBACK_PRICE = "$9.99";
 
 export default function Upgrade() {
   const { plan } = useSubscription();
@@ -34,6 +35,23 @@ export default function Upgrade() {
   const [location] = useLocation();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [displayPrice, setDisplayPrice] = useState<string | null>(null);
+  const [priceInterval, setPriceInterval] = useState<string>("mo");
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/billing/price`)
+      .then(r => r.ok ? r.json() : Promise.reject(r))
+      .then((data: { formatted?: string; interval?: string }) => {
+        setDisplayPrice(data.formatted ?? FALLBACK_PRICE);
+        if (data.interval) {
+          const intervalMap: Record<string, string> = { month: "mo", year: "yr", week: "wk", day: "day" };
+          setPriceInterval(intervalMap[data.interval] ?? data.interval);
+        }
+      })
+      .catch(() => {
+        setDisplayPrice(FALLBACK_PRICE);
+      });
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -233,7 +251,8 @@ export default function Upgrade() {
               )}
             </div>
             <p className="text-2xl font-bold text-primary">
-              $9.99 <span className="text-sm font-normal text-muted-foreground">/mo</span>
+              {displayPrice ?? <span className="inline-block w-12 h-5 rounded bg-primary/10 animate-pulse align-middle" />}{" "}
+              <span className="text-sm font-normal text-muted-foreground">/{priceInterval}</span>
             </p>
           </CardHeader>
           <div className="px-6 pb-6 space-y-2">
@@ -271,7 +290,7 @@ export default function Upgrade() {
                 >
                   {checkoutLoading
                     ? <><Loader2 className="h-4 w-4 animate-spin" /> Opening checkout…</>
-                    : <><Crown className="h-4 w-4" /> Subscribe — $9.99/mo</>}
+                    : <><Crown className="h-4 w-4" /> Subscribe — {displayPrice ?? "…"}/{priceInterval}</>}
                 </Button>
               )}
             </div>

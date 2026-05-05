@@ -10,6 +10,46 @@ const SUBSCRIBER_PRICE_ID = process.env.STRIPE_PRICE_ID ?? "";
 const APP_URL = process.env.APP_URL ?? `https://${process.env.REPLIT_DOMAINS?.split(",")[0] ?? "localhost"}`;
 
 /**
+ * GET /api/billing/price
+ * Returns the current monthly price for the subscriber plan from Stripe.
+ * Public endpoint — no auth required.
+ */
+router.get("/billing/price", async (_req: Request, res: Response) => {
+  const priceId = SUBSCRIBER_PRICE_ID;
+  if (!priceId) {
+    res.status(500).json({ error: "Stripe price ID not configured" });
+    return;
+  }
+
+  try {
+    const stripe = await getUncachableStripeClient();
+    const price = await stripe.prices.retrieve(priceId);
+
+    if (price.unit_amount == null || !price.currency) {
+      res.status(500).json({ error: "Price data unavailable" });
+      return;
+    }
+
+    const amount = price.unit_amount / 100;
+    const formatted = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: price.currency.toUpperCase(),
+      minimumFractionDigits: 2,
+    }).format(amount);
+
+    res.json({
+      amount,
+      currency: price.currency,
+      formatted,
+      interval: price.recurring?.interval ?? "month",
+    });
+  } catch (err) {
+    console.error("billing/price error:", err);
+    res.status(500).json({ error: "Failed to fetch price from Stripe" });
+  }
+});
+
+/**
  * POST /api/billing/start-verification
  * Creates a Stripe Identity VerificationSession and stores the session ID in
  * the user's Clerk privateMetadata. Returns the hosted verification URL.
