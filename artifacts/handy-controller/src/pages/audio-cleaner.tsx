@@ -5,7 +5,7 @@ import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Scissors, Upload, Play, Pause, Download, X, Activity } from "lucide-react";
+import { Scissors, Upload, Play, Pause, Download, X, Activity, Square } from "lucide-react";
 
 export const AUDIO_CLEANER_SESSION_KEY = "hc_bd_from_cleaner";
 
@@ -184,7 +184,7 @@ function drawWaveform(canvas: HTMLCanvasElement, buffer: AudioBuffer) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-type Step = "idle" | "extracting" | "processing" | "done" | "error";
+type Step = "idle" | "ready" | "extracting" | "processing" | "done" | "error";
 
 interface Options {
   vocalRemoval: boolean;
@@ -216,6 +216,8 @@ export default function AudioCleaner() {
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ffmpegLoaded = useRef(false);
+  const selectedFileRef = useRef<File | null>(null);
+  const runIdRef = useRef(0);
 
   const loadFFmpeg = useCallback(async () => {
     if (ffmpegLoaded.current) return;
@@ -245,12 +247,14 @@ export default function AudioCleaner() {
   }, [stopPlayback]);
 
   const processFile = useCallback(async (file: File) => {
+    const myRunId = ++runIdRef.current;
+    const alive = () => runIdRef.current === myRunId;
+
     setStep("extracting");
     setProgress(0);
     setStatusMsg("Loading audio engine…");
     setProcessedBuffer(null);
     setWavBlob(null);
-    setFileName(file.name);
     stopPlayback();
 
     // Close any previous AudioContext before creating a new one
@@ -261,10 +265,15 @@ export default function AudioCleaner() {
 
     try {
       await loadFFmpeg();
+      if (!alive()) return;
       const ff = ffmpegRef.current!;
 
       setStatusMsg("Extracting audio from video…");
       await ff.writeFile("input", await fetchFile(file));
+      if (!alive()) {
+        await ff.deleteFile("input").catch(() => {});
+        return;
+      }
       await ff.exec([
         "-i", "input",
         "-vn",
@@ -273,9 +282,16 @@ export default function AudioCleaner() {
         "-ac", "2",
         "output.wav",
       ]);
+      if (!alive()) {
+        await ff.deleteFile("input").catch(() => {});
+        await ff.deleteFile("output.wav").catch(() => {});
+        return;
+      }
       const wavData = await ff.readFile("output.wav");
       await ff.deleteFile("input");
       await ff.deleteFile("output.wav");
+
+      if (!alive()) return;
 
       setStep("processing");
       setStatusMsg("Applying audio processing…");
@@ -287,23 +303,28 @@ export default function AudioCleaner() {
 
       const wavBytes = wavData instanceof Uint8Array ? wavData.buffer : wavData;
       let decoded = await audioCtx.decodeAudioData(wavBytes as ArrayBuffer);
+      if (!alive()) return;
 
       if (options.vocalRemoval) {
         setStatusMsg("Removing vocals…");
         decoded = applyVocalRemoval(decoded, audioCtx);
+        if (!alive()) return;
       }
       if (options.impactSuppression) {
         setStatusMsg("Suppressing impact sounds…");
         decoded = applyImpactSuppression(decoded, audioCtx);
+        if (!alive()) return;
       }
       if (options.screamSuppression) {
         setStatusMsg("Suppressing screaming…");
         decoded = applyScreamSuppression(decoded, audioCtx);
+        if (!alive()) return;
       }
 
       setProgress(90);
       setStatusMsg("Encoding output…");
       const blob = encodeWav(decoded);
+      if (!alive()) return;
       setWavBlob(blob);
       setProcessedBuffer(decoded);
       setProgress(100);
@@ -313,6 +334,7 @@ export default function AudioCleaner() {
         requestAnimationFrame(() => drawWaveform(canvasRef.current!, decoded));
       }
     } catch (err) {
+      if (!alive()) return;
       console.error(err);
       setErrorMsg(err instanceof Error ? err.message : "Unknown error");
       setStep("error");
@@ -321,8 +343,37 @@ export default function AudioCleaner() {
 
   const handleFileSelect = useCallback((file: File | null | undefined) => {
     if (!file) return;
-    processFile(file);
-  }, [processFile]);
+    selectedFileRef.current = file;
+    setFileName(file.name);
+    setStep("ready");
+    setProgress(0);
+    setStatusMsg("");
+    setErrorMsg("");
+    setProcessedBuffer(null);
+    setWavBlob(null);
+    stopPlayback();
+  }, [stopPlayback]);
+
+  const handleStart = useCallback(() => {
+    if (!selectedFileRef.current || isProcessing) return;
+    processFile(selectedFileRef.current);
+  }, [processFile, isProcessing]);
+
+  const handleCancel = useCallback(() => {
+    runIdRef.current++;
+    // Detach the current ffmpeg instance so the next run starts fresh with a
+    // clean virtual filesystem — the old run keeps its locally-captured `ff`
+    // reference and continues to completion in the background, but alive()
+    // will be false at every checkpoint so it never mutates React state.
+    ffmpegRef.current = null;
+    ffmpegLoaded.current = false;
+    stopPlayback();
+    setStep("ready");
+    setProgress(0);
+    setStatusMsg("");
+    setProcessedBuffer(null);
+    setWavBlob(null);
+  }, [stopPlayback]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -367,9 +418,13 @@ export default function AudioCleaner() {
   }, [wavBlob, navigate]);
 
   const reset = useCallback(() => {
+    runIdRef.current++;
+    ffmpegRef.current = null;
+    ffmpegLoaded.current = false;
     stopPlayback();
     audioCtxRef.current?.close();
     audioCtxRef.current = null;
+    selectedFileRef.current = null;
     setStep("idle");
     setProgress(0);
     setStatusMsg("");
@@ -432,7 +487,7 @@ export default function AudioCleaner() {
               ) : (
                 <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/40 border border-border/50">
                   <p className="text-sm truncate text-foreground" title={fileName}>{fileName}</p>
-                  {(step === "done" || step === "error") && (
+                  {(step === "ready" || step === "done" || step === "error") && (
                     <button onClick={reset} className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0" title="Remove file">
                       <X className="h-4 w-4" />
                     </button>
@@ -493,6 +548,19 @@ export default function AudioCleaner() {
 
         {/* Right column: progress + waveform + playback */}
         <div className="md:col-span-2 flex flex-col gap-4">
+          {/* Ready — Start button */}
+          {step === "ready" && (
+            <Card className="bg-card/50 border-primary/20">
+              <CardContent className="pt-5 flex flex-col gap-3">
+                <p className="text-sm text-muted-foreground">File ready. Adjust options then start processing.</p>
+                <Button className="w-full gap-2" onClick={handleStart}>
+                  <Play className="h-4 w-4" />
+                  Start Processing
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Progress card */}
           {isProcessing && (
             <Card className="bg-card/50 border-primary/20">
@@ -503,6 +571,14 @@ export default function AudioCleaner() {
                 <p className="text-sm text-muted-foreground">{statusMsg}</p>
                 <Progress value={progress} className="h-2" />
                 <p className="text-xs text-muted-foreground text-right">{progress}%</p>
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={handleCancel}
+                >
+                  <Square className="h-4 w-4" />
+                  Cancel
+                </Button>
               </CardContent>
             </Card>
           )}
