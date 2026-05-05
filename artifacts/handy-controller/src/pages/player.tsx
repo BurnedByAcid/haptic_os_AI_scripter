@@ -124,10 +124,17 @@ export default function Player() {
     hsspEngine.setKey(key);
   }, [key]);
 
-  // Subscribe to HSSP status changes
+  // Subscribe to HSSP status changes and errors
   useEffect(() => {
     hsspEngine.onStatus(setHsspStatus);
-  }, []);
+    hsspEngine.onError((msg) => {
+      toast({
+        title: "Script upload failed — using direct sync instead",
+        description: msg,
+        variant: "destructive",
+      });
+    });
+  }, [toast]);
 
   // Load item passed from Library
   useEffect(() => {

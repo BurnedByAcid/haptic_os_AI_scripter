@@ -169,6 +169,7 @@ export class HSSPSyncEngine {
   private serverOffset: number = 0;
   private status: HSSPStatus = "idle";
   private onStatusChange: ((s: HSSPStatus) => void) | null = null;
+  private onErrorChange: ((msg: string) => void) | null = null;
   private onReady: (() => void) | null = null;
   /** Monotonically-increasing token; stale async operations are discarded. */
   private token: number = 0;
@@ -183,6 +184,10 @@ export class HSSPSyncEngine {
 
   onStatus(cb: (s: HSSPStatus) => void) {
     this.onStatusChange = cb;
+  }
+
+  onError(cb: (msg: string) => void) {
+    this.onErrorChange = cb;
   }
 
   /** Register a callback invoked once when status transitions to "ready". */
@@ -269,6 +274,8 @@ export class HSSPSyncEngine {
     } catch (e) {
       if (myToken !== this.token) return false;
       console.error("HSSP prepare failed:", e);
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      this.onErrorChange?.(msg);
       this.setStatus("error");
       return false;
     }
