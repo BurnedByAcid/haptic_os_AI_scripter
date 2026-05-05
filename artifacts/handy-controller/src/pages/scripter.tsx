@@ -24,6 +24,7 @@ import { ResumeDraftPicker, ExitWarningDialog, type DraftSummary } from "@/compo
 import { useDirtyExitWarning } from "@/hooks/use-dirty-exit-warning";
 import { useLocation } from "wouter";
 import { AUDIO_CLEANER_SESSION_KEY } from "@/pages/audio-cleaner";
+import { applyVocalRemoval, applyImpactSuppression, applyScreamSuppression } from "@/lib/audio-dsp";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -458,9 +459,27 @@ export default function Scripter() {
   const bdBandEnabledRef = useRef<boolean[]>(Array(11).fill(true));
   const bdFilterGainsRef = useRef<GainNode[]>([]); // one GainNode per band, gates audio to destination
 
+  // ─── Band Cleaner state (inline DSP inside the Beat Detector) ───
+  const [bdCleanBand, setBdCleanBand] = useState<number | null>(null);
+  const bdCleanBandRef = useRef<number | null>(null);
+  const [bdCleanOpts, setBdCleanOpts] = useState({
+    vocalRemoval: false,
+    impactSuppression: true,
+    screamSuppression: false,
+  });
+  const bdCleanOptsRef = useRef(bdCleanOpts);
+
   useEffect(() => { bdSensitivityRef.current = bdSensitivity; }, [bdSensitivity]);
   useEffect(() => { bdIsRecordingRef.current = bdIsRecording; }, [bdIsRecording]);
   useEffect(() => { bdBandEnabledRef.current = bdBandEnabled; }, [bdBandEnabled]);
+  useEffect(() => { bdCleanBandRef.current = bdCleanBand; }, [bdCleanBand]);
+  useEffect(() => { bdCleanOptsRef.current = bdCleanOpts; }, [bdCleanOpts]);
+
+  // When a clean band is selected, automatically solo it in the band filter chain
+  useEffect(() => {
+    if (bdCleanBand === null) return;
+    setBdBandEnabled(prev => prev.map((_, j) => j === bdCleanBand));
+  }, [bdCleanBand]);
 
   // Sync band enables → gain nodes so the user hears only active bands
   useEffect(() => {
@@ -483,21 +502,47 @@ export default function Scripter() {
 
     const hzPerBin = analyser.context.sampleRate / analyser.fftSize;
     const enabled = bdBandEnabledRef.current;
+    const cleanBand = bdCleanBandRef.current;
+    const cleanOpts = bdCleanOptsRef.current;
+    const anyCleanerOn = cleanOpts.vocalRemoval || cleanOpts.impactSuppression || cleanOpts.screamSuppression;
 
-    // ── Compute energy only from enabled bands ──
+    // ── Compute energy — optionally from a DSP-cleaned time-domain snapshot ──
     let energy = 0;
-    let totalBins = 0;
-    for (let b = 0; b < BD_BANDS.length; b++) {
-      if (!enabled[b]) continue;
-      const startBin = Math.max(0, Math.round(BD_BANDS[b].range[0] / hzPerBin));
-      const endBin   = Math.min(binCount - 1, Math.round(BD_BANDS[b].range[1] / hzPerBin));
-      for (let i = startBin; i <= endBin; i++) {
-        const v = freqData[i] / 255;
-        energy += v * v;
-        totalBins++;
+
+    if (cleanBand !== null && anyCleanerOn && bdAudioCtxRef.current) {
+      // Get raw PCM snapshot from the analyser
+      const tdData = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(tdData);
+
+      const audioCtx = bdAudioCtxRef.current;
+      let tempBuf = audioCtx.createBuffer(1, tdData.length, audioCtx.sampleRate);
+      tempBuf.getChannelData(0).set(tdData);
+
+      // Apply selected DSP transforms (vocal removal is a no-op on mono)
+      if (cleanOpts.vocalRemoval) tempBuf = applyVocalRemoval(tempBuf, audioCtx);
+      if (cleanOpts.impactSuppression) tempBuf = applyImpactSuppression(tempBuf, audioCtx);
+      if (cleanOpts.screamSuppression) tempBuf = applyScreamSuppression(tempBuf, audioCtx);
+
+      // Compute RMS² energy from the cleaned samples
+      const samples = tempBuf.getChannelData(0);
+      let sumSq = 0;
+      for (let i = 0; i < samples.length; i++) sumSq += samples[i] * samples[i];
+      energy = sumSq / samples.length;
+    } else {
+      // Default: frequency-bin energy from enabled bands
+      let totalBins = 0;
+      for (let b = 0; b < BD_BANDS.length; b++) {
+        if (!enabled[b]) continue;
+        const startBin = Math.max(0, Math.round(BD_BANDS[b].range[0] / hzPerBin));
+        const endBin   = Math.min(binCount - 1, Math.round(BD_BANDS[b].range[1] / hzPerBin));
+        for (let i = startBin; i <= endBin; i++) {
+          const v = freqData[i] / 255;
+          energy += v * v;
+          totalBins++;
+        }
       }
+      if (totalBins > 0) energy /= totalBins; // normalise so scale doesn't shift as bands toggle
     }
-    if (totalBins > 0) energy /= totalBins; // normalise so scale doesn't shift as bands toggle
 
     const history = bdEnergyHistoryRef.current;
     history.push(energy);
@@ -537,11 +582,18 @@ export default function Scripter() {
       const startBin = Math.max(0, Math.round(BD_BANDS[b].range[0] / hzPerBin));
       const endBin   = Math.min(binCount - 1, Math.round(BD_BANDS[b].range[1] / hzPerBin));
       const numBins  = Math.max(1, endBin - startBin + 1);
+      const isCleanBand = cleanBand === b;
 
       // Average amplitude in this band (0-255)
       let sum = 0;
       for (let i = startBin; i <= endBin; i++) sum += freqData[i];
       const avg = sum / numBins;
+
+      // Cleaning band gets a subtle tinted background
+      if (isCleanBand) {
+        ctx.fillStyle = BD_BANDS[b].color + "18";
+        ctx.fillRect(b * bandW, 0, bandW, canvas.height);
+      }
 
       // Draw sub-bar columns within each band section
       const subBarW = Math.max(1, (bandW - 2) / numBins);
@@ -557,6 +609,17 @@ export default function Scripter() {
         const levelH = (avg / 255) * canvas.height;
         ctx.fillStyle = BD_BANDS[b].color;
         ctx.fillRect(b * bandW + 1, canvas.height - levelH - 2, bandW - 4, 3);
+      }
+
+      // Cleaning band: draw a distinct ring border + "Cleaning" label
+      if (isCleanBand) {
+        ctx.strokeStyle = BD_BANDS[b].color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(b * bandW + 1, 1, bandW - 2, canvas.height - 2);
+        ctx.fillStyle = BD_BANDS[b].color;
+        ctx.font = "bold 9px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(anyCleanerOn ? "Cleaning" : "Isolated", b * bandW + bandW / 2, 14);
       }
 
       // Divider
@@ -2412,6 +2475,102 @@ export default function Scripter() {
                   <span className="font-mono text-primary text-xs">{bdSensitivity.toFixed(1)}×</span>
                 </div>
                 <Slider min={1.0} max={3.0} step={0.1} value={[bdSensitivity]} onValueChange={v => setBdSensitivity(v[0])} />
+              </CardContent>
+            </Card>
+
+            {/* Band Cleaner card */}
+            <Card className="bg-card/50 border-primary/20 flex-shrink-0">
+              <CardContent className="pt-3 pb-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Band Cleaner</span>
+                  {bdCleanBand !== null && (
+                    <button
+                      className="text-[9px] text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => {
+                        setBdCleanBand(null);
+                        setBdBandEnabled(Array(11).fill(true));
+                      }}
+                      title="Clear band selection"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-snug">
+                  Pick a band to isolate, then enable cleaners to filter before beat detection.
+                </p>
+
+                {/* Band picker — two rows of pills */}
+                <div className="grid grid-cols-4 gap-1">
+                  {BD_BANDS.map((band, i) => {
+                    const isSelected = bdCleanBand === i;
+                    return (
+                      <button
+                        key={band.label}
+                        className="rounded text-[9px] font-bold py-1 transition-all leading-tight"
+                        style={{
+                          borderWidth: 1,
+                          borderStyle: "solid",
+                          borderColor: isSelected ? band.color : "rgba(255,255,255,0.08)",
+                          background: isSelected ? band.color + "33" : "rgba(0,0,0,0.3)",
+                          color: isSelected ? band.color : "rgba(255,255,255,0.3)",
+                        }}
+                        onClick={() => {
+                          if (isSelected) {
+                            setBdCleanBand(null);
+                            setBdBandEnabled(Array(11).fill(true));
+                          } else {
+                            setBdCleanBand(i);
+                          }
+                        }}
+                        title={`${band.label}: ${band.range[0]}–${band.range[1]} Hz`}
+                      >
+                        {band.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Cleaner toggles — only shown when a band is selected */}
+                {bdCleanBand !== null && (
+                  <div className="space-y-1.5 pt-1 border-t border-border/40">
+                    {(
+                      [
+                        { key: "vocalRemoval" as const, label: "Vocal Removal", desc: "Phase-cancels center-panned vocals" },
+                        { key: "impactSuppression" as const, label: "Impact Suppression", desc: "Limits sharp transient peaks" },
+                        { key: "screamSuppression" as const, label: "Scream Suppression", desc: "Hi-freq rolloff + peak limiter" },
+                      ]
+                    ).map(({ key, label, desc }) => (
+                      <label key={key} className="flex items-start gap-2 cursor-pointer group">
+                        <div className="mt-0.5 relative flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={bdCleanOpts[key]}
+                            onChange={() => setBdCleanOpts(prev => ({ ...prev, [key]: !prev[key] }))}
+                            className="sr-only"
+                          />
+                          <div
+                            className={`h-3.5 w-3.5 rounded border transition-colors flex items-center justify-center ${
+                              bdCleanOpts[key]
+                                ? "bg-primary border-primary"
+                                : "border-border bg-background group-hover:border-primary/50"
+                            }`}
+                          >
+                            {bdCleanOpts[key] && (
+                              <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 12 12" fill="none">
+                                <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-medium text-foreground leading-tight">{label}</p>
+                          <p className="text-[9px] text-muted-foreground leading-snug">{desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
