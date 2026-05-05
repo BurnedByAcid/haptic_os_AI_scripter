@@ -11,8 +11,8 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-           // @replit: crimson-to-rose gradient with glow, no flat color
-           "bg-gradient-to-r from-[#DC2626] to-[#EF4444] text-white border-0 shadow-[0_0_18px_rgba(220,38,38,0.45)] btn-gradient-shimmer",
+           // @replit: muted red, low-opacity background to match Admin badge style
+           "bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 active:bg-red-500/25",
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm border-destructive-border",
         outline:
