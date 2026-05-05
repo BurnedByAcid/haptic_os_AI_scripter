@@ -93,7 +93,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { key, updateKey, connected, checking, battery } = useHandy();
+  const { key, updateKey, connected, checking, battery, charging } = useHandy();
   const [inputKey, setInputKey] = useState(key);
   const { toast } = useToast();
   const { user } = useUser();
@@ -203,7 +203,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   connected ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" :
                   "bg-red-500"
                 }`}
-                title={checking ? "Checking..." : connected ? `Connected${battery !== undefined ? ` · ${battery}% battery` : ""}` : "Disconnected"}
+                title={checking ? "Checking..." : connected ? `Connected${battery !== undefined ? ` · ${battery}%${charging ? " ⚡" : ""}` : ""}` : "Disconnected"}
               />
               {/* Expand button */}
               <button
@@ -225,7 +225,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="flex items-center gap-2">
                   {battery !== undefined && connected && (
-                    <span className="text-xs font-mono text-muted-foreground">{battery}%</span>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {battery}%{charging && <span title="Charging"> ⚡</span>}
+                    </span>
                   )}
                   <div
                     className={`h-3 w-3 rounded-full flex-shrink-0 ${
@@ -233,7 +235,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       connected ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" :
                       "bg-red-500"
                     }`}
-                    title={checking ? "Checking..." : connected ? `Connected${battery !== undefined ? ` · ${battery}% battery` : ""}` : "Disconnected"}
+                    title={checking ? "Checking..." : connected ? `Connected${battery !== undefined ? ` · ${battery}%${charging ? " ⚡" : ""}` : ""}` : "Disconnected"}
                   />
                   {/* Collapse button */}
                   <button

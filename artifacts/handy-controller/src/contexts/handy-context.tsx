@@ -1,15 +1,20 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { getStatus } from "@/lib/handyApi";
+import { BASE } from "@/lib/handyApi";
 
-const POLL_INTERVAL_MS = 5000;
-const MAX_CONSECUTIVE_FAILURES = 3;
+// Back-off constants for SSE reconnection
+const SSE_RETRY_MIN_MS = 5_000;
+const SSE_RETRY_MAX_MS = 30_000;
+
 // Spacing between the burst of attempts triggered by a Save click.
 const SAVE_RETRY_SPACING_MS = 1500;
+const SAVE_MAX_ATTEMPTS = 3;
 
 interface HandyStatus {
   connected: boolean;
   checking: boolean;
   battery?: number;
+  charging: boolean;
 }
 
 interface HandyContextType extends HandyStatus {
@@ -22,6 +27,7 @@ const HandyContext = createContext<HandyContextType>({
   updateKey: () => {},
   connected: false,
   checking: false,
+  charging: false,
 });
 
 export function HandyProvider({ children }: { children: React.ReactNode }) {
@@ -29,98 +35,130 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [checking, setChecking] = useState(false);
   const [battery, setBattery] = useState<number | undefined>(undefined);
+  const [charging, setCharging] = useState(false);
 
   const mountedRef = useRef(true);
-  // Tracks consecutive failed status checks for the *current* key. Reset on
-  // success or when the key changes. Once it hits MAX_CONSECUTIVE_FAILURES
-  // the background poll silently stops to avoid hammering the API.
-  const failureCountRef = useRef(0);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
 
-  // Single status check. Returns true on success, false on failure (so callers
-  // can implement bounded retry loops). Updates `connected` / `battery` /
-  // `checking` and the failure counter.
+  // Single status check via REST. Used for:
+  //   1. The initial state snapshot before SSE is established
+  //   2. The fallback triggered when SSE drops
   const checkOnce = useCallback(async (k: string): Promise<boolean> => {
     if (!k || !mountedRef.current) return false;
     setChecking(true);
     try {
       const res = await getStatus(k);
       if (!mountedRef.current) return false;
-      if (res.connected) {
-        failureCountRef.current = 0;
-        setConnected(true);
-        if (res.battery !== undefined) setBattery(res.battery);
-        return true;
-      }
-      failureCountRef.current += 1;
-      setConnected(false);
-      return false;
+      setConnected(res.connected);
+      return res.connected;
     } catch {
-      if (mountedRef.current) {
-        failureCountRef.current += 1;
-        setConnected(false);
-      }
+      if (mountedRef.current) setConnected(false);
       return false;
     } finally {
       if (mountedRef.current) setChecking(false);
     }
   }, []);
 
-  const stopPolling = useCallback(() => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-  }, []);
-
-  // Background poll: kicks off once per saved key. Stops itself silently
-  // after MAX_CONSECUTIVE_FAILURES so a wrong/missing key doesn't keep
-  // pinging Handy's API forever. Polling resumes only when the user updates
-  // the key (which triggers this effect again).
+  // ─── SSE connection manager ────────────────────────────────────────────────
   useEffect(() => {
-    stopPolling();
-    failureCountRef.current = 0;
-
     if (!key) {
       setConnected(false);
       setBattery(undefined);
+      setCharging(false);
       return;
     }
 
+    let sse: EventSource | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryDelay = SSE_RETRY_MIN_MS;
     let cancelled = false;
-    void checkOnce(key);
 
-    pollIntervalRef.current = setInterval(() => {
+    const cleanup = () => {
+      if (sse) { sse.close(); sse = null; }
+      if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    };
+
+    const connect = () => {
       if (cancelled) return;
-      if (failureCountRef.current >= MAX_CONSECUTIVE_FAILURES) {
-        stopPolling();
-        return;
-      }
-      void checkOnce(key);
-    }, POLL_INTERVAL_MS);
+      // SSE requires credentials as query params — EventSource doesn't support headers
+      const url = `${BASE}/events?ck=${encodeURIComponent(key)}`;
+      sse = new EventSource(url);
+
+      sse.onopen = () => {
+        if (!mountedRef.current || cancelled) return;
+        // Reset back-off on successful connection
+        retryDelay = SSE_RETRY_MIN_MS;
+        setChecking(false);
+      };
+
+      sse.addEventListener("device_connected", () => {
+        if (!mountedRef.current || cancelled) return;
+        setConnected(true);
+      });
+
+      sse.addEventListener("device_disconnected", () => {
+        if (!mountedRef.current || cancelled) return;
+        setConnected(false);
+        setBattery(undefined);
+        setCharging(false);
+      });
+
+      sse.addEventListener("battery_changed", (e: MessageEvent) => {
+        if (!mountedRef.current || cancelled) return;
+        try {
+          const data = JSON.parse(e.data as string) as {
+            battery_level?: number;
+            charger_connected?: boolean;
+            charging_complete?: boolean;
+          };
+          if (typeof data.battery_level === "number") {
+            setBattery(data.battery_level);
+          }
+          // charging = plugged in (regardless of whether already full)
+          setCharging(!!data.charger_connected);
+        } catch {
+          // Ignore malformed events
+        }
+      });
+
+      sse.onerror = () => {
+        if (cancelled) return;
+        // SSE dropped — close, fall back to a single REST check, then retry
+        sse?.close();
+        sse = null;
+        void checkOnce(key);
+        retryTimer = setTimeout(() => {
+          retryDelay = Math.min(retryDelay * 2, SSE_RETRY_MAX_MS);
+          connect();
+        }, retryDelay);
+      };
+    };
+
+    // Initial REST check before SSE stream delivers its first event
+    void checkOnce(key);
+    connect();
 
     return () => {
       cancelled = true;
-      stopPolling();
+      cleanup();
     };
-  }, [key, checkOnce, stopPolling]);
+  }, [key, checkOnce]);
 
   // Called when the user clicks Save next to the connection key. Persists the
-  // new key, then runs up to MAX_CONSECUTIVE_FAILURES attempts spaced by
+  // new key, then runs up to SAVE_MAX_ATTEMPTS attempts spaced by
   // SAVE_RETRY_SPACING_MS. If all attempts fail the burst stops silently —
-  // no error toast, no further user-visible noise — and the regular poll
-  // (started by the key-change effect above) takes over until it also hits
-  // the failure cap.
+  // no error toast — and the SSE stream (started by the key-change effect
+  // above) will take over for ongoing status.
   const updateKey = useCallback((newKey: string) => {
     localStorage.setItem("handy_connection_key", newKey);
     setKey(newKey);
     setConnected(false);
-    failureCountRef.current = 0;
+    setBattery(undefined);
+    setCharging(false);
 
     if (!newKey) return;
 
@@ -129,14 +167,14 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current) return;
       attempts += 1;
       const ok = await checkOnce(newKey);
-      if (ok || attempts >= MAX_CONSECUTIVE_FAILURES || !mountedRef.current) return;
+      if (ok || attempts >= SAVE_MAX_ATTEMPTS || !mountedRef.current) return;
       setTimeout(() => { void tryOnce(); }, SAVE_RETRY_SPACING_MS);
     };
     void tryOnce();
   }, [checkOnce]);
 
   return (
-    <HandyContext.Provider value={{ key, updateKey, connected, checking, battery }}>
+    <HandyContext.Provider value={{ key, updateKey, connected, checking, battery, charging }}>
       {children}
     </HandyContext.Provider>
   );
