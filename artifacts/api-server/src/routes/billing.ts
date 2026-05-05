@@ -6,18 +6,38 @@ import Stripe from "stripe";
 
 const router = Router();
 
-const SUBSCRIBER_PRICE_ID = process.env.STRIPE_PRICE_ID ?? "";
 const APP_URL = process.env.APP_URL ?? `https://${process.env.REPLIT_DOMAINS?.split(",")[0] ?? "localhost"}`;
+
+const PRICE_CACHE_TTL_MS = 15 * 60 * 1000;
+
+interface PriceCache {
+  priceId: string;
+  data: { amount: number; currency: string; formatted: string; interval: string };
+  fetchedAt: number;
+}
+
+let priceCache: PriceCache | null = null;
 
 /**
  * GET /api/billing/price
  * Returns the current monthly price for the subscriber plan from Stripe.
+ * Result is cached in memory for 15 minutes, keyed to the current STRIPE_PRICE_ID.
  * Public endpoint — no auth required.
  */
 router.get("/billing/price", async (_req: Request, res: Response) => {
-  const priceId = SUBSCRIBER_PRICE_ID;
+  const priceId = process.env.STRIPE_PRICE_ID ?? "";
   if (!priceId) {
     res.status(500).json({ error: "Stripe price ID not configured" });
+    return;
+  }
+
+  const now = Date.now();
+  if (
+    priceCache &&
+    priceCache.priceId === priceId &&
+    now - priceCache.fetchedAt < PRICE_CACHE_TTL_MS
+  ) {
+    res.json(priceCache.data);
     return;
   }
 
@@ -37,12 +57,16 @@ router.get("/billing/price", async (_req: Request, res: Response) => {
       minimumFractionDigits: 2,
     }).format(amount);
 
-    res.json({
+    const data = {
       amount,
       currency: price.currency,
       formatted,
       interval: price.recurring?.interval ?? "month",
-    });
+    };
+
+    priceCache = { priceId, data, fetchedAt: now };
+
+    res.json(data);
   } catch (err) {
     console.error("billing/price error:", err);
     res.status(500).json({ error: "Failed to fetch price from Stripe" });
@@ -171,7 +195,7 @@ router.post("/billing/checkout", async (req: Request, res: Response) => {
       );
     }
 
-    const priceId = SUBSCRIBER_PRICE_ID;
+    const priceId = process.env.STRIPE_PRICE_ID ?? "";
     if (!priceId) {
       res.status(500).json({ error: "Stripe price ID not configured. Set STRIPE_PRICE_ID." });
       return;
