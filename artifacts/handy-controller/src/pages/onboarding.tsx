@@ -134,7 +134,7 @@ export default function OnboardingPage() {
               />
               <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
                 {usernameStatus === "checking" && (
-                  <Loader2 className="h-4 w-4 animate-spin text-[#8CA9AD]" />
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 )}
                 {usernameStatus === "available" && (
                   <CheckCircle2 className="h-4 w-4 text-green-400" />
