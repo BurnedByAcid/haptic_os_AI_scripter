@@ -204,6 +204,7 @@ export default function AudioCleaner() {
     screamSuppression: false,
   });
 
+  const [cancelling, setCancelling] = useState(false);
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
   const [wavBlob, setWavBlob] = useState<Blob | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -250,6 +251,15 @@ export default function AudioCleaner() {
     const myRunId = ++runIdRef.current;
     const alive = () => runIdRef.current === myRunId;
 
+    const resetAfterCancel = () => {
+      setCancelling(false);
+      setStep("ready");
+      setProgress(0);
+      setStatusMsg("");
+      setProcessedBuffer(null);
+      setWavBlob(null);
+    };
+
     setStep("extracting");
     setProgress(0);
     setStatusMsg("Loading audio engine…");
@@ -265,13 +275,14 @@ export default function AudioCleaner() {
 
     try {
       await loadFFmpeg();
-      if (!alive()) return;
+      if (!alive()) { resetAfterCancel(); return; }
       const ff = ffmpegRef.current!;
 
       setStatusMsg("Extracting audio from video…");
       await ff.writeFile("input", await fetchFile(file));
       if (!alive()) {
         await ff.deleteFile("input").catch(() => {});
+        resetAfterCancel();
         return;
       }
       await ff.exec([
@@ -285,13 +296,14 @@ export default function AudioCleaner() {
       if (!alive()) {
         await ff.deleteFile("input").catch(() => {});
         await ff.deleteFile("output.wav").catch(() => {});
+        resetAfterCancel();
         return;
       }
       const wavData = await ff.readFile("output.wav");
       await ff.deleteFile("input");
       await ff.deleteFile("output.wav");
 
-      if (!alive()) return;
+      if (!alive()) { resetAfterCancel(); return; }
 
       setStep("processing");
       setStatusMsg("Applying audio processing…");
@@ -303,28 +315,28 @@ export default function AudioCleaner() {
 
       const wavBytes = wavData instanceof Uint8Array ? wavData.buffer : wavData;
       let decoded = await audioCtx.decodeAudioData(wavBytes as ArrayBuffer);
-      if (!alive()) return;
+      if (!alive()) { resetAfterCancel(); return; }
 
       if (options.vocalRemoval) {
         setStatusMsg("Removing vocals…");
         decoded = applyVocalRemoval(decoded, audioCtx);
-        if (!alive()) return;
+        if (!alive()) { resetAfterCancel(); return; }
       }
       if (options.impactSuppression) {
         setStatusMsg("Suppressing impact sounds…");
         decoded = applyImpactSuppression(decoded, audioCtx);
-        if (!alive()) return;
+        if (!alive()) { resetAfterCancel(); return; }
       }
       if (options.screamSuppression) {
         setStatusMsg("Suppressing screaming…");
         decoded = applyScreamSuppression(decoded, audioCtx);
-        if (!alive()) return;
+        if (!alive()) { resetAfterCancel(); return; }
       }
 
       setProgress(90);
       setStatusMsg("Encoding output…");
       const blob = encodeWav(decoded);
-      if (!alive()) return;
+      if (!alive()) { resetAfterCancel(); return; }
       setWavBlob(blob);
       setProcessedBuffer(decoded);
       setProgress(100);
@@ -334,7 +346,7 @@ export default function AudioCleaner() {
         requestAnimationFrame(() => drawWaveform(canvasRef.current!, decoded));
       }
     } catch (err) {
-      if (!alive()) return;
+      if (!alive()) { resetAfterCancel(); return; }
       console.error(err);
       setErrorMsg(err instanceof Error ? err.message : "Unknown error");
       setStep("error");
@@ -354,6 +366,8 @@ export default function AudioCleaner() {
     stopPlayback();
   }, [stopPlayback]);
 
+  const isProcessing = step === "extracting" || step === "processing" || cancelling;
+
   const handleStart = useCallback(() => {
     if (!selectedFileRef.current || isProcessing) return;
     processFile(selectedFileRef.current);
@@ -368,11 +382,11 @@ export default function AudioCleaner() {
     ffmpegRef.current = null;
     ffmpegLoaded.current = false;
     stopPlayback();
-    setStep("ready");
-    setProgress(0);
-    setStatusMsg("");
-    setProcessedBuffer(null);
-    setWavBlob(null);
+    // Show "Cancelling…" immediately so the user knows the click was received.
+    // The progress card stays visible until processFile's next alive() check
+    // calls resetAfterCancel(), which snaps the UI back to "ready".
+    setCancelling(true);
+    setStatusMsg("Cancelling…");
   }, [stopPlayback]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -425,6 +439,7 @@ export default function AudioCleaner() {
     audioCtxRef.current?.close();
     audioCtxRef.current = null;
     selectedFileRef.current = null;
+    setCancelling(false);
     setStep("idle");
     setProgress(0);
     setStatusMsg("");
@@ -433,8 +448,6 @@ export default function AudioCleaner() {
     setWavBlob(null);
     setFileName("");
   }, [stopPlayback]);
-
-  const isProcessing = step === "extracting" || step === "processing";
 
   const toggleOption = (key: keyof Options) => {
     setOptions(prev => ({ ...prev, [key]: !prev[key] }));
@@ -565,19 +578,24 @@ export default function AudioCleaner() {
           {isProcessing && (
             <Card className="bg-card/50 border-primary/20">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">{step === "extracting" ? "Extracting Audio" : "Processing"}</CardTitle>
+                <CardTitle className="text-base">
+                  {cancelling ? "Cancelling" : step === "extracting" ? "Extracting Audio" : "Processing"}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">{statusMsg}</p>
+                <p className={`text-sm ${cancelling ? "text-muted-foreground/70 italic" : "text-muted-foreground"}`}>
+                  {statusMsg}
+                </p>
                 <Progress value={progress} className="h-2" />
                 <p className="text-xs text-muted-foreground text-right">{progress}%</p>
                 <Button
                   variant="outline"
-                  className="w-full gap-2 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  className="w-full gap-2 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleCancel}
+                  disabled={cancelling}
                 >
                   <Square className="h-4 w-4" />
-                  Cancel
+                  {cancelling ? "Cancelling…" : "Cancel"}
                 </Button>
               </CardContent>
             </Card>
