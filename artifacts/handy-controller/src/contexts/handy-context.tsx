@@ -19,9 +19,27 @@ interface HandyStatus {
   firmwareVersion?: string;
 }
 
+/** Fired when the device mode changes via the physical button or another app. */
+export interface ModeChangedEvent {
+  mode: number;
+  /** true = the change came from an external source (physical button / other app) */
+  external: boolean;
+  /** Monotonically-increasing sequence number for useEffect dependency tracking */
+  seq: number;
+}
+
 interface HandyContextType extends HandyStatus {
   key: string;
   updateKey: (k: string) => void;
+  /** Current device mode: 0=HAMP, 1=HDSP, 2=HSSP. undefined if unknown. */
+  mode: number | undefined;
+  /**
+   * Call this BEFORE sending a mode-change command to the device so the next
+   * SSE mode_changed event for that mode is treated as app-initiated (no toast).
+   */
+  recordAppModeChange: (mode: number) => void;
+  /** Latest mode-changed event (null until the first event fires). */
+  modeChangedEvent: ModeChangedEvent | null;
 }
 
 const HandyContext = createContext<HandyContextType>({
@@ -30,6 +48,9 @@ const HandyContext = createContext<HandyContextType>({
   connected: false,
   checking: false,
   charging: false,
+  mode: undefined,
+  recordAppModeChange: () => {},
+  modeChangedEvent: null,
 });
 
 export function HandyProvider({ children }: { children: React.ReactNode }) {
@@ -40,12 +61,24 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
   const [charging, setCharging] = useState(false);
   const [deviceModel, setDeviceModel] = useState<string | undefined>(undefined);
   const [firmwareVersion, setFirmwareVersion] = useState<string | undefined>(undefined);
+  const [mode, setMode] = useState<number | undefined>(undefined);
+  const [modeChangedEvent, setModeChangedEvent] = useState<ModeChangedEvent | null>(null);
 
   const mountedRef = useRef(true);
+  /** The mode the app is about to set — used to suppress the echoed SSE event. */
+  const pendingAppModeRef = useRef<number | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
+  }, []);
+
+  /**
+   * Call before sending a mode-change to the device.
+   * The next SSE mode_changed event carrying this mode will be suppressed.
+   */
+  const recordAppModeChange = useCallback((m: number) => {
+    pendingAppModeRef.current = m;
   }, []);
 
   // Single status check via REST. Used for:
@@ -58,6 +91,7 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
       const res = await getStatus(k);
       if (!mountedRef.current) return false;
       setConnected(res.connected);
+      if (typeof res.mode === "number") setMode(res.mode);
       return res.connected;
     } catch {
       if (mountedRef.current) setConnected(false);
@@ -75,6 +109,7 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
       setCharging(false);
       setDeviceModel(undefined);
       setFirmwareVersion(undefined);
+      setMode(undefined);
       return;
     }
 
@@ -146,6 +181,23 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
         }
       });
 
+      sse.addEventListener("mode_changed", (e: MessageEvent) => {
+        if (!mountedRef.current || cancelled) return;
+        try {
+          const data = JSON.parse(e.data as string) as { mode?: number };
+          if (typeof data.mode === "number") {
+            const newMode = data.mode;
+            // If the app triggered this mode change, suppress the toast
+            const external = pendingAppModeRef.current !== newMode;
+            pendingAppModeRef.current = null;
+            setMode(newMode);
+            setModeChangedEvent({ mode: newMode, external, seq: Date.now() });
+          }
+        } catch {
+          // Ignore malformed events
+        }
+      });
+
       sse.onerror = () => {
         if (cancelled) return;
         // SSE dropped — close, fall back to a single REST check, then retry
@@ -197,7 +249,12 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
   }, [checkOnce]);
 
   return (
-    <HandyContext.Provider value={{ key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion }}>
+    <HandyContext.Provider value={{
+      key, updateKey,
+      connected, checking, battery, charging,
+      deviceModel, firmwareVersion,
+      mode, recordAppModeChange, modeChangedEvent,
+    }}>
       {children}
     </HandyContext.Provider>
   );

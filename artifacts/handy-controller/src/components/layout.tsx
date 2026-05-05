@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter";
+import { ToastAction } from "@/components/ui/toast";
 import { useHandy } from "@/hooks/use-handy";
 import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Scissors, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useClerk, Show } from "@clerk/react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -91,15 +92,78 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/audio-cleaner", label: "Audio Cleaner",  icon: Scissors,  requiresPro: true  },
 ];
 
+// ─── Device mode constants ─────────────────────────────────────────────────────
+const MODE_HAMP = 0;
+// const MODE_HDSP = 1;  // no dedicated page; no nav suggestion needed
+const MODE_HSSP = 2;
+
+/** Pages that are "wrong" when the device is in HAMP mode. */
+const HAMP_MISMATCH_PAGES = new Set(["/scripter", "/player"]);
+
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
-  const { key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion } = useHandy();
+  const [location, navigate] = useLocation();
+  const { key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion, modeChangedEvent } = useHandy();
   const [inputKey, setInputKey] = useState(key);
   const { toast } = useToast();
   const { user } = useUser();
   const { signOut, openSignIn } = useClerk();
   const [collapsed, setCollapsed] = useState(false);
   const { isAdmin, isPro, plan } = useSubscription();
+
+  // ─── Device mode watcher ──────────────────────────────────────────────────
+  // Track last interaction time so we can auto-navigate if the user is idle.
+  const lastInteractionRef = useRef<number>(Date.now());
+  useEffect(() => {
+    const onInteraction = () => { lastInteractionRef.current = Date.now(); };
+    window.addEventListener("pointerdown", onInteraction);
+    window.addEventListener("keydown", onInteraction);
+    return () => {
+      window.removeEventListener("pointerdown", onInteraction);
+      window.removeEventListener("keydown", onInteraction);
+    };
+  }, []);
+
+  const locationRef = useRef(location);
+  useEffect(() => { locationRef.current = location; }, [location]);
+
+  useEffect(() => {
+    if (!modeChangedEvent || !modeChangedEvent.external) return;
+
+    const { mode } = modeChangedEvent;
+
+    if (mode === MODE_HAMP) {
+      // Only surface a suggestion when the user is on a page that doesn't match HAMP.
+      if (!HAMP_MISMATCH_PAGES.has(locationRef.current)) return;
+
+      const idleMs = Date.now() - lastInteractionRef.current;
+      if (idleMs > 5_000) {
+        // User has been idle for >5 s — navigate automatically.
+        navigate("/control");
+        toast({
+          title: "Switched to Manual Controls",
+          description: "The device entered HAMP mode — navigated automatically.",
+        });
+      } else {
+        toast({
+          title: "Device switched to HAMP mode",
+          description: "Go to Manual Controls to operate it from this page.",
+          action: (
+            <ToastAction altText="Go to Manual Controls" onClick={() => navigate("/control")}>
+              Manual Controls
+            </ToastAction>
+          ),
+        });
+      }
+    } else if (mode === MODE_HSSP) {
+      toast({
+        title: "HSSP script sync active",
+        description: "The device is now in script-sync mode.",
+        duration: 4000,
+      });
+    }
+  // modeChangedEvent.seq changes every time an external mode change fires.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modeChangedEvent?.seq]);
 
   // ─── Device selector ──────────────────────────────────────────────────────
   const [deviceId, setDeviceId] = useState<DeviceId>(() =>

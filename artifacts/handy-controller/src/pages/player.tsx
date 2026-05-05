@@ -99,7 +99,7 @@ function SyncBadge({ status }: { status: HSSPStatus }) {
 
 export default function Player() {
   useFeatureTracking("player");
-  const { key, connected } = useHandy();
+  const { key, connected, recordAppModeChange } = useHandy();
   const { toast } = useToast();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoMode, setVideoMode] = useState<VideoMode>("file");
@@ -201,9 +201,10 @@ export default function Player() {
     // prepare() failed, a retry (same or new script) that succeeds should still
     // fire the recovery toast to close the UX loop.
     if (activeScript && key) {
+      recordAppModeChange(2);
       hsspEngine.prepare(activeScript);
     }
-  }, [activeScript, key]);
+  }, [activeScript, key, recordAppModeChange]);
 
   useEffect(() => {
     if (videoRef.current) {

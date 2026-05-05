@@ -9,7 +9,7 @@ import { Square, Move } from "lucide-react";
 
 export default function Control() {
   useFeatureTracking("control");
-  const { key, connected, battery } = useHandy();
+  const { key, connected, battery, recordAppModeChange } = useHandy();
   const [speed, setSpeed] = useState(0);
   const [min, setMin] = useState(0);
   const [max, setMax] = useState(100);
@@ -22,6 +22,7 @@ export default function Control() {
   const updateHAMP = (s: number, mn: number, mx: number) => {
     if (!connected || !key) return;
     if (hampTimeout.current) clearTimeout(hampTimeout.current);
+    recordAppModeChange(0);
     hampTimeout.current = setTimeout(() => {
       if (s === 0) stopDevice(key);
       else setHAMP(key, { velocity: s, slideMin: mn, slideMax: mx });
@@ -31,6 +32,7 @@ export default function Control() {
   const updateHDSP = (pos: number) => {
     if (!connected || !key) return;
     if (hdspTimeout.current) clearTimeout(hdspTimeout.current);
+    recordAppModeChange(1);
     hdspTimeout.current = setTimeout(() => {
       setHDSP(key, pos, 50);
     }, 50);
