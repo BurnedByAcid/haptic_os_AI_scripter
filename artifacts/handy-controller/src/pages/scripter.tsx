@@ -2457,13 +2457,19 @@ export default function Scripter() {
             preload="auto"
             onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
             onLoadedMetadata={e => setVtEndTime(Math.round(e.currentTarget.duration))}
-            onError={() => {
+            onError={(e) => {
+              // Prevent the MediaError from bubbling to the Vite runtime error overlay.
+              e.preventDefault();
+              e.stopPropagation();
               if (videoUrl && /^https?:/.test(videoUrl)) {
                 toast({
                   variant: "destructive",
                   title: "Couldn't load video",
-                  description: "The host may not allow direct playback (CORS) or the file is unavailable. Try downloading and loading the file instead.",
+                  description: "The link may have expired or the host doesn't allow direct playback. Paste the URL again or load the file directly.",
                 });
+                // Clear the stale URL so the empty-state placeholder reappears.
+                setVideoUrl(null);
+                setVideoFileName("");
               }
             }}
           />
