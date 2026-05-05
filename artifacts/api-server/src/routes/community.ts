@@ -204,6 +204,20 @@ router.post("/community", writeLimiter, scriptUploadLimiter, async (req: Request
   if (fsErr) { res.status(400).json({ error: fsErr }); return; }
 
   try {
+    const { rows: dupeRows } = await pool.query(
+      `SELECT id, title FROM community_scripts WHERE user_id = $1 AND video_url = $2 LIMIT 1`,
+      [auth.userId, video_url],
+    );
+    if (dupeRows.length > 0) {
+      const dupe = dupeRows[0] as { id: number; title: string };
+      res.status(409).json({
+        error: "already_shared",
+        existing_id: dupe.id,
+        existing_title: dupe.title,
+      });
+      return;
+    }
+
     const { rows } = await pool.query(
       `INSERT INTO community_scripts (user_id, username, title, description, video_url, funscript, tags)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -211,7 +225,26 @@ router.post("/community", writeLimiter, scriptUploadLimiter, async (req: Request
       [auth.userId, username, title, description, video_url, funscriptStr, tags],
     );
     res.status(201).json(rows[0]);
-  } catch {
+  } catch (err: unknown) {
+    const pg = err as { code?: string };
+    if (pg.code === "23505") {
+      // Unique constraint violation — race condition duplicate; look up the existing entry
+      try {
+        const { rows: existing } = await pool.query(
+          `SELECT id, title FROM community_scripts WHERE user_id = $1 AND video_url = $2 LIMIT 1`,
+          [auth.userId, video_url],
+        );
+        const dupe = existing[0] as { id: number; title: string } | undefined;
+        res.status(409).json({
+          error: "already_shared",
+          existing_id: dupe?.id,
+          existing_title: dupe?.title,
+        });
+      } catch {
+        res.status(409).json({ error: "already_shared" });
+      }
+      return;
+    }
     res.status(500).json({ error: "Failed to share script" });
   }
 });

@@ -76,8 +76,33 @@ async function migrateLegacyFunscripts(): Promise<void> {
   }
 }
 
+/**
+ * Idempotent migration: add a UNIQUE constraint on (user_id, video_url) in
+ * community_scripts so the DB itself prevents race-condition duplicates.
+ * Uses DO NOTHING on conflict — safe to run on every boot.
+ */
+async function migrateCommunityUniqueConstraint(): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    await pool.query(`
+      ALTER TABLE community_scripts
+        ADD CONSTRAINT community_scripts_user_video_unique
+        UNIQUE (user_id, video_url)
+    `);
+    logger.info("Added community_scripts_user_video_unique constraint");
+  } catch (err: unknown) {
+    const pg = err as { code?: string };
+    if (pg.code === "42710" || pg.code === "42P07") {
+      // 42710 = duplicate_object (constraint already exists) — this is fine
+    } else {
+      logger.warn({ err }, "Could not add community unique constraint — continuing");
+    }
+  }
+}
+
 await initStripe();
 await migrateLegacyFunscripts();
+await migrateCommunityUniqueConstraint();
 
 app.listen(port, (err) => {
   if (err) {

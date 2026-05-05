@@ -21,6 +21,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { useLocation } from "wouter";
 import { Link } from "wouter";
 import {
@@ -83,6 +84,7 @@ function ShareToCommunityDialog({ entry, onClose, authHeaders, onSuccess }: Shar
   const [saved, setSaved] = useState(false);
   const { toast } = useToast();
   const { reportAction } = useBlockedReport();
+  const [, navigate] = useLocation();
 
   if (!entry) return null;
 
@@ -108,6 +110,22 @@ function ShareToCommunityDialog({ entry, onClose, authHeaders, onSuccess }: Shar
           funscript,
         }),
       });
+
+      if (res.status === 409) {
+        const d = await res.json().catch(() => ({})) as { error?: string; existing_title?: string };
+        const existingTitle = d.existing_title ?? entry.title;
+        toast({
+          title: "Already shared",
+          description: `"${existingTitle}" is already live in the Community.`,
+          action: (
+            <ToastAction altText="View in Community" onClick={() => { onClose(); navigate("/community"); }}>
+              View in Community
+            </ToastAction>
+          ),
+        });
+        return;
+      }
+
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(d.error ?? "Failed to share");
