@@ -385,6 +385,8 @@ export default function Scripter() {
   const vtCancelRef = useRef(false);
   const [vtProgress, setVtProgress] = useState(0);
   const [vtMarkerCount, setVtMarkerCount] = useState(0);
+  const vtMarkerCountRef = useRef(0);
+  const [vtLastScanCount, setVtLastScanCount] = useState<number | null>(null);
   const [vtStartTime, setVtStartTime] = useState(0);
   const [vtEndTime, setVtEndTime] = useState(0);
   const [vtPreviewPoints, setVtPreviewPoints] = useState<Point[]>([]);
@@ -1850,6 +1852,7 @@ export default function Scripter() {
     setVtAnalyzing(true);
     setVtProgress(0);
     setVtMarkerCount(0);
+    vtMarkerCountRef.current = 0;
     setVtPreviewPoints([]);
 
     // Outer try/finally guarantees setVtAnalyzing(false) on every exit path,
@@ -1859,6 +1862,7 @@ export default function Scripter() {
     } catch (err) {
       console.error("[VideoAnalysis] scan failed:", err);
     } finally {
+      setVtLastScanCount(vtMarkerCountRef.current);
       setVtAnalyzing(false);
     }
   };
@@ -1959,7 +1963,7 @@ export default function Scripter() {
           // Worker finished analysing a frame — drive the progress badge and
           // unblock the corresponding pipeline slot.
           setVtProgress(e.data.percent as number);
-          if (e.data.markerCount !== undefined) setVtMarkerCount(e.data.markerCount as number);
+          if (e.data.markerCount !== undefined) { const mc = e.data.markerCount as number; setVtMarkerCount(mc); vtMarkerCountRef.current = mc; }
           const p = pendingFrames.get(e.data.frameMs as number);
           if (p) { pendingFrames.delete(e.data.frameMs as number); p.resolve(); }
           releaseSlot();
@@ -3086,6 +3090,13 @@ export default function Scripter() {
           {/* Zone status */}
           {!vtAnalyzing && (
             <div className="flex-1 flex flex-col gap-2 min-h-0 justify-start">
+              {vtLastScanCount !== null && (
+                <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 flex items-center gap-2">
+                  <span className="text-xs text-primary font-medium">Scan complete</span>
+                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-xs font-mono font-semibold text-primary">{vtLastScanCount} marker{vtLastScanCount === 1 ? "" : "s"} found</span>
+                </div>
+              )}
               <div className="rounded-lg border border-border/50 bg-card/40 p-3 flex flex-col gap-2">
                 <p className="text-xs text-muted-foreground">
                   {videoUrl
