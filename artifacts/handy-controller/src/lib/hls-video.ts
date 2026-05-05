@@ -47,6 +47,12 @@ export function attachHlsSource(
   const hls = new Hls({
     enableWorker: true,
     lowLatencyMode: false,
+    // -1 = automatic ABR: hls.js picks the starting level based on bandwidth
+    // estimation and then adapts as playback continues.
+    startLevel: -1,
+    // Don't let the player size artificially cap the quality — the video
+    // element may be smaller than the desired playback resolution.
+    capLevelToPlayerSize: false,
     // Keep cross-origin fetch so canvas capture stays untainted.
     xhrSetup: (xhr) => {
       xhr.withCredentials = false;
