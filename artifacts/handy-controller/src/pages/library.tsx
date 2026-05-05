@@ -61,10 +61,14 @@ function getStaticPlatformThumbnail(url: string): string | null {
 
 /** Builds the neutral placeholder SVG used when no platform match exists. */
 function getPlaceholderThumbnail(): string {
+  // Colors derived from the app's red/warm dark palette (--card, --muted, --muted-foreground)
+  const bg = "#190b0b";   // hsl(0 40% 7%)  — matches --card
+  const box = "#221616";  // hsl(0 20% 11%) — matches --muted
+  const icon = "#a38f8f"; // hsl(0 10% 60%) — matches --muted-foreground
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180">
-    <rect width="320" height="180" fill="#18181b"/>
-    <rect x="130" y="55" width="60" height="70" rx="4" fill="#3f3f46"/>
-    <polygon points="148,72 148,108 180,90" fill="#71717a"/>
+    <rect width="320" height="180" fill="${bg}"/>
+    <rect x="130" y="55" width="60" height="70" rx="4" fill="${box}"/>
+    <polygon points="148,72 148,108 180,90" fill="${icon}"/>
   </svg>`;
   return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
