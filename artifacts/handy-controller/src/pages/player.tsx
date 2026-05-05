@@ -110,6 +110,8 @@ export default function Player() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [finishMode, setFinishMode] = useState(false);
   const [hsspStatus, setHsspStatus] = useState<HSSPStatus>("idle");
+  /** True once hsspStatus has reached "error"; cleared after the recovery toast fires. */
+  const hadHsspErrorRef = useRef(false);
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -195,6 +197,9 @@ export default function Player() {
   useEffect(() => {
     hsspEngine.reset();
     setHsspStatus("idle");
+    // Note: hadHsspErrorRef is intentionally NOT cleared here — if a previous
+    // prepare() failed, a retry (same or new script) that succeeds should still
+    // fire the recovery toast to close the UX loop.
     if (activeScript && key) {
       hsspEngine.prepare(activeScript);
     }
@@ -223,6 +228,22 @@ export default function Player() {
       const posMs = videoRef.current.currentTime * 1000;
       hsspEngine.play(posMs);
     }
+
+    // Track whether we've ever hit an error so we can detect recovery even
+    // though prepare() transitions error → uploading → ready (not directly).
+    if (hsspStatus === "error") {
+      hadHsspErrorRef.current = true;
+    }
+
+    // Fire a success toast when recovering from a previous error state
+    if (hsspStatus === "ready" && hadHsspErrorRef.current) {
+      hadHsspErrorRef.current = false;
+      toastRef.current({
+        title: "Script re-synced successfully",
+        description: "HSSP sync is back online — the device is now server-synced.",
+      });
+    }
+
     // isPlaying intentionally omitted: we only want to fire on status transition
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hsspStatus]);
