@@ -367,6 +367,14 @@ export default function Scripter() {
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const [videoRect, setVideoRect] = useState({ left: 0, top: 0, width: 0, height: 0 });
 
+  // ─── Video / tabs split resize ───
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+  const [videoHeight, setVideoHeight] = useState<number | null>(null);
+  const dragResizeRef = useRef<{ startY: number; startH: number } | null>(null);
+  const MIN_VIDEO_H = 120;
+  const MIN_TABS_H = 80;
+  const HANDLE_H = 6;
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   // Cleanup fn returned by attachHlsSource — called when video URL changes or on unmount.
@@ -1815,6 +1823,29 @@ export default function Scripter() {
     return () => { ro.disconnect(); video.removeEventListener("loadedmetadata", compute); };
   }, [videoUrl]);
 
+  // ─── Split resize: initialise height and re-clamp on window resize ───
+  useEffect(() => {
+    const container = splitContainerRef.current;
+    if (!container) return;
+    const obs = new ResizeObserver(() => {
+      const h = container.clientHeight;
+      setVideoHeight(prev => {
+        const safeMax = Math.max(MIN_VIDEO_H, h - HANDLE_H - MIN_TABS_H);
+        if (prev === null) return Math.min(Math.max(Math.round(h * 0.55), MIN_VIDEO_H), safeMax);
+        return Math.min(Math.max(prev, MIN_VIDEO_H), safeMax);
+      });
+    });
+    obs.observe(container);
+    return () => obs.disconnect();
+  }, []);
+
+  // ─── Defensive cleanup: release drag listeners if component unmounts mid-drag ───
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = "";
+    };
+  }, []);
+
   // ─────────────── Visual Trigger ───────────────
 
   // VT uses the shared videoRef — no separate video needed
@@ -2450,8 +2481,15 @@ export default function Scripter() {
         </div>
       </div>
 
-      {/* ── Shared video player — takes 2/3 of available height ── */}
-      <div ref={videoBlockRef} className={`flex flex-row rounded-lg border border-border/50 overflow-hidden min-h-0 ${vtAnalyzing ? "hidden" : ""}`} style={{ flex: 2 }}>
+      {/* ── Split container: video + handle + tabs ── */}
+      <div ref={splitContainerRef} className="flex flex-col flex-1 min-h-0">
+
+      {/* ── Shared video player ── */}
+      <div
+        ref={videoBlockRef}
+        className={`flex flex-row rounded-lg border border-border/50 overflow-hidden ${vtAnalyzing ? "hidden" : ""}`}
+        style={tabsOpen ? { height: videoHeight ?? 300, flexShrink: 0 } : { flex: 1 }}
+      >
         {/* Left sidebar: load/import controls */}
         <div className="w-36 flex-shrink-0 bg-card/50 border-r border-border/50 flex flex-col gap-1.5 p-2">
           <Button size="sm" className="relative cursor-pointer w-full justify-start text-xs h-7">
@@ -2554,6 +2592,40 @@ export default function Scripter() {
         </div>{/* end Video + controls */}
       </div>
 
+      {/* ── Drag handle ── */}
+      {!vtAnalyzing && tabsOpen && (
+        <div
+          className="flex-shrink-0 flex items-center justify-center group cursor-row-resize select-none z-10"
+          style={{ height: HANDLE_H }}
+          onPointerDown={e => {
+            e.preventDefault();
+            const startY = e.clientY;
+            const startH = videoHeight ?? 300;
+            dragResizeRef.current = { startY, startH };
+            document.body.style.cursor = "row-resize";
+
+            const onMove = (ev: PointerEvent) => {
+              if (!dragResizeRef.current) return;
+              const containerH = splitContainerRef.current?.clientHeight ?? 0;
+              const delta = ev.clientY - dragResizeRef.current.startY;
+              const newH = dragResizeRef.current.startH + delta;
+              const safeMax = Math.max(MIN_VIDEO_H, containerH - HANDLE_H - MIN_TABS_H);
+              setVideoHeight(Math.min(Math.max(newH, MIN_VIDEO_H), safeMax));
+            };
+            const onUp = () => {
+              dragResizeRef.current = null;
+              document.body.style.cursor = "";
+              window.removeEventListener("pointermove", onMove);
+              window.removeEventListener("pointerup", onUp);
+            };
+            window.addEventListener("pointermove", onMove);
+            window.addEventListener("pointerup", onUp);
+          }}
+        >
+          <div className="w-12 h-0.5 rounded-full bg-border/50 group-hover:bg-border transition-colors" />
+        </div>
+      )}
+
       {/* ── Tabs — collapsible tool panel ── */}
       <Tabs
         value={activeTab}
@@ -2563,8 +2635,8 @@ export default function Scripter() {
           setTabsOpen(true);
           setLocation(tab === "beat" ? "/scripter" : `/scripter?tab=${tab}`);
         }}
-        className="flex flex-col min-h-0 flex-shrink-0"
-        style={tabsOpen ? { flex: 1, minHeight: 0 } : {}}
+        className="flex flex-col min-h-0"
+        style={tabsOpen ? { flex: 1, minHeight: MIN_TABS_H } : { flexShrink: 0 }}
       >
         <TabsList className="bg-card/50 w-full flex-shrink-0 flex justify-between items-center h-9 px-1">
           <div className="flex">
@@ -3458,6 +3530,8 @@ export default function Scripter() {
         </TabsContent>
         </>}
       </Tabs>
+
+      </div>{/* end split container */}
 
       {/* ── Paste Video URL Dialog ── */}
       <Dialog open={urlDialogOpen} onOpenChange={(open) => { if (urlResolving) return; setUrlDialogOpen(open); if (!open) { setUrlInput(""); setUrlError(null); } }}>
