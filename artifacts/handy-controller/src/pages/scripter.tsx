@@ -381,6 +381,7 @@ export default function Scripter() {
   const [vtDragging, setVtDragging] = useState(false);
   const [vtSampledPatch, setVtSampledPatch] = useState<Uint8Array | null>(null);
   const vtPatchPreviewRef = useRef<HTMLCanvasElement>(null);
+  const vtToleranceRef = useRef<HTMLDivElement>(null);
   const [vtTolerance, setVtTolerance] = useState(20); // RMS threshold 0-255
   const [vtMinDelay, setVtMinDelay] = useState(200);   // ms cooldown between triggers
   const [vtFrameDebounce, setVtFrameDebounce] = useState(5); // frame-based debounce 1–5
@@ -3187,7 +3188,21 @@ export default function Scripter() {
                   </div>
                   {!vtLastScanCancelled && vtLastScanCount === 0 && (
                     <p className="text-xs text-amber-500/80">
-                      Try widening the tolerance, redrawing the zone over a clearer pattern edge, or resampling the pattern.
+                      Try{" "}
+                      <button
+                        aria-label="Jump to Match Sensitivity tolerance slider"
+                        className="underline underline-offset-2 hover:text-amber-400 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-400 rounded"
+                        onClick={() => {
+                          vtToleranceRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                          vtToleranceRef.current?.classList.add("ring-2", "ring-amber-400", "ring-offset-1", "ring-offset-background", "rounded-md");
+                          setTimeout(() => {
+                            vtToleranceRef.current?.classList.remove("ring-2", "ring-amber-400", "ring-offset-1", "ring-offset-background", "rounded-md");
+                          }, 1800);
+                        }}
+                      >
+                        widening the tolerance ↗
+                      </button>
+                      , redrawing the zone over a clearer pattern edge, or resampling the pattern.
                     </p>
                   )}
                 </div>
@@ -3244,7 +3259,7 @@ export default function Scripter() {
                     </Button>
                   </div>
 
-                  <div>
+                  <div ref={vtToleranceRef} className="transition-all duration-300">
                     <div className="flex justify-between mb-1">
                       <span className="text-sm font-medium">Match Sensitivity</span>
                       <span className="text-xs font-mono text-primary">RMS &lt; {vtTolerance}</span>
