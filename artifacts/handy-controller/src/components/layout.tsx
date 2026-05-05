@@ -378,7 +378,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{device.keyLabel}</label>
                 <div className="flex gap-2">
                   <Input
-                    type="password"
+                    type="text"
                     value={inputKey}
                     onChange={e => setInputKey(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter") handleSaveKey(); }}
