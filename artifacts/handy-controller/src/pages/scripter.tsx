@@ -214,7 +214,14 @@ export default function Scripter() {
 
   // ─── Layout state ───
   const [tabsOpen, setTabsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"beat" | "timeline" | "visual">("beat");
+
+  function getTabFromSearch(): "beat" | "timeline" | "visual" {
+    const param = new URLSearchParams(window.location.search).get("tab");
+    if (param === "timeline" || param === "visual") return param;
+    return "beat";
+  }
+
+  const [activeTab, setActiveTab] = useState<"beat" | "timeline" | "visual">(getTabFromSearch);
 
   // ─── Timeline Editor state ───
   const [tlZoomLevel, setTlZoomLevel] = useState(3); // 0 = max zoom (2 s), 9 = min (60 s)
@@ -345,6 +352,13 @@ export default function Scripter() {
   const handleExitCancel = useCallback(() => {
     setExitDialogOpen(false);
     pendingNavRef.current = null;
+  }, []);
+
+  // ─── Sync active tab to URL ───
+  useEffect(() => {
+    const onPopState = () => setActiveTab(getTabFromSearch());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   // ─── Video rect (for VT overlay alignment) ───
@@ -2482,7 +2496,12 @@ export default function Scripter() {
       {/* ── Tabs — collapsible tool panel ── */}
       <Tabs
         value={activeTab}
-        onValueChange={v => { setActiveTab(v as "beat" | "timeline" | "visual"); setTabsOpen(true); }}
+        onValueChange={v => {
+          const tab = v as "beat" | "timeline" | "visual";
+          setActiveTab(tab);
+          setTabsOpen(true);
+          setLocation(tab === "beat" ? "/scripter" : `/scripter?tab=${tab}`);
+        }}
         className="flex flex-col min-h-0 flex-shrink-0"
         style={tabsOpen ? { flex: 1, minHeight: 0 } : {}}
       >

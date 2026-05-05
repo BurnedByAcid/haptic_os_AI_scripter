@@ -92,8 +92,12 @@ export function useDirtyExitWarning({ dirty, onAttemptNavigate }: Options): void
   useEffect(() => {
     if (!dirty) return;
     const sentinelUrl = window.location.href;
+    const sentinelPathname = window.location.pathname;
     const onPopState = () => {
       if (!dirtyRef.current) return;
+      // Same-pathname navigation (e.g. tab switch via ?tab= query) is purely
+      // in-page UI movement — don't treat it as a "leave page" attempt.
+      if (window.location.pathname === sentinelPathname) return;
       try { window.history.pushState(null, "", sentinelUrl); } catch { /* ignore */ }
       navRef.current(null);
     };
