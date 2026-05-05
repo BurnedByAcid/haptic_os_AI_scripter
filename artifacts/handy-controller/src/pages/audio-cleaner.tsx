@@ -5,7 +5,7 @@ import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Scissors, Upload, Play, Pause, Download, X, Activity, Square } from "lucide-react";
+import { Scissors, Upload, Play, Pause, Download, X, Activity, Square, RefreshCw } from "lucide-react";
 
 export const AUDIO_CLEANER_SESSION_KEY = "hc_bd_from_cleaner";
 
@@ -211,8 +211,10 @@ export default function AudioCleaner() {
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState("");
 
+  const [swapDragOver, setSwapDragOver] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const changeFileInputRef = useRef<HTMLInputElement>(null);
   const ffmpegRef = useRef<FFmpeg | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -396,6 +398,13 @@ export default function AudioCleaner() {
     if (file) handleFileSelect(file);
   }, [handleFileSelect]);
 
+  const handleSwapDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setSwapDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  }, [handleFileSelect]);
+
   const togglePlayback = useCallback(() => {
     if (!processedBuffer || !audioCtxRef.current) return;
 
@@ -447,6 +456,7 @@ export default function AudioCleaner() {
     setProcessedBuffer(null);
     setWavBlob(null);
     setFileName("");
+    setOptions({ vocalRemoval: true, impactSuppression: true, screamSuppression: false });
   }, [stopPlayback]);
 
   const toggleOption = (key: keyof Options) => {
@@ -498,12 +508,35 @@ export default function AudioCleaner() {
                   />
                 </div>
               ) : (
-                <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/40 border border-border/50">
-                  <p className="text-sm truncate text-foreground" title={fileName}>{fileName}</p>
-                  {(step === "ready" || step === "done" || step === "error") && (
-                    <button onClick={reset} className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0" title="Remove file">
-                      <X className="h-4 w-4" />
-                    </button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-muted/40 border border-border/50">
+                    <p className="text-sm truncate text-foreground" title={fileName}>{fileName}</p>
+                    {(step === "ready" || step === "done") && (
+                      <button onClick={reset} className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0" title="Remove file and reset all settings">
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                  {(step === "ready" || step === "done") && (
+                    <div
+                      className={`border border-dashed rounded-lg p-3 flex items-center gap-2 cursor-pointer transition-colors ${
+                        swapDragOver ? "border-primary bg-primary/10" : "border-border/40 hover:border-primary/40 hover:bg-muted/20"
+                      }`}
+                      onDragOver={e => { e.preventDefault(); setSwapDragOver(true); }}
+                      onDragLeave={() => setSwapDragOver(false)}
+                      onDrop={handleSwapDrop}
+                      onClick={() => changeFileInputRef.current?.click()}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      <p className="text-xs text-muted-foreground">Change file — options are kept</p>
+                      <input
+                        ref={changeFileInputRef}
+                        type="file"
+                        accept="video/*,audio/*"
+                        className="hidden"
+                        onChange={e => { handleFileSelect(e.target.files?.[0]); e.target.value = ""; }}
+                      />
+                    </div>
                   )}
                 </div>
               )}
