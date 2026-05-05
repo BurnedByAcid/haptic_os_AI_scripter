@@ -265,7 +265,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className={`border-b border-border flex-shrink-0 ${collapsed ? "p-2" : "p-4"}`}>
           {collapsed ? (
             <div className="flex flex-col items-center gap-3">
-              {/* Purple Fusion icon */}
               <EmblemGlow />
               {/* Connection dot */}
               <div
@@ -306,7 +305,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div className="flex items-center gap-2.5">
                   <EmblemGlow />
                   <h1 className="text-xl font-bold tracking-tight whitespace-nowrap">
-                    <span className="text-[#C850F0]">Haptic</span><span className="text-white">OS</span>
+                    <span className="text-[#E05252]">Haptic</span><span className="text-foreground">OS</span>
                   </h1>
                 </div>
                 <div className="flex items-center gap-2">
@@ -436,7 +435,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
                     } ${
                       isActive
-                        ? "bg-gradient-to-r from-[#A855F7]/20 to-[#E040FB]/10 text-[#C850F0] font-medium shadow-[inset_0_0_0_1px_rgba(168,85,247,0.2)]"
+                        ? "bg-gradient-to-r from-[#DC2626]/20 to-[#EF4444]/10 text-[#E05252] font-medium shadow-[inset_0_0_0_1px_rgba(220,38,38,0.2)]"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                     title={collapsed ? item.label : undefined}
@@ -459,7 +458,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                         collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
                       } ${
                         location === "/upgrade"
-                          ? "bg-gradient-to-r from-[#A855F7]/20 to-[#E040FB]/10 text-[#C850F0] font-medium shadow-[inset_0_0_0_1px_rgba(168,85,247,0.2)]"
+                          ? "bg-gradient-to-r from-[#DC2626]/20 to-[#EF4444]/10 text-[#E05252] font-medium shadow-[inset_0_0_0_1px_rgba(220,38,38,0.2)]"
                           : "text-primary/70 hover:bg-primary/10 hover:text-primary"
                       }`}
                       title={collapsed ? "Upgrade to Pro" : undefined}

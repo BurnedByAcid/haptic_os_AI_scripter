@@ -60,11 +60,11 @@ function drawWaveform(canvas: HTMLCanvasElement, buffer: AudioBuffer) {
   const step = Math.ceil(data.length / width);
   const amp = height / 2;
 
-  ctx.fillStyle = "#0D0B12";
+  ctx.fillStyle = "#0f0303";
   ctx.fillRect(0, 0, width, height);
 
   ctx.beginPath();
-  ctx.strokeStyle = "hsl(270,85%,60%)";
+  ctx.strokeStyle = "hsl(0,72%,55%)";
   ctx.lineWidth = 1.5;
 
   for (let i = 0; i < width; i++) {

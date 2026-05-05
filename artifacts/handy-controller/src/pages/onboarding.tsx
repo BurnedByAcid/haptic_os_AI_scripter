@@ -100,24 +100,24 @@ export default function OnboardingPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md rounded-2xl border border-[#302840] bg-[#0D0B12] p-8 shadow-2xl shadow-[#A855F7]/5 space-y-6">
+      <div className="w-full max-w-md rounded-2xl border border-[#3D1515] bg-[#120404] p-8 shadow-2xl shadow-[#DC2626]/5 space-y-6">
         <div className="text-center space-y-1">
-          <h1 className="text-2xl font-bold text-white">Welcome to HapticOS</h1>
-          <p className="text-sm text-[#8CA9AD]">
+          <h1 className="text-2xl font-bold text-foreground">Welcome to HapticOS</h1>
+          <p className="text-sm text-muted-foreground">
             Choose a username to get started.
           </p>
         </div>
 
         <div className="space-y-6">
           <div>
-            <h2 className="text-base font-semibold text-white mb-1">Choose a Username</h2>
-            <p className="text-sm text-[#8CA9AD]">
+            <h2 className="text-base font-semibold text-foreground mb-1">Choose a Username</h2>
+            <p className="text-sm text-muted-foreground">
               This will identify you across the platform. You can't change it later.
             </p>
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="username" className="text-sm text-[#8CA9AD]">
+            <label htmlFor="username" className="text-sm text-muted-foreground">
               Username
             </label>
             <div className="relative">
@@ -127,7 +127,7 @@ export default function OnboardingPage() {
                 onChange={(e) => setUsername(e.target.value.toLowerCase())}
                 placeholder="e.g. cool_user42"
                 maxLength={32}
-                className="bg-[#17131F] border-[#302840] text-white pr-9 focus:border-[#A855F7] focus:ring-[#A855F7]"
+                className="bg-[#1E0707] border-[#3D1515] pr-9 focus:border-[#DC2626] focus:ring-[#DC2626]"
                 autoComplete="off"
                 spellCheck={false}
                 autoFocus
@@ -150,7 +150,7 @@ export default function OnboardingPage() {
             {usernameStatus === "available" && (
               <p className="text-xs text-green-400">Username is available.</p>
             )}
-            <p className="text-[11px] text-[#8CA9AD]">
+            <p className="text-[11px] text-muted-foreground">
               5–32 characters. Letters, numbers, hyphens, and underscores only.
             </p>
           </div>
@@ -158,7 +158,7 @@ export default function OnboardingPage() {
           {submitError && <p className="text-sm text-red-400">{submitError}</p>}
 
           <Button
-            className="w-full bg-[#A855F7] text-white font-bold hover:bg-[#A855F7]/90 disabled:opacity-40"
+            className="w-full bg-[#DC2626] text-white font-bold hover:bg-[#DC2626]/90 disabled:opacity-40"
             disabled={usernameStatus !== "available" || submitting}
             onClick={handleSubmit}
           >

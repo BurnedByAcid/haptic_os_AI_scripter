@@ -75,55 +75,55 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  /* Deep dark professional background — purple-tinted */
-  --background: 255 10% 4%;
-  --foreground: 210 40% 98%;
+  /* Deep dark red background with warm beige text */
+  --background: 0 45% 6%;
+  --foreground: 35 40% 88%;
 
-  --border: 255 5% 15%;
+  --border: 0 20% 18%;
   
-  --card: 255 10% 6%;
-  --card-foreground: 210 40% 98%;
-  --card-border: 255 5% 15%;
+  --card: 0 40% 7%;
+  --card-foreground: 35 40% 88%;
+  --card-border: 0 20% 18%;
 
-  --sidebar: 255 10% 5%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-border: 255 5% 15%;
-  --sidebar-primary: 270 85% 60%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 255 10% 12%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-ring: 270 85% 60%;
+  --sidebar: 0 42% 6%;
+  --sidebar-foreground: 35 40% 88%;
+  --sidebar-border: 0 20% 18%;
+  --sidebar-primary: 0 72% 55%;
+  --sidebar-primary-foreground: 35 40% 95%;
+  --sidebar-accent: 0 30% 11%;
+  --sidebar-accent-foreground: 35 40% 88%;
+  --sidebar-ring: 0 72% 55%;
 
-  --popover: 255 10% 6%;
-  --popover-foreground: 210 40% 98%;
-  --popover-border: 255 5% 15%;
+  --popover: 0 40% 7%;
+  --popover-foreground: 35 40% 88%;
+  --popover-border: 0 20% 18%;
 
-  /* Purple Fusion accent */
-  --primary: 270 85% 60%;
-  --primary-foreground: 0 0% 100%;
+  /* Crimson red accent */
+  --primary: 0 72% 55%;
+  --primary-foreground: 35 40% 95%;
 
-  /* Magenta secondary accent — echoes the logo gradient end */
-  --magenta: 300 80% 55%;
+  /* Rose secondary accent */
+  --magenta: 340 70% 55%;
   --color-magenta: hsl(var(--magenta));
 
-  --secondary: 255 5% 12%;
-  --secondary-foreground: 210 40% 98%;
+  --secondary: 0 20% 11%;
+  --secondary-foreground: 35 40% 88%;
 
-  --muted: 255 5% 12%;
-  --muted-foreground: 255 5% 65%;
+  --muted: 0 20% 11%;
+  --muted-foreground: 0 10% 60%;
 
-  --accent: 255 5% 15%;
-  --accent-foreground: 210 40% 98%;
+  --accent: 0 20% 14%;
+  --accent-foreground: 35 40% 88%;
 
   --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
+  --destructive-foreground: 35 40% 95%;
 
-  --input: 255 5% 15%;
-  --ring: 270 85% 60%;
+  --input: 0 20% 14%;
+  --ring: 0 72% 55%;
 
-  --chart-1: 270 85% 60%;
-  --chart-2: 280 80% 60%;
-  --chart-3: 340 80% 60%;
+  --chart-1: 0 72% 55%;
+  --chart-2: 340 70% 55%;
+  --chart-3: 20 80% 55%;
   --chart-4: 40 80% 60%;
   --chart-5: 120 80% 60%;
 
@@ -163,7 +163,7 @@
   textarea:focus-visible,
   select:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 1px #A855F7, 0 0 14px rgba(168, 85, 247, 0.35), 0 0 28px rgba(224, 64, 251, 0.15);
+    box-shadow: 0 0 0 1px #DC2626, 0 0 14px rgba(220, 38, 38, 0.35), 0 0 28px rgba(239, 68, 68, 0.15);
   }
 }
 
@@ -202,10 +202,10 @@
 
   @keyframes emblem-glow-disconnected {
     0%, 100% {
-      filter: drop-shadow(0 0 5px rgba(200, 80, 240, 0.55)) drop-shadow(0 0 10px rgba(200, 80, 240, 0.25));
+      filter: drop-shadow(0 0 5px rgba(220, 38, 38, 0.55)) drop-shadow(0 0 10px rgba(220, 38, 38, 0.25));
     }
     50% {
-      filter: drop-shadow(0 0 9px rgba(220, 100, 255, 0.85)) drop-shadow(0 0 18px rgba(200, 80, 240, 0.45));
+      filter: drop-shadow(0 0 9px rgba(239, 68, 68, 0.85)) drop-shadow(0 0 18px rgba(220, 38, 38, 0.45));
     }
   }
 

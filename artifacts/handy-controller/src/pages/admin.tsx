@@ -37,7 +37,7 @@ const PLAN_OPTIONS: { plan: Plan; label: string; icon: typeof Crown; desc: strin
 ];
 
 const FEATURE_META: Record<string, { label: string; icon: typeof Play; color: string }> = {
-  scripter:  { label: "Scripter",    icon: PenLine,   color: "text-purple-400" },
+  scripter:  { label: "Scripter",    icon: PenLine,   color: "text-red-400" },
   player:    { label: "Player",      icon: Play,      color: "text-blue-400" },
   community: { label: "Community",   icon: Users,     color: "text-green-400" },
   library:   { label: "Library",     icon: BookOpen,  color: "text-yellow-400" },
@@ -256,7 +256,7 @@ export default function Admin() {
               <FileText className="h-3.5 w-3.5" /> Content
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <StatCard label="Scripter Sessions" value={analytics?.content.scripterSessions ?? "—"} icon={PenLine} color="text-purple-400" />
+              <StatCard label="Scripter Sessions" value={analytics?.content.scripterSessions ?? "—"} icon={PenLine} color="text-red-400" />
               <StatCard label="Community Scripts" value={analytics?.content.communityScripts ?? "—"} icon={FileText} color="text-green-400" />
               <StatCard label="Script Views" value={analytics?.content.communityViews ?? "—"} icon={Eye} color="text-blue-400" />
               <StatCard label="Ratings" value={analytics?.content.communityRatings ?? "—"} icon={Star} color="text-yellow-400" />

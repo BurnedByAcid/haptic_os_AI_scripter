@@ -117,7 +117,7 @@ export default function Games() {
       }
 
       // Draw pipes
-      ctx.fillStyle = "hsl(270,85%,60%)"; // primary
+      ctx.fillStyle = "hsl(0,72%,55%)"; // primary
       gameState.current.pipes.forEach(p => {
         ctx.fillRect(p.x, 0, 60, p.y);
         ctx.fillRect(p.x, p.y + p.height, 60, canvas.height - p.y - p.height);

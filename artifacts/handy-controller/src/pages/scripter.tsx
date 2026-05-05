@@ -32,11 +32,11 @@ const STORAGE_KEY = "scripter_session_v1";
 
 /** 11 EQ bands — label, Hz range, display colour */
 const BD_BANDS: { label: string; range: [number, number]; color: string }[] = [
-  { label: "Sub",     range: [20,     60],   color: "#6366f1" },
-  { label: "Bass",    range: [60,    250],   color: "#8b5cf6" },
-  { label: "Lo-Mid",  range: [250,   500],   color: "#7c3aed" },
-  { label: "Mid",     range: [500,   1000],  color: "#a855f7" },
-  { label: "Up-Mid",  range: [1000,  2000],  color: "#c026d3" },
+  { label: "Sub",     range: [20,     60],   color: "#b91c1c" },
+  { label: "Bass",    range: [60,    250],   color: "#dc2626" },
+  { label: "Lo-Mid",  range: [250,   500],   color: "#ef4444" },
+  { label: "Mid",     range: [500,   1000],  color: "#f87171" },
+  { label: "Up-Mid",  range: [1000,  2000],  color: "#fca5a5" },
   { label: "Prsnc",   range: [2000,  4000],  color: "#0ea5e9" },
   { label: "Brill",   range: [4000,  6000],  color: "#10b981" },
   { label: "High",    range: [6000,  8000],  color: "#84cc16" },
@@ -692,7 +692,7 @@ export default function Scripter() {
 
     // Beat flash overlay
     if (isBeat) {
-      ctx.fillStyle = "rgba(168,85,247,0.18)";
+      ctx.fillStyle = "rgba(220,38,38,0.18)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
@@ -959,10 +959,10 @@ export default function Scripter() {
       ctx.fillText(fmtMs(t), x, H - 4);
     }
 
-    // ── Committed points (purple) ──
+    // ── Committed points ──
     const sorted = [...points].sort((a, b) => a.time - b.time);
     if (sorted.length > 0) {
-      ctx.strokeStyle = "hsl(270,85%,60%)";
+      ctx.strokeStyle = "hsl(0,72%,55%)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       sorted.forEach((p, i) => {
@@ -977,7 +977,7 @@ export default function Scripter() {
         if (x < -12 || x > W + 12) return;
         const y = H - (p.pos / 100) * H;
         const sel = selectedIds.has(p.id);
-        ctx.fillStyle = sel ? "hsl(270,85%,60%)" : "#fff";
+        ctx.fillStyle = sel ? "hsl(0,72%,55%)" : "#fff";
         ctx.beginPath();
         ctx.arc(x, y, sel ? 6 : 4, 0, Math.PI * 2);
         ctx.fill();
@@ -1017,9 +1017,9 @@ export default function Scripter() {
       const ry = Math.min(box.y1, box.y2);
       const rw = Math.abs(box.x2 - box.x1);
       const rh = Math.abs(box.y2 - box.y1);
-      ctx.fillStyle = "rgba(168,85,247,0.08)";
+      ctx.fillStyle = "rgba(220,38,38,0.08)";
       ctx.fillRect(rx, ry, rw, rh);
-      ctx.strokeStyle = "rgba(168,85,247,0.7)";
+      ctx.strokeStyle = "rgba(220,38,38,0.7)";
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 2]);
       ctx.strokeRect(rx, ry, rw, rh);
@@ -1677,10 +1677,10 @@ export default function Scripter() {
     const zone = vtDragLiveRef.current ?? vtZone;
     if (zone) {
       const { x, y, w, h } = zone;
-      ctx.strokeStyle = "hsl(270,85%,60%)";
+      ctx.strokeStyle = "hsl(0,72%,55%)";
       ctx.lineWidth = Math.max(1, canvas.width / 600);
       ctx.strokeRect(x, y, w, h);
-      ctx.fillStyle = "rgba(168,85,247,0.18)";
+      ctx.fillStyle = "rgba(220,38,38,0.18)";
       ctx.fillRect(x, y, w, h);
       // Dimension label — shows MIN/MAX suffix when a drag clamp is active
       const MIN_VID = 10, MAX_VID = 50;
@@ -1690,7 +1690,7 @@ export default function Scripter() {
       const label = `${w}${wSuffix}×${h}${hSuffix}`;
       const fontSize = Math.max(10, Math.round(canvas.width / 70));
       ctx.font = `bold ${fontSize}px monospace`;
-      ctx.fillStyle = "hsl(270,85%,60%)";
+      ctx.fillStyle = "hsl(0,72%,55%)";
       ctx.shadowColor = "#000";
       ctx.shadowBlur = 3;
       ctx.fillText(label, x + w + 3, y + fontSize);
@@ -2911,7 +2911,7 @@ export default function Scripter() {
                     <div className="flex gap-0.5 h-6">
                       {[0,100,0,100,0,100,0,100].map((v,i) => (
                         <div key={i} className="flex-1 bg-border/30 rounded-sm flex items-end overflow-hidden">
-                          <div className="w-full bg-violet-400/70 rounded-sm" style={{ height: `${v}%` }} />
+                          <div className="w-full bg-red-400/70 rounded-sm" style={{ height: `${v}%` }} />
                         </div>
                       ))}
                     </div>
