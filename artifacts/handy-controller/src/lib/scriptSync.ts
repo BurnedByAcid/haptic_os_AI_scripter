@@ -9,6 +9,50 @@ export interface Funscript {
   actions: FunscriptAction[];
 }
 
+// ─── Content-hash cache helpers ───────────────────────────────────────────────
+
+const CACHE_PREFIX = "hssp_sha_";
+
+/**
+ * Compute a SHA-256 hex digest of the canonicalized funscript JSON.
+ * Actions are sorted by `at` so two scripts with the same data but different
+ * insertion order produce the same hash.
+ */
+async function computeScriptHash(script: Funscript): Promise<string> {
+  const canonical = JSON.stringify({
+    actions: [...script.actions].sort((a, b) => a.at - b.at || a.pos - b.pos),
+  });
+  const encoded = new TextEncoder().encode(canonical);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function getCachedSha(contentHash: string): string | null {
+  try {
+    return sessionStorage.getItem(CACHE_PREFIX + contentHash);
+  } catch {
+    return null;
+  }
+}
+
+function setCachedSha(contentHash: string, sha: string): void {
+  try {
+    sessionStorage.setItem(CACHE_PREFIX + contentHash, sha);
+  } catch {
+    // sessionStorage unavailable — silently skip caching
+  }
+}
+
+function evictCachedSha(contentHash: string): void {
+  try {
+    sessionStorage.removeItem(CACHE_PREFIX + contentHash);
+  } catch {
+    // ignore
+  }
+}
+
 // ─── HDSP Engine (real-time rAF polling) ─────────────────────────────────────
 
 export class ScriptSyncEngine {
@@ -163,21 +207,63 @@ export class HSSPSyncEngine {
     const myToken = ++this.token;
     this.setStatus("uploading");
     try {
-      // Upload and calibrate in parallel
-      const [sha, offset] = await Promise.all([
-        uploadScript(script),
-        getServerTimeOffset(5)
-      ]);
-      // Discard if a newer prepare() was started while we were awaiting
+      // Compute a strong content hash to use as the cache key.
+      // This runs quickly and lets us skip the upload entirely on a cache hit.
+      const contentHash = await computeScriptHash(script);
       if (myToken !== this.token) return false;
-      if (typeof sha !== "string" || sha.length === 0) {
-        throw new Error("uploadScript returned an invalid SHA");
+
+      const cachedSha = getCachedSha(contentHash);
+
+      let sha: string;
+      let offset: number;
+
+      if (cachedSha) {
+        // Cache hit: skip upload, only calibrate server time
+        offset = await getServerTimeOffset(5);
+        if (myToken !== this.token) return false;
+
+        // Attempt setup with the cached SHA. If the server rejects it (e.g. the
+        // SHA expired on the backend), evict the bad entry and fall back to a
+        // fresh upload so this prepare() still succeeds.
+        try {
+          await hsspSetup(this.key, cachedSha);
+          sha = cachedSha;
+        } catch {
+          evictCachedSha(contentHash);
+          const [freshSha, freshOffset] = await Promise.all([
+            uploadScript(script),
+            getServerTimeOffset(5),
+          ]);
+          if (myToken !== this.token) return false;
+          if (typeof freshSha !== "string" || freshSha.length === 0) {
+            throw new Error("uploadScript returned an invalid SHA after cache eviction");
+          }
+          sha = freshSha;
+          offset = freshOffset;
+          setCachedSha(contentHash, sha);
+          await hsspSetup(this.key, sha);
+        }
+      } else {
+        // Cache miss: upload and calibrate in parallel
+        const [uploadedSha, serverOffset] = await Promise.all([
+          uploadScript(script),
+          getServerTimeOffset(5),
+        ]);
+        if (myToken !== this.token) return false;
+        if (typeof uploadedSha !== "string" || uploadedSha.length === 0) {
+          throw new Error("uploadScript returned an invalid SHA");
+        }
+        sha = uploadedSha;
+        offset = serverOffset;
+        // Store the SHA so subsequent prepare() calls with the same script
+        // content skip the upload (cache expires on tab/window close).
+        setCachedSha(contentHash, sha);
+        await hsspSetup(this.key, sha);
       }
+
+      if (myToken !== this.token) return false;
       this.sha = sha;
       this.serverOffset = offset;
-      // Run setup so device knows which script to play
-      await hsspSetup(this.key, sha);
-      if (myToken !== this.token) return false;
       this.setStatus("ready");
       return true;
     } catch (e) {
