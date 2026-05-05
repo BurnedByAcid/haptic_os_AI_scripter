@@ -1,7 +1,6 @@
-export const BASE = "https://www.handyfeeling.com/api/handy/v2";
-export const SYNC_BASE = "https://www.handyfeeling.com/api/server/v3";
+export const BASE = "https://www.handyfeeling.com/api/handy-rest/v3";
 
-// Handy v2 motion limits
+// Handy v3 motion limits
 // Max physical speed: 350 units/s (full stroke = 100 units)
 // HAMP velocity API takes 0-100 (% of max speed), so 100% = 350 units/s
 // HDSP velocity takes 0-1 (normalised), so 1.0 = max speed ≈ 350 units/s
@@ -32,12 +31,13 @@ export async function getStatus(key: string): Promise<HandyStatusResult> {
     let mode: number | undefined;
     if (connRes.status === "fulfilled" && connRes.value.ok) {
       const d = await connRes.value.json();
-      connected = !!d.connected;
+      // v3: result.connected nested under result wrapper
+      connected = !!(d.result?.connected ?? d.connected);
     }
     if (infoRes.status === "fulfilled" && infoRes.value.ok) {
       const d = await infoRes.value.json();
-      battery = d.hardware?.batteryLevel;
-      mode = d.mode;
+      // v3 DeviceInfo no longer carries battery — battery comes from SSE events
+      mode = d.result?.mode ?? d.mode;
     }
     return { connected, battery, mode };
   } catch {
@@ -72,9 +72,10 @@ export async function setHAMP(
       });
     }
     // Default stroke range: 60%-100% when not specified
+    // v3: stroke range moved from /hamp/slide to /slider/stroke
     const slideMin = opts.slideMin ?? 60;
     const slideMax = opts.slideMax ?? 100;
-    await fetch(`${BASE}/hamp/slide`, {
+    await fetch(`${BASE}/slider/stroke`, {
       method: "PUT",
       headers: headers(key),
       body: JSON.stringify({ min: slideMin / 100, max: slideMax / 100 })
@@ -86,12 +87,13 @@ export async function setHAMP(
 
 export async function setHDSP(key: string, position: number, velocity: number): Promise<void> {
   try {
+    // v3 XAVA body: { xa: absolute-position 0-1, va: absolute-velocity 0-1 }
     await fetch(`${BASE}/hdsp/xava`, {
       method: "PUT",
       headers: headers(key),
       body: JSON.stringify({
-        position: Math.max(0, Math.min(100, Math.round(position))) / 100,
-        velocity: Math.min(Math.round(velocity), 100) / 100
+        xa: Math.max(0, Math.min(100, Math.round(position))) / 100,
+        va: Math.min(Math.round(velocity), 100) / 100
       })
     });
   } catch (e) {
@@ -110,17 +112,18 @@ export async function stopDevice(key: string): Promise<void> {
 // ─── HSSP — Handy Sync Script Play ───────────────────────────────────────────
 
 /**
- * Fetch server time and return the offset (serverTime - localTime) in ms.
+ * Fetch server time and return the offset (server_time - localTime) in ms.
  * Average of multiple samples for accuracy.
+ * v3: response field is server_time (snake_case), not serverTime.
  */
 export async function getServerTimeOffset(samples = 5): Promise<number> {
   const offsets: number[] = [];
   for (let i = 0; i < samples; i++) {
     const t0 = Date.now();
-    const res = await fetch(`${SYNC_BASE}/servertime`);
+    const res = await fetch(`${BASE}/servertime`);
     const t1 = Date.now();
-    const { serverTime } = await res.json();
-    offsets.push(serverTime - Math.round((t0 + t1) / 2));
+    const { server_time } = await res.json();
+    offsets.push(server_time - Math.round((t0 + t1) / 2));
   }
   // Return median offset
   offsets.sort((a, b) => a - b);
@@ -128,28 +131,32 @@ export async function getServerTimeOffset(samples = 5): Promise<number> {
 }
 
 /**
- * Upload funscript JSON to Handy's sync server and return the SHA.
+ * Upload funscript JSON to Handy's sync server and return the script URL.
+ * v3: the sync server returns { url } which is passed directly to /hssp/setup.
  */
 export async function uploadScript(scriptJson: object): Promise<string> {
   const blob = new Blob([JSON.stringify(scriptJson)], { type: "application/json" });
   const formData = new FormData();
   formData.append("file", blob, "script.funscript");
-  const res = await fetch(`${SYNC_BASE}/syncFile`, { method: "POST", body: formData });
+  const res = await fetch(`${BASE}/syncFile`, { method: "POST", body: formData });
   if (!res.ok) throw new Error(`Script upload failed: ${res.status}`);
   const data = await res.json();
-  // API returns { url, sha } or similar
-  return (data.sha ?? data.url) as string;
+  // v3 sync server returns { url } — the URL is passed to /hssp/setup as { url }
+  const url = data.url as string | undefined;
+  if (!url) throw new Error("Script upload returned no URL");
+  return url;
 }
 
 /**
- * Tell the Handy which script to use (by SHA).
+ * Tell the Handy which script to use (by URL).
+ * v3: /hssp/setup takes { url } not { sha }.
  * Call once after upload, before play.
  */
-export async function hsspSetup(key: string, sha: string): Promise<void> {
+export async function hsspSetup(key: string, url: string): Promise<void> {
   const res = await fetch(`${BASE}/hssp/setup`, {
     method: "PUT",
     headers: headers(key),
-    body: JSON.stringify({ sha })
+    body: JSON.stringify({ url })
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -159,8 +166,9 @@ export async function hsspSetup(key: string, sha: string): Promise<void> {
 
 /**
  * Start or seek HSSP playback.
+ * v3: body fields are snake_case: { start_time, server_time }.
  * @param key            Connection key
- * @param serverOffset   ms offset = serverTime - localTime (from getServerTimeOffset)
+ * @param serverOffset   ms offset = server_time - localTime (from getServerTimeOffset)
  * @param startTimeMs    Current video position in ms
  */
 export async function hsspPlay(
@@ -168,11 +176,11 @@ export async function hsspPlay(
   serverOffset: number,
   startTimeMs: number
 ): Promise<void> {
-  const estimatedServerTime = Date.now() + serverOffset;
+  const server_time = Date.now() + serverOffset;
   const res = await fetch(`${BASE}/hssp/play`, {
     method: "PUT",
     headers: headers(key),
-    body: JSON.stringify({ estimatedServerTime, startTime: startTimeMs })
+    body: JSON.stringify({ start_time: startTimeMs, server_time })
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -182,10 +190,11 @@ export async function hsspPlay(
 
 /**
  * Stop HSSP playback.
+ * v3: /hssp/stop (was incorrectly /hamp/stop).
  */
 export async function hsspStop(key: string): Promise<void> {
   try {
-    await fetch(`${BASE}/hamp/stop`, { method: "PUT", headers: headers(key) });
+    await fetch(`${BASE}/hssp/stop`, { method: "PUT", headers: headers(key) });
   } catch (e) {
     console.error("hsspStop error", e);
   }
@@ -194,12 +203,12 @@ export async function hsspStop(key: string): Promise<void> {
 // Legacy combined helper kept for backwards compat
 export async function setHSSP(
   key: string,
-  sha: string,
+  url: string,
   serverTimeOffsetMs: number,
   startTimeMs = 0
 ): Promise<void> {
   try {
-    await hsspSetup(key, sha);
+    await hsspSetup(key, url);
     await hsspPlay(key, serverTimeOffsetMs, startTimeMs);
   } catch (e) {
     console.error("setHSSP error", e);

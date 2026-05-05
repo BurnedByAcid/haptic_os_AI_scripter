@@ -10,8 +10,11 @@ export interface Funscript {
 }
 
 // ─── Content-hash cache helpers ───────────────────────────────────────────────
+// The cache maps a content-hash of the funscript → the script URL returned by
+// the sync server. In v3 the sync server returns a URL (not a SHA), which is
+// passed directly to /hssp/setup as { url }.
 
-const CACHE_PREFIX = "hssp_sha_";
+const CACHE_PREFIX = "hssp_url_";
 
 /**
  * Compute a SHA-256 hex digest of the canonicalized funscript JSON.
@@ -29,7 +32,7 @@ async function computeScriptHash(script: Funscript): Promise<string> {
     .join("");
 }
 
-function getCachedSha(contentHash: string): string | null {
+function getCachedUrl(contentHash: string): string | null {
   try {
     return sessionStorage.getItem(CACHE_PREFIX + contentHash);
   } catch {
@@ -37,15 +40,15 @@ function getCachedSha(contentHash: string): string | null {
   }
 }
 
-function setCachedSha(contentHash: string, sha: string): void {
+function setCachedUrl(contentHash: string, url: string): void {
   try {
-    sessionStorage.setItem(CACHE_PREFIX + contentHash, sha);
+    sessionStorage.setItem(CACHE_PREFIX + contentHash, url);
   } catch {
     // sessionStorage unavailable — silently skip caching
   }
 }
 
-function evictCachedSha(contentHash: string): void {
+function evictCachedUrl(contentHash: string): void {
   try {
     sessionStorage.removeItem(CACHE_PREFIX + contentHash);
   } catch {
@@ -165,7 +168,8 @@ export type HSSPStatus = "idle" | "uploading" | "ready" | "error";
 
 export class HSSPSyncEngine {
   private key: string = "";
-  private sha: string | null = null;
+  /** The script URL returned by the sync server and confirmed by /hssp/setup. */
+  private scriptUrl: string | null = null;
   private serverOffset: number = 0;
   private status: HSSPStatus = "idle";
   private onStatusChange: ((s: HSSPStatus) => void) | null = null;
@@ -219,57 +223,57 @@ export class HSSPSyncEngine {
       const contentHash = await computeScriptHash(script);
       if (myToken !== this.token) return false;
 
-      const cachedSha = getCachedSha(contentHash);
+      const cachedUrl = getCachedUrl(contentHash);
 
-      let sha: string;
+      let scriptUrl: string;
       let offset: number;
 
-      if (cachedSha) {
+      if (cachedUrl) {
         // Cache hit: skip upload, only calibrate server time
         offset = await getServerTimeOffset(5);
         if (myToken !== this.token) return false;
 
-        // Attempt setup with the cached SHA. If the server rejects it (e.g. the
-        // SHA expired on the backend), evict the bad entry and fall back to a
+        // Attempt setup with the cached URL. If the server rejects it (e.g. the
+        // URL expired on the backend), evict the bad entry and fall back to a
         // fresh upload so this prepare() still succeeds.
         try {
-          await hsspSetup(this.key, cachedSha);
-          sha = cachedSha;
+          await hsspSetup(this.key, cachedUrl);
+          scriptUrl = cachedUrl;
         } catch {
-          evictCachedSha(contentHash);
-          const [freshSha, freshOffset] = await Promise.all([
+          evictCachedUrl(contentHash);
+          const [freshUrl, freshOffset] = await Promise.all([
             uploadScript(script),
             getServerTimeOffset(5),
           ]);
           if (myToken !== this.token) return false;
-          if (typeof freshSha !== "string" || freshSha.length === 0) {
-            throw new Error("uploadScript returned an invalid SHA after cache eviction");
+          if (typeof freshUrl !== "string" || freshUrl.length === 0) {
+            throw new Error("uploadScript returned an invalid URL after cache eviction");
           }
-          sha = freshSha;
+          scriptUrl = freshUrl;
           offset = freshOffset;
-          setCachedSha(contentHash, sha);
-          await hsspSetup(this.key, sha);
+          setCachedUrl(contentHash, scriptUrl);
+          await hsspSetup(this.key, scriptUrl);
         }
       } else {
         // Cache miss: upload and calibrate in parallel
-        const [uploadedSha, serverOffset] = await Promise.all([
+        const [uploadedUrl, serverOffset] = await Promise.all([
           uploadScript(script),
           getServerTimeOffset(5),
         ]);
         if (myToken !== this.token) return false;
-        if (typeof uploadedSha !== "string" || uploadedSha.length === 0) {
-          throw new Error("uploadScript returned an invalid SHA");
+        if (typeof uploadedUrl !== "string" || uploadedUrl.length === 0) {
+          throw new Error("uploadScript returned an invalid URL");
         }
-        sha = uploadedSha;
+        scriptUrl = uploadedUrl;
         offset = serverOffset;
-        // Store the SHA so subsequent prepare() calls with the same script
+        // Cache the URL so subsequent prepare() calls with the same script
         // content skip the upload (cache expires on tab/window close).
-        setCachedSha(contentHash, sha);
-        await hsspSetup(this.key, sha);
+        setCachedUrl(contentHash, scriptUrl);
+        await hsspSetup(this.key, scriptUrl);
       }
 
       if (myToken !== this.token) return false;
-      this.sha = sha;
+      this.scriptUrl = scriptUrl;
       this.serverOffset = offset;
       this.setStatus("ready");
       return true;
@@ -290,7 +294,7 @@ export class HSSPSyncEngine {
 
   /** Call on video play or seek-then-play. */
   async play(currentTimeMs: number): Promise<void> {
-    if (this.status !== "ready" || !this.sha || !this.key) return;
+    if (this.status !== "ready" || !this.scriptUrl || !this.key) return;
     try {
       await hsspPlay(this.key, this.serverOffset, currentTimeMs);
     } catch (e) {
@@ -316,7 +320,7 @@ export class HSSPSyncEngine {
 
   /** Reset state (e.g. when a new script is loaded). */
   reset() {
-    this.sha = null;
+    this.scriptUrl = null;
     this.serverOffset = 0;
     this.setStatus("idle");
   }
