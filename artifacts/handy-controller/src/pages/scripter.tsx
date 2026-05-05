@@ -351,6 +351,7 @@ export default function Scripter() {
   const vtPatchPreviewRef = useRef<HTMLCanvasElement>(null);
   const [vtTolerance, setVtTolerance] = useState(20); // RMS threshold 0-255
   const [vtMinDelay, setVtMinDelay] = useState(200);   // ms cooldown between triggers
+  const [vtFrameDebounce, setVtFrameDebounce] = useState(5); // frame-based debounce 1–5
   const [vtMovementLimit, setVtMovementLimit] = useState(300);
   const [vtChosenRange, setVtChosenRange] = useState<[number, number]>([0, 100]);
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
@@ -1535,7 +1536,9 @@ export default function Scripter() {
     if (videoUrl) drawVtFrame();
   }, [vtZone, videoUrl, currentTime, drawVtFrame]);
 
-  // Convert a CSS-space drag rect (clamped to 25×25px) into video pixel coords
+  // Convert a CSS-space drag rect into video pixel coords.
+  // Size is clamped to [10, 50] video pixels AFTER applying the canvas→video
+  // scale, so the constraint is always in native video resolution space.
   const cssDragToZone = useCallback((
     startCssX: number, startCssY: number,
     endCssX: number, endCssY: number,
@@ -1544,18 +1547,22 @@ export default function Scripter() {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    const MAX_CSS = 25;
+    const MIN_VID = 10;
+    const MAX_VID = 50;
     const rawCssW = endCssX - startCssX;
     const rawCssH = endCssY - startCssY;
-    const cssW = Math.max(1, Math.min(MAX_CSS, Math.abs(rawCssW)));
-    const cssH = Math.max(1, Math.min(MAX_CSS, Math.abs(rawCssH)));
-    const cssTlX = rawCssW >= 0 ? startCssX : startCssX - cssW;
-    const cssTlY = rawCssH >= 0 ? startCssY : startCssY - cssH;
+    const absCssW = Math.abs(rawCssW);
+    const absCssH = Math.abs(rawCssH);
+    const cssTlX = rawCssW >= 0 ? startCssX : startCssX - absCssW;
+    const cssTlY = rawCssH >= 0 ? startCssY : startCssY - absCssH;
+    // Clamp in video-pixel space
+    const vidW = Math.min(MAX_VID, Math.max(MIN_VID, Math.round(absCssW * scaleX)));
+    const vidH = Math.min(MAX_VID, Math.max(MIN_VID, Math.round(absCssH * scaleY)));
     return {
       x: Math.max(0, Math.round(cssTlX * scaleX)),
       y: Math.max(0, Math.round(cssTlY * scaleY)),
-      w: Math.max(1, Math.round(cssW * scaleX)),
-      h: Math.max(1, Math.round(cssH * scaleY)),
+      w: vidW,
+      h: vidH,
     };
   }, []);
 
@@ -1852,6 +1859,7 @@ export default function Scripter() {
         startMs, endMs, rangeMs, stepMs,
         tolerance: vtTolerance,
         minDelay:  vtMinDelay,
+        frameDebounce: vtFrameDebounce,
         nx, ny, nw, nh,
       });
     });
@@ -2185,7 +2193,7 @@ export default function Scripter() {
           )}
           {activeTab === "visual" && videoUrl && !vtZone && !vtDragging && (
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/70 text-xs text-muted-foreground px-3 py-1 rounded-full pointer-events-none z-20">
-              Click and drag on the video to draw sampling zone (max 25×25px)
+              Click and drag on the video to draw sampling zone (10–50 video px)
             </div>
           )}
         </div>
@@ -2788,7 +2796,7 @@ export default function Scripter() {
               <div className="rounded-lg border border-border/50 bg-card/40 p-3 flex flex-col gap-2">
                 <p className="text-xs text-muted-foreground">
                   {videoUrl
-                    ? "Click and drag on the video above to draw a sampling zone (capped at 25×25px on screen)."
+                    ? "Click and drag on the video above to draw a sampling zone (10–50 video pixels)."
                     : "Load a video using the toolbar above to get started."}
                 </p>
                 {vtZone && (
@@ -2853,6 +2861,15 @@ export default function Scripter() {
                     </div>
                     <Slider min={0} max={2000} step={50} value={[vtMinDelay]} onValueChange={v => setVtMinDelay(v[0])} />
                     <p className="text-[10px] text-muted-foreground mt-1">Cooldown between triggers — suppresses duplicate detections on held frames (default 200 ms)</p>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm font-medium">Frame Debounce</span>
+                      <span className="text-xs font-mono text-primary">{vtFrameDebounce} frame{vtFrameDebounce !== 1 ? "s" : ""}</span>
+                    </div>
+                    <Slider min={1} max={5} step={1} value={[vtFrameDebounce]} onValueChange={v => setVtFrameDebounce(v[0])} />
+                    <p className="text-[10px] text-muted-foreground mt-1">Suppress re-trigger for this many consecutive frames after a match (default 5)</p>
                   </div>
 
                   <div>

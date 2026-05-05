@@ -17,9 +17,10 @@
  *     refPatch: Uint8Array, patchW: number, patchH: number,
  *     startMs: number, endMs: number, rangeMs: number,
  *     stepMs: number,
- *     tolerance: number, minDelay: number,
+ *     tolerance: number, minDelay: number, frameDebounce: number,
  *     nx, ny, nw, nh: number }
  *     Initialise GPU/CPU matchers and all scan parameters.
+ *     frameDebounce: suppress re-trigger for N consecutive analyzed frames (1–5).
  *     Reply: { type: 'ready', mode: 'webgpu'|'webgl'|'cpu' }
  *
  *   { type: 'frame', bitmap: ImageBitmap, frameMs: number }
@@ -52,14 +53,17 @@ let glMatcher:   GlPatchMatcher    | null  = null;
 
 // ─── Scan-state machine (worker owns all of this) ─────────────────────────────
 
-let startMs         = 0;
-let rangeMs         = 1;
-let stepMs          = 1000 / 30; // 30 fps resolution
-let tolerance       = 0;
-let minDelay        = 0;
-let lastState       = false;
-let lastTriggerMs   = 0;
-let lastAnalyzedMs  = -Infinity; // frame scheduling: skip frames closer than stepMs
+let startMs              = 0;
+let rangeMs              = 1;
+let stepMs               = 1000 / 30; // 30 fps resolution
+let tolerance            = 0;
+let minDelay             = 0;
+let frameDebounce        = 5; // suppress re-trigger for N analyzed frames after a match
+let lastState            = false;
+let lastTriggerMs        = 0;
+let lastTriggerFrameIdx  = -Infinity; // analyzed-frame index of the last trigger
+let analyzedFrameCount   = 0;         // counts every frame that passes the stepMs gate
+let lastAnalyzedMs       = -Infinity; // frame scheduling: skip frames closer than stepMs
 let triggerTimes: number[] = [];
 
 // ─── Crop coordinates (normalised 0–1) ───────────────────────────────────────
@@ -131,27 +135,30 @@ async function computeRms(bitmap: ImageBitmap): Promise<number> {
 async function handleInit(msg: {
   refPatch: Uint8Array; patchW: number; patchH: number;
   startMs: number; rangeMs: number; stepMs: number;
-  tolerance: number; minDelay: number;
+  tolerance: number; minDelay: number; frameDebounce?: number;
   nx: number; ny: number; nw: number; nh: number;
 }): Promise<void> {
-  refPatch     = msg.refPatch;
-  patchPixW    = msg.patchW;
-  patchPixH    = msg.patchH;
-  startMs      = msg.startMs;
-  rangeMs      = msg.rangeMs;
-  stepMs       = msg.stepMs;
-  tolerance    = msg.tolerance;
-  minDelay     = msg.minDelay;
-  cropNx       = msg.nx;
-  cropNy       = msg.ny;
-  cropNw       = msg.nw;
-  cropNh       = msg.nh;
+  refPatch      = msg.refPatch;
+  patchPixW     = msg.patchW;
+  patchPixH     = msg.patchH;
+  startMs       = msg.startMs;
+  rangeMs       = msg.rangeMs;
+  stepMs        = msg.stepMs;
+  tolerance     = msg.tolerance;
+  minDelay      = msg.minDelay;
+  frameDebounce = msg.frameDebounce ?? 5;
+  cropNx        = msg.nx;
+  cropNy        = msg.ny;
+  cropNw        = msg.nw;
+  cropNh        = msg.nh;
 
   // Reset state machine for this scan
-  lastState       = false;
-  lastTriggerMs   = msg.startMs - msg.minDelay; // allows trigger at very first frame
-  lastAnalyzedMs  = -Infinity;
-  triggerTimes    = [];
+  lastState            = false;
+  lastTriggerMs        = msg.startMs - msg.minDelay; // allows trigger at very first frame
+  lastTriggerFrameIdx  = -Infinity;
+  analyzedFrameCount   = 0;
+  lastAnalyzedMs       = -Infinity;
+  triggerTimes         = [];
 
   // ── Try WebGPU (navigator.gpu available in workers) ──
   try {
@@ -205,12 +212,16 @@ async function handleFrame(bitmap: ImageBitmap, frameMs: number): Promise<void> 
     bitmap.close();
 
     lastAnalyzedMs = frameMs;
+    analyzedFrameCount++;
 
     // ── Trigger detection ─────────────────────────────────────────────────
     const matched = rms < tolerance;
-    if (matched && !lastState && frameMs - lastTriggerMs >= minDelay) {
+    const msOk    = frameMs - lastTriggerMs >= minDelay;
+    const frameOk = analyzedFrameCount - lastTriggerFrameIdx >= frameDebounce;
+    if (matched && !lastState && msOk && frameOk) {
       triggerTimes.push(frameMs);
-      lastTriggerMs = frameMs;
+      lastTriggerMs       = frameMs;
+      lastTriggerFrameIdx = analyzedFrameCount;
     }
     lastState = matched;
 
