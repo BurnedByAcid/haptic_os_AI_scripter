@@ -127,6 +127,69 @@ export default function Player() {
   const [recordedActions, setRecordedActions] = useState<RecordedAction[]>([]);
   const recordRef = useRef({ isRecording: false, actions: [] as RecordedAction[] });
 
+  // Resizable video / waveform panels
+  const TOTAL_HEIGHT = 500;
+  const HANDLE_HEIGHT = 8;
+  const MIN_VIDEO_HEIGHT = 200;
+  const MIN_WAVEFORM_HEIGHT = 60;
+  const [videoHeight, setVideoHeight] = useState(380);
+  const waveformHeight = TOTAL_HEIGHT - HANDLE_HEIGHT - videoHeight;
+  const dragStartRef = useRef<{ startY: number; startVideoHeight: number } | null>(null);
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+  const dragHandleRef = useRef<HTMLDivElement>(null);
+
+  const startDrag = useCallback((startY: number) => {
+    dragStartRef.current = { startY, startVideoHeight: videoHeight };
+
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      if (!dragStartRef.current) return;
+      ev.preventDefault();
+      const y = "touches" in ev ? (ev as TouchEvent).touches[0].clientY : (ev as MouseEvent).clientY;
+      const delta = y - dragStartRef.current.startY;
+      const newVideoHeight = Math.min(
+        TOTAL_HEIGHT - HANDLE_HEIGHT - MIN_WAVEFORM_HEIGHT,
+        Math.max(MIN_VIDEO_HEIGHT, dragStartRef.current.startVideoHeight + delta)
+      );
+      setVideoHeight(newVideoHeight);
+    };
+
+    const onUp = () => {
+      dragStartRef.current = null;
+      dragCleanupRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchend", onUp);
+    };
+
+    dragCleanupRef.current = onUp;
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchend", onUp);
+  }, [videoHeight]);
+
+  const handleMouseDragStart = useCallback((e: React.MouseEvent) => {
+    startDrag(e.clientY);
+  }, [startDrag]);
+
+  // Attach a non-passive touchstart listener to the drag handle so preventDefault works
+  useEffect(() => {
+    const handle = dragHandleRef.current;
+    if (!handle) return;
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      startDrag(e.touches[0].clientY);
+    };
+    handle.addEventListener("touchstart", onTouchStart, { passive: false });
+    return () => handle.removeEventListener("touchstart", onTouchStart);
+  }, [startDrag]);
+
+  // Clean up any active drag listeners when the component unmounts
+  useEffect(() => {
+    return () => { dragCleanupRef.current?.(); };
+  }, []);
+
   // Keep engine keys in sync
   useEffect(() => {
     syncEngine.setKey(key);
@@ -537,108 +600,133 @@ export default function Player() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
         <div className="lg:col-span-2 flex flex-col gap-4">
-          <Card className="flex-1 bg-black overflow-hidden relative border-border/50 min-h-[300px] flex flex-col">
-            {videoUrl ? (
-              <div className="flex-1 min-h-0 relative group">
-                <video
-                  ref={videoRef}
-                  src={videoUrl}
-                  className="w-full h-full object-contain"
-                  onPlay={handlePlay}
-                  onPause={handlePause}
-                  onSeeking={handleSeeking}
-                  onSeeked={handleSeeked}
-                  onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
-                  preload="auto"
-                  controls={false}
-                />
+          {/* Video + Waveform resizable container */}
+          <div className="flex flex-col" style={{ height: `${TOTAL_HEIGHT}px` }}>
+            {/* Video card */}
+            <Card
+              className="bg-black overflow-hidden relative border-border/50 flex flex-col flex-shrink-0"
+              style={{ height: `${videoHeight}px` }}
+            >
+              {videoUrl ? (
+                <div className="flex-1 min-h-0 relative group">
+                  <video
+                    ref={videoRef}
+                    src={videoUrl}
+                    className="w-full h-full object-contain"
+                    onPlay={handlePlay}
+                    onPause={handlePause}
+                    onSeeking={handleSeeking}
+                    onSeeked={handleSeeked}
+                    onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
+                    preload="auto"
+                    controls={false}
+                  />
 
-                {/* Tap-anywhere Finish Mode zone */}
-                {isPlaying && connected && !finishMode && !isRecording && (
-                  <div
-                    className="absolute inset-0 flex items-end justify-center pb-6 cursor-pointer select-none"
-                    onClick={e => { e.stopPropagation(); triggerFinishMode(); }}
-                    title="Tap anywhere to trigger Finish Mode"
-                  >
-                    <div className="opacity-0 hover:opacity-100 transition-opacity duration-200 bg-black/60 backdrop-blur text-white text-sm font-bold px-6 py-3 rounded-full border border-white/30 flex items-center gap-2 pointer-events-none">
-                      <Zap className="h-4 w-4 text-primary" /> Tap anywhere → Finish Mode
+                  {/* Tap-anywhere Finish Mode zone */}
+                  {isPlaying && connected && !finishMode && !isRecording && (
+                    <div
+                      className="absolute inset-0 flex items-end justify-center pb-6 cursor-pointer select-none"
+                      onClick={e => { e.stopPropagation(); triggerFinishMode(); }}
+                      title="Tap anywhere to trigger Finish Mode"
+                    >
+                      <div className="opacity-0 hover:opacity-100 transition-opacity duration-200 bg-black/60 backdrop-blur text-white text-sm font-bold px-6 py-3 rounded-full border border-white/30 flex items-center gap-2 pointer-events-none">
+                        <Zap className="h-4 w-4 text-primary" /> Tap anywhere → Finish Mode
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Recording overlay */}
-                {isRecording && (
-                  <div className="absolute inset-0 border-4 border-red-500 pointer-events-none">
-                    <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-sm font-bold px-3 py-1.5 rounded-full">
-                      <Circle className="h-3 w-3 fill-white animate-pulse" /> RECORDING
+                  {/* Recording overlay */}
+                  {isRecording && (
+                    <div className="absolute inset-0 border-4 border-red-500 pointer-events-none">
+                      <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-sm font-bold px-3 py-1.5 rounded-full">
+                        <Circle className="h-3 w-3 fill-white animate-pulse" /> RECORDING
+                      </div>
+                      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white text-xs bg-black/60 backdrop-blur px-3 py-1.5 rounded-full">
+                        {recordedActions.length} strokes recorded
+                      </div>
                     </div>
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white text-xs bg-black/60 backdrop-blur px-3 py-1.5 rounded-full">
+                  )}
+
+                  {finishMode && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="bg-primary/20 border border-primary rounded-full px-8 py-4 text-primary font-bold text-xl animate-pulse">
+                        <Zap className="inline mr-2 h-6 w-6" /> FINISHING...
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : embedUrl ? (
+                <div className="flex-1 min-h-0 relative">
+                  <iframe
+                    src={embedUrl}
+                    className="w-full h-full border-0"
+                    allowFullScreen
+                    allow="autoplay; fullscreen; picture-in-picture"
+                    title="Embedded video"
+                  />
+                  {recordedActions.length > 0 && (
+                    <div className="absolute top-3 right-3 bg-black/80 text-white text-xs px-3 py-1.5 rounded-full">
                       {recordedActions.length} strokes recorded
                     </div>
-                  </div>
-                )}
-
-                {finishMode && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="bg-primary/20 border border-primary rounded-full px-8 py-4 text-primary font-bold text-xl animate-pulse">
-                      <Zap className="inline mr-2 h-6 w-6" /> FINISHING...
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : embedUrl ? (
-              <div className="flex-1 min-h-0 relative">
-                <iframe
-                  src={embedUrl}
-                  className="w-full h-full border-0"
-                  allowFullScreen
-                  allow="autoplay; fullscreen; picture-in-picture"
-                  title="Embedded video"
-                />
-                {recordedActions.length > 0 && (
-                  <div className="absolute top-3 right-3 bg-black/80 text-white text-xs px-3 py-1.5 rounded-full">
-                    {recordedActions.length} strokes recorded
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
-                <Upload className="h-12 w-12 mb-4 opacity-50" />
-                <h3 className="text-xl font-medium text-foreground mb-2">No Video Loaded</h3>
-                <p className="mb-4 max-w-sm text-sm">Load a local file or paste a URL from YouTube, Pornhub, xVideos, and more.</p>
-              </div>
-            )}
-
-            {/* Controls strip — directly below the video, inside the card */}
-            {videoUrl && (
-              <div className="bg-card/80 border-t border-border/40 px-4 py-2 flex-shrink-0">
-                <VideoControlBar
-                  videoRef={videoRef}
-                  extraControls={isRecording ? (
-                    <Button size="sm" variant="destructive" onClick={recordPoint} className="text-xs h-7 gap-1.5 font-bold">
-                      ● STROKE
-                    </Button>
-                  ) : undefined}
-                />
-              </div>
-            )}
-          </Card>
-
-          {/* Funscript waveform */}
-          <Card className="border-border/50 bg-card/50 overflow-hidden">
-            <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Waveform</span>
-              {activeScript && (
-                <span className="text-[10px] text-muted-foreground">{activeScript.actions.length} points · click to seek</span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
+                  <Upload className="h-12 w-12 mb-4 opacity-50" />
+                  <h3 className="text-xl font-medium text-foreground mb-2">No Video Loaded</h3>
+                  <p className="mb-4 max-w-sm text-sm">Load a local file or paste a URL from YouTube, Pornhub, xVideos, and more.</p>
+                </div>
               )}
+
+              {/* Controls strip — directly below the video, inside the card */}
+              {videoUrl && (
+                <div className="bg-card/80 border-t border-border/40 px-4 py-2 flex-shrink-0">
+                  <VideoControlBar
+                    videoRef={videoRef}
+                    extraControls={isRecording ? (
+                      <Button size="sm" variant="destructive" onClick={recordPoint} className="text-xs h-7 gap-1.5 font-bold">
+                        ● STROKE
+                      </Button>
+                    ) : undefined}
+                  />
+                </div>
+              )}
+            </Card>
+
+            {/* Drag handle */}
+            <div
+              ref={dragHandleRef}
+              className="flex-shrink-0 h-2 flex items-center justify-center cursor-row-resize group relative z-10 select-none"
+              style={{ touchAction: "none" }}
+              onMouseDown={handleMouseDragStart}
+            >
+              <div className="w-full h-px bg-border/50 group-hover:bg-primary/50 transition-colors duration-150" />
+              <div className="absolute flex items-center justify-center w-10 h-4 rounded-sm bg-border/80 group-hover:bg-primary/30 transition-colors duration-150 border border-border group-hover:border-primary/50">
+                <div className="flex flex-col gap-[3px]">
+                  <div className="w-5 h-px bg-muted-foreground/60 group-hover:bg-primary/80 transition-colors duration-150 rounded-full" />
+                  <div className="w-5 h-px bg-muted-foreground/60 group-hover:bg-primary/80 transition-colors duration-150 rounded-full" />
+                </div>
+              </div>
             </div>
-            <FunscriptWaveform
-              script={activeScript ?? null}
-              videoRef={videoRef}
-              className="w-full"
-              style={{ height: "96px" }}
-            />
-          </Card>
+
+            {/* Funscript waveform */}
+            <Card
+              className="border-border/50 bg-card/50 overflow-hidden flex flex-col flex-shrink-0"
+              style={{ height: `${waveformHeight}px` }}
+            >
+              <div className="px-4 pt-3 pb-1 flex items-center justify-between flex-shrink-0">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Waveform</span>
+                {activeScript && (
+                  <span className="text-[10px] text-muted-foreground">{activeScript.actions.length} points · click to seek</span>
+                )}
+              </div>
+              <FunscriptWaveform
+                script={activeScript ?? null}
+                videoRef={videoRef}
+                className="w-full flex-1 min-h-0"
+              />
+            </Card>
+          </div>
 
           {/* Script recorder */}
           <Card className="border-border/50 bg-card/50">
