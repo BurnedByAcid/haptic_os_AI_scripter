@@ -57,6 +57,31 @@ function niceTickMs(halfWindowMs: number): number {
   return 60000;
 }
 
+/**
+ * Immediately download a raw .funscript where every detected timestamp
+ * sits at position 50 (neutral midpoint). Used by all three detector flows:
+ * Beat Detector (mic / audio file / video audio) and Video Analysis.
+ */
+function downloadRawFunscript(timestampsMs: number[], nameHint: string): void {
+  if (timestampsMs.length === 0) return;
+  const sorted = [...timestampsMs].sort((a, b) => a - b);
+  const script = {
+    version: "1.0",
+    inverted: false,
+    range: 90,
+    actions: sorted.map(at => ({ at, pos: 50 })),
+  };
+  const blob = new Blob([JSON.stringify(script, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${nameHint}.funscript`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 /** Format milliseconds as a short time label. */
 function fmtMs(ms: number): string {
   const s = ms / 1000;
@@ -455,6 +480,10 @@ export default function Scripter() {
   const bdRecordStartRef = useRef(0);
   const bdBeatPosRef = useRef(0); // alternates 0 ↔ 100
   const [bdPointsAdded, setBdPointsAdded] = useState(0);
+  /** Beat timestamps (ms) accumulated during the current recording session. */
+  const bdSessionTimestampsRef = useRef<number[]>([]);
+  /** Tracks the previous bdIsRecording value to detect stop transitions. */
+  const bdPrevIsRecordingRef = useRef(false);
 
   const [bdBandEnabled, setBdBandEnabled] = useState<boolean[]>(() => Array(11).fill(true));
   const bdBandEnabledRef = useRef<boolean[]>(Array(11).fill(true));
@@ -472,6 +501,18 @@ export default function Scripter() {
 
   useEffect(() => { bdSensitivityRef.current = bdSensitivity; }, [bdSensitivity]);
   useEffect(() => { bdIsRecordingRef.current = bdIsRecording; }, [bdIsRecording]);
+
+  // Auto-download raw funscript when a Beat Detector session ends.
+  // Fires on every bdIsRecording false→true→false cycle; skipped on unmount
+  // (mountedRef.current is false by then).
+  useEffect(() => {
+    const wasRecording = bdPrevIsRecordingRef.current;
+    bdPrevIsRecordingRef.current = bdIsRecording;
+    if (wasRecording && !bdIsRecording && bdSessionTimestampsRef.current.length > 0 && mountedRef.current) {
+      downloadRawFunscript(bdSessionTimestampsRef.current, "beat-detect");
+      bdSessionTimestampsRef.current = [];
+    }
+  }, [bdIsRecording]);
   useEffect(() => { bdBandEnabledRef.current = bdBandEnabled; }, [bdBandEnabled]);
   useEffect(() => { bdCleanBandRef.current = bdCleanBand; }, [bdCleanBand]);
   useEffect(() => { bdCleanOptsRef.current = bdCleanOpts; }, [bdCleanOpts]);
@@ -586,6 +627,7 @@ export default function Scripter() {
         bdBeatPosRef.current = pos === 0 ? 100 : 0;
         setPoints(prev => [...prev, { id: crypto.randomUUID(), time: beatMs, pos }]);
         setBdPointsAdded(c => c + 1);
+        bdSessionTimestampsRef.current.push(beatMs);
       }
     }
 
@@ -826,6 +868,7 @@ export default function Scripter() {
     if (!bdIsRecordingRef.current) {
       bdRecordStartRef.current = performance.now();
       bdBeatPosRef.current = 100; // first beat will be 100
+      bdSessionTimestampsRef.current = []; // reset for new session
       setBdPointsAdded(0);
       setBdIsRecording(true);
     } else {
@@ -2108,6 +2151,9 @@ export default function Scripter() {
 
     // ── Post-processing (skipped on cancellation) ─────────────────────────────
     if (vtCancelRef.current) return;
+
+    // Auto-download raw funscript: every detection at the neutral midpoint.
+    downloadRawFunscript(triggerTimes, "video-analysis");
 
     // Commit all detections at the neutral midpoint — one pos value per trigger.
     setVtPreviewPoints(triggerTimes.map(time => ({
