@@ -173,6 +173,8 @@ export class HSSPSyncEngine {
   private onReady: (() => void) | null = null;
   /** Monotonically-increasing token; stale async operations are discarded. */
   private token: number = 0;
+  /** Token of the last prepare() that already fired an error — prevents duplicate toasts. */
+  private errorFiredToken: number = -1;
 
   setKey(key: string) {
     this.key = key;
@@ -274,8 +276,13 @@ export class HSSPSyncEngine {
     } catch (e) {
       if (myToken !== this.token) return false;
       console.error("HSSP prepare failed:", e);
-      const msg = e instanceof Error ? e.message : "Unknown error";
-      this.onErrorChange?.(msg);
+      // Fire the error callback at most once per prepare() call so rapid script
+      // switches that each fail cannot stack multiple toasts for the same failure.
+      if (this.errorFiredToken !== myToken) {
+        this.errorFiredToken = myToken;
+        const msg = e instanceof Error ? e.message : "Unknown error";
+        this.onErrorChange?.(msg);
+      }
       this.setStatus("error");
       return false;
     }

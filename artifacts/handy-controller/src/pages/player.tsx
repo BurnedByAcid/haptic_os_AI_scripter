@@ -124,17 +124,23 @@ export default function Player() {
     hsspEngine.setKey(key);
   }, [key]);
 
-  // Subscribe to HSSP status changes and errors
+  // Keep a stable ref to toast so the subscription effect never needs to re-run.
+  const toastRef = useRef(toast);
+  useEffect(() => { toastRef.current = toast; }, [toast]);
+
+  // Subscribe to HSSP status changes and errors — registered once, never re-registered.
   useEffect(() => {
     hsspEngine.onStatus(setHsspStatus);
     hsspEngine.onError((msg) => {
-      toast({
+      toastRef.current({
         title: "Script upload failed — using direct sync instead",
         description: msg,
         variant: "destructive",
       });
     });
-  }, [toast]);
+    // Empty deps: register exactly once. toastRef always holds the latest toast.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load item passed from Library
   useEffect(() => {
