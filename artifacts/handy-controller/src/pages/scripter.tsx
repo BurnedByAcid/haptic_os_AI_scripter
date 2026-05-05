@@ -1485,10 +1485,25 @@ export default function Scripter() {
   };
 
   const handleLoadVideoUrl = async () => {
-    const trimmed = urlInput.trim();
-    if (!trimmed) { setUrlError("Please paste a video URL."); return; }
-    const err = validateVideoUrl(trimmed);
-    if (err) { setUrlError(err.message); return; }
+    let trimmed = urlInput.trim();
+    if (!trimmed) { setUrlError("Please paste a video URL or embed code."); return; }
+
+    // ── Embed-code handling ───────────────────────────────────────────────────
+    // If the user pasted an <iframe src="..."> snippet, pull out the src URL
+    // and send it straight to yt-dlp; skip the allowlist check because the
+    // src is an embed player URL, not a page URL.
+    const embedMatch = trimmed.match(/src=["']([^"']+)["']/i);
+    const fromEmbedCode = embedMatch !== null;
+    if (fromEmbedCode) {
+      trimmed = embedMatch![1];
+      try { new URL(trimmed); } catch {
+        setUrlError("Could not extract a valid URL from that embed code."); return;
+      }
+    } else {
+      // Normal URL — run the allowlist check.
+      const err = validateVideoUrl(trimmed);
+      if (err) { setUrlError(err.message); return; }
+    }
 
     let parsed: URL;
     try { parsed = new URL(trimmed); } catch {
@@ -1496,8 +1511,9 @@ export default function Scripter() {
     }
 
     // Direct video file URL — no resolution needed; load immediately.
+    // (Skip this shortcut for embed-extracted URLs — they need yt-dlp.)
     const isDirectVideo = /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(parsed.pathname);
-    if (isDirectVideo) {
+    if (isDirectVideo && !fromEmbedCode) {
       const name = decodeURIComponent(parsed.pathname.split("/").pop() || "video");
       setVideoUrl(trimmed);
       setVideoFileName(name);
@@ -1508,8 +1524,8 @@ export default function Scripter() {
       return;
     }
 
-    // Page URL — resolve via yt-dlp on the backend then proxy through our server
-    // so crossOrigin="anonymous" + canvas frame capture works for analysis.
+    // Page URL or embed src — resolve via yt-dlp on the backend then proxy
+    // through our server so crossOrigin="anonymous" + canvas frame capture works.
     setUrlResolving(true);
     setUrlError(null);
     try {
@@ -1522,7 +1538,7 @@ export default function Scripter() {
       );
       const data = await res.json() as { token?: string; title?: string; error?: string };
       if (!res.ok || !data.token) {
-        setUrlError(data.error ?? "Could not resolve that URL. Try a direct .mp4 link or load a file.");
+        setUrlError(data.error ?? "Could not resolve that URL. Try a direct .mp4 link, load a file, or paste the site's embed code.");
         return;
       }
       const proxyUrl = `${API_BASE}/api/video/stream/${data.token}`;
@@ -3404,13 +3420,13 @@ export default function Scripter() {
           <DialogHeader>
             <DialogTitle>Load video from URL</DialogTitle>
             <DialogDescription>
-              Paste any video page URL or a direct file link (.mp4, .webm, .ogg, .mov). Page URLs from supported sites are resolved automatically.
+              Paste a page URL, a direct video link (.mp4 / .webm), or an embed code from any site. Embed codes are accepted when the page URL is blocked.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
             <Input
-              type="url"
-              placeholder="https://example.com/video.mp4 or page URL"
+              type="text"
+              placeholder="https://example.com/video.mp4  or  <iframe src=…>"
               value={urlInput}
               onChange={(e) => { setUrlInput(e.target.value); if (urlError) setUrlError(null); }}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void handleLoadVideoUrl(); } }}
@@ -3447,7 +3463,7 @@ export default function Scripter() {
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              Supported: direct video files and most video hosting sites. If a site blocks the resolver, download the file and use Load Video instead.
+              Supported: direct video files, most video hosting sites, and embed codes. If a site blocks URL resolution, copy the embed code from the site&apos;s share menu and paste it here.
             </p>
           </div>
           <DialogFooter>

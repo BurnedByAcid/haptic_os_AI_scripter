@@ -312,8 +312,21 @@ export default function Player() {
   }, [getToken, toast]);
 
   const handleUrlLoad = async () => {
-    const raw = urlInput.trim();
+    let raw = urlInput.trim();
     if (!raw) return;
+
+    // ── Embed-code handling ───────────────────────────────────────────────────
+    // If the user pasted an <iframe src="…"> snippet (copied from a site's
+    // share/embed menu), extract the src and use it directly as the embed URL.
+    const embedMatch = raw.match(/src=["']([^"']+)["']/i);
+    if (embedMatch) {
+      const src = embedMatch[1];
+      try { new URL(src); } catch { return; } // malformed src — ignore
+      setEmbedUrl(src);
+      setVideoUrl(null);
+      setVideoMode("embed");
+      return;
+    }
 
     const detected = detectEmbedUrl(raw);
     if (!detected) return; // malformed URL
@@ -500,7 +513,7 @@ export default function Player() {
               <>
                 <Input
                   className="flex-1 h-9 text-sm bg-background/50 border-border/50"
-                  placeholder="Paste YouTube, Pornhub, xVideos, xHamster, Vimeo, or direct video URL…"
+                  placeholder="Paste a URL or an <iframe src=…> embed code…"
                   value={urlInput}
                   onChange={e => setUrlInput(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleUrlLoad()}
@@ -516,7 +529,7 @@ export default function Player() {
           </div>
           {videoMode !== "file" && (
             <p className="text-[11px] text-muted-foreground mt-1.5 ml-1">
-              Supports YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo, or any direct .mp4/.webm URL
+  Supports page URLs (YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo) and embed codes — paste the &lt;iframe&gt; from any site&apos;s share menu
             </p>
           )}
         </CardContent>
