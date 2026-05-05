@@ -5,7 +5,7 @@ import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Scissors, Upload, Play, Pause, Download, X, Activity, Square, RefreshCw } from "lucide-react";
+import { Scissors, Upload, Play, Pause, Download, X, Activity, Square, RefreshCw, RotateCcw } from "lucide-react";
 
 export const AUDIO_CLEANER_SESSION_KEY = "hc_bd_from_cleaner";
 
@@ -370,7 +370,7 @@ export default function AudioCleaner() {
 
   const isProcessing = step === "extracting" || step === "processing" || cancelling;
 
-  const handleStart = useCallback(() => {
+  const runCurrentFile = useCallback(() => {
     if (!selectedFileRef.current || isProcessing) return;
     processFile(selectedFileRef.current);
   }, [processFile, isProcessing]);
@@ -600,7 +600,7 @@ export default function AudioCleaner() {
             <Card className="bg-card/50 border-primary/20">
               <CardContent className="pt-5 flex flex-col gap-3">
                 <p className="text-sm text-muted-foreground">File ready. Adjust options then start processing.</p>
-                <Button className="w-full gap-2" onClick={handleStart}>
+                <Button className="w-full gap-2" onClick={runCurrentFile}>
                   <Play className="h-4 w-4" />
                   Start Processing
                 </Button>
@@ -675,6 +675,14 @@ export default function AudioCleaner() {
                     Download WAV
                   </Button>
                 </div>
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  onClick={runCurrentFile}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Re-process with current options
+                </Button>
                 <Button
                   className="w-full gap-2"
                   onClick={sendToScripter}
