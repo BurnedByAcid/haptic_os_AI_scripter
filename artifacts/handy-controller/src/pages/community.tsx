@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { validateVideoUrl, validateAndParseFunscriptFile } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
 import { Link, useLocation } from "wouter";
+import { useAppSettings } from "@/hooks/use-app-settings";
+import { funscriptJsonToCSV, triggerDownload } from "@/lib/script-export";
 import { TagPicker, ActiveTagChips, CardTagChips } from "@/components/tag-picker";
 import { parseTagsFilter, MAX_TAG_FILTERS, type LibraryTag } from "@workspace/validation";
 
@@ -137,6 +139,7 @@ export default function Community() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const { reportAction } = useBlockedReport();
+  const { scriptOutputFiletype } = useAppSettings();
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<{
@@ -434,12 +437,22 @@ export default function Community() {
       const res = await fetch(`${API}/api/community/${s.id}`, { headers });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json() as CommunityScript & { funscript: string };
-      const blob = new Blob([data.funscript], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `${s.title.replace(/[^a-z0-9]/gi, "_")}.funscript`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      const safeName = s.title.replace(/[^a-z0-9]/gi, "_");
+
+      let content: string;
+      let mimeType: string;
+      let ext: string;
+      if (scriptOutputFiletype === "csv") {
+        content = funscriptJsonToCSV(data.funscript) ?? "";
+        mimeType = "text/csv";
+        ext = "csv";
+      } else {
+        content = data.funscript;
+        mimeType = "application/json";
+        ext = "funscript";
+      }
+
+      triggerDownload(content, `${safeName}.${ext}`, mimeType);
     } catch {
       toast({ title: "Download failed", variant: "destructive" });
     }

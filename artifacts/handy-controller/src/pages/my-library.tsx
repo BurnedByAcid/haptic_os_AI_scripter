@@ -32,6 +32,8 @@ import {
 } from "@/lib/file-handle-store";
 import { validateAndParseFunscriptFile, validateVideoUrl, sanitizeName } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
+import { useAppSettings } from "@/hooks/use-app-settings";
+import { funscriptJsonToCSV, triggerDownload } from "@/lib/script-export";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 
@@ -920,6 +922,7 @@ export default function MyLibrary() {
   const { isPro } = useSubscription();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { scriptOutputFiletype } = useAppSettings();
   const [location, setLocation] = useLocation();
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [shareEntry, setShareEntry] = useState<LibraryEntry | null>(null);
@@ -1105,12 +1108,22 @@ export default function MyLibrary() {
       const res = await fetch(`${API}/api/library/${entry.id}/funscript`, { headers });
       if (!res.ok) throw new Error("Failed to fetch");
       const { funscript } = await res.json() as { funscript: string };
-      const blob = new Blob([funscript], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `${entry.title.replace(/[^a-z0-9]/gi, "_")}.funscript`;
-      a.click();
-      URL.revokeObjectURL(a.href);
+      const safeName = entry.title.replace(/[^a-z0-9]/gi, "_");
+
+      let content: string;
+      let mimeType: string;
+      let ext: string;
+      if (scriptOutputFiletype === "csv") {
+        content = funscriptJsonToCSV(funscript) ?? "";
+        mimeType = "text/csv";
+        ext = "csv";
+      } else {
+        content = funscript;
+        mimeType = "application/json";
+        ext = "funscript";
+      }
+
+      triggerDownload(content, `${safeName}.${ext}`, mimeType);
     } catch {
       toast({ title: "Download failed", variant: "destructive" });
     }

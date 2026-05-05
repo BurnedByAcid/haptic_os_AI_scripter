@@ -13,6 +13,8 @@ import { VideoControlBar } from "@/components/video-control-bar";
 import { useToast } from "@/hooks/use-toast";
 import { validateAndParseFunscriptFile } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
+import { useAppSettings } from "@/hooks/use-app-settings";
+import { buildScriptExport, triggerDownload } from "@/lib/script-export";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -105,6 +107,7 @@ export default function Player() {
   const { key, connected, recordAppModeChange } = useHandy();
   const { getToken } = useAuth();
   const { toast } = useToast();
+  const { scriptOutputFiletype } = useAppSettings();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoMode, setVideoMode] = useState<VideoMode>("file");
   const [urlInput, setUrlInput] = useState("");
@@ -452,12 +455,8 @@ export default function Player() {
   const downloadRecordedScript = () => {
     const actions = recordedActions;
     if (!actions.length) return;
-    const script: Funscript = { actions };
-    const blob = new Blob([JSON.stringify(script, null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "recorded.funscript";
-    a.click();
+    const { content, mimeType, ext } = buildScriptExport(actions, scriptOutputFiletype);
+    triggerDownload(content, `recorded.${ext}`, mimeType);
   };
 
   const hasVideo = videoUrl || embedUrl;

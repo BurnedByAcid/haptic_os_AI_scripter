@@ -25,6 +25,8 @@ import { useDirtyExitWarning } from "@/hooks/use-dirty-exit-warning";
 import { useLocation } from "wouter";
 import { AUDIO_CLEANER_SESSION_KEY } from "@/pages/audio-cleaner";
 import { applyVocalRemoval, applyImpactSuppression, applyScreamSuppression } from "@/lib/audio-dsp";
+import { useAppSettings, type ScriptOutputFiletype } from "@/hooks/use-app-settings";
+import { actionsToCSV, triggerDownload } from "@/lib/script-export";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -58,28 +60,30 @@ function niceTickMs(halfWindowMs: number): number {
 }
 
 /**
- * Immediately download a raw .funscript where every detected timestamp
+ * Immediately download a raw script where every detected timestamp
  * sits at position 50 (neutral midpoint). Used by all three detector flows:
  * Beat Detector (mic / audio file / video audio) and Video Analysis.
  */
-function downloadRawFunscript(timestampsMs: number[], nameHint: string): void {
+function downloadRawFunscript(timestampsMs: number[], nameHint: string, filetype: ScriptOutputFiletype = "funscript"): void {
   if (timestampsMs.length === 0) return;
   const sorted = [...timestampsMs].sort((a, b) => a - b);
-  const script = {
-    version: "1.0",
-    inverted: false,
-    range: 90,
-    actions: sorted.map(at => ({ at, pos: 50 })),
-  };
-  const blob = new Blob([JSON.stringify(script, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${nameHint}.funscript`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const actions = sorted.map(at => ({ at, pos: 50 }));
+
+  let content: string;
+  let mimeType: string;
+  let filename: string;
+  if (filetype === "csv") {
+    content = actionsToCSV(actions);
+    mimeType = "text/csv";
+    filename = `${nameHint}.csv`;
+  } else {
+    const script = { version: "1.0", inverted: false, range: 90, actions };
+    content = JSON.stringify(script, null, 2);
+    mimeType = "application/json";
+    filename = `${nameHint}.funscript`;
+  }
+
+  triggerDownload(content, filename, mimeType);
 }
 
 /** Format milliseconds as a short time label. */
@@ -102,6 +106,7 @@ export default function Scripter() {
   const isSubscriber = planLoaded && !isFree;
   const { getToken } = useAuth();
   const [, setLocation] = useLocation();
+  const { scriptOutputFiletype } = useAppSettings();
 
   // ─── Dirty / unsaved-work tracking ───
   // We snapshot the "clean" `Point[]` array reference. Dirty = the live
@@ -515,7 +520,7 @@ export default function Scripter() {
     const wasRecording = bdPrevIsRecordingRef.current;
     bdPrevIsRecordingRef.current = bdIsRecording;
     if (wasRecording && !bdIsRecording && bdSessionTimestampsRef.current.length > 0 && mountedRef.current) {
-      downloadRawFunscript(bdSessionTimestampsRef.current, "beat-detect");
+      downloadRawFunscript(bdSessionTimestampsRef.current, "beat-detect", scriptOutputFiletype);
       bdSessionTimestampsRef.current = [];
     }
   }, [bdIsRecording]);
@@ -1300,20 +1305,24 @@ export default function Scripter() {
 
   const exportScript = async () => {
     const sorted = [...points].sort((a, b) => a.time - b.time);
-    const script = { actions: sorted.map(p => ({ at: Math.round(p.time), pos: p.pos })) };
-    const json = JSON.stringify(script, null, 2);
+    const actions = sorted.map(p => ({ at: Math.round(p.time), pos: p.pos }));
+    const isCSV = scriptOutputFiletype === "csv";
+    const ext = isCSV ? "csv" : "funscript";
+    const content = isCSV
+      ? actionsToCSV(actions)
+      : JSON.stringify({ actions }, null, 2);
 
     // Derive base name from the loaded video (strip its extension)
     const baseName = videoFileName
       ? videoFileName.replace(/\.[^/.]+$/, "")
       : "script";
 
-    // Build versioned filename: first export = baseName.funscript,
-    // subsequent exports = baseName (01).funscript, baseName (02).funscript …
+    // Build versioned filename: first export = baseName.<ext>,
+    // subsequent exports = baseName (01).<ext>, baseName (02).<ext> …
     const counts = exportCountsRef.current;
     const count = counts.get(baseName) ?? 0;
     const suffix = count === 0 ? "" : ` (${String(count).padStart(2, "0")})`;
-    const fileName = `${baseName}${suffix}.funscript`;
+    const fileName = `${baseName}${suffix}.${ext}`;
     counts.set(baseName, count + 1);
 
     // Try the File System Access API (Chrome / Edge) so the save dialog opens
@@ -1323,15 +1332,12 @@ export default function Scripter() {
       try {
         const handle = await (fsa as (opts: unknown) => Promise<FileSystemFileHandle>)({
           suggestedName: fileName,
-          types: [
-            {
-              description: "Funscript",
-              accept: { "application/json": [".funscript"] },
-            },
-          ],
+          types: isCSV
+            ? [{ description: "CSV", accept: { "text/csv": [".csv"] } }]
+            : [{ description: "Funscript", accept: { "application/json": [".funscript"] } }],
         });
         const writable = await handle.createWritable();
-        await writable.write(json);
+        await writable.write(content);
         await writable.close();
         markClean();
         return;
@@ -1343,7 +1349,7 @@ export default function Scripter() {
     }
 
     // Fallback: classic anchor download (Firefox, Safari, etc.)
-    const blob = new Blob([json], { type: "application/json" });
+    const blob = new Blob([content], { type: isCSV ? "text/csv" : "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -2266,7 +2272,7 @@ export default function Scripter() {
     if (vtCancelRef.current) return;
 
     // Auto-download raw funscript: every detection at the neutral midpoint.
-    downloadRawFunscript(triggerTimes, "video-analysis");
+    downloadRawFunscript(triggerTimes, "video-analysis", scriptOutputFiletype);
 
     // Snapshot the final GPU/CPU mode so the post-scan badge reflects what was
     // actually used for the majority of the scan (not the live analyzeMode,
