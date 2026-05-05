@@ -2449,9 +2449,9 @@ export default function Scripter() {
                     {/* Video audio — only show when a video is loaded */}
                     {videoUrl && (
                       <Button
-                        variant="default"
+                        variant="outline-primary"
                         size="sm"
-                        className="w-full bg-primary/20 border border-primary/40 text-primary hover:bg-primary/30"
+                        className="w-full"
                         onClick={bdStartVideo}
                       >
                         <span className="mr-2 text-base leading-none">▶</span>Use Video Audio
