@@ -440,6 +440,7 @@ export default function Scripter() {
   const [bdIsRecording, setBdIsRecording] = useState(false);
   const bdAudioCtxRef = useRef<AudioContext | null>(null);
   const bdAnalyserRef = useRef<AnalyserNode | null>(null);
+  const bdAnalyserRRef = useRef<AnalyserNode | null>(null); // right-channel analyser for stereo vocal removal
   const bdSourceRef = useRef<MediaStreamAudioSourceNode | AudioBufferSourceNode | MediaElementAudioSourceNode | null>(null);
   const bdUsingVideoRef = useRef(false); // true = timing comes from videoRef.currentTime
   // Persistent across stop/start — createMediaElementSource can only be called ONCE per element
@@ -510,20 +511,35 @@ export default function Scripter() {
     let energy = 0;
 
     if (cleanBand !== null && anyCleanerOn && bdAudioCtxRef.current) {
-      // Get raw PCM snapshot from the analyser
-      const tdData = new Float32Array(analyser.fftSize);
-      analyser.getFloatTimeDomainData(tdData);
+      // Get raw PCM snapshot from the primary (left) analyser
+      const tdDataL = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(tdDataL);
 
       const audioCtx = bdAudioCtxRef.current;
-      let tempBuf = audioCtx.createBuffer(1, tdData.length, audioCtx.sampleRate);
-      tempBuf.getChannelData(0).set(tdData);
+      const analyserR = bdAnalyserRRef.current;
 
-      // Apply selected DSP transforms (vocal removal is a no-op on mono)
-      if (cleanOpts.vocalRemoval) tempBuf = applyVocalRemoval(tempBuf, audioCtx);
+      let tempBuf: AudioBuffer;
+      if (cleanOpts.vocalRemoval && analyserR) {
+        // Stereo path: capture right channel and build a 2-ch buffer so phase
+        // cancellation in applyVocalRemoval actually removes centre-panned audio
+        const tdDataR = new Float32Array(analyser.fftSize);
+        analyserR.getFloatTimeDomainData(tdDataR);
+        tempBuf = audioCtx.createBuffer(2, tdDataL.length, audioCtx.sampleRate);
+        tempBuf.getChannelData(0).set(tdDataL);
+        tempBuf.getChannelData(1).set(tdDataR);
+        tempBuf = applyVocalRemoval(tempBuf, audioCtx);
+      } else {
+        // Mono path (mic or vocal removal off): vocal removal is a no-op on mono
+        tempBuf = audioCtx.createBuffer(1, tdDataL.length, audioCtx.sampleRate);
+        tempBuf.getChannelData(0).set(tdDataL);
+        if (cleanOpts.vocalRemoval) tempBuf = applyVocalRemoval(tempBuf, audioCtx);
+      }
+
+      // Apply remaining DSP transforms
       if (cleanOpts.impactSuppression) tempBuf = applyImpactSuppression(tempBuf, audioCtx);
       if (cleanOpts.screamSuppression) tempBuf = applyScreamSuppression(tempBuf, audioCtx);
 
-      // Compute RMS² energy from the cleaned samples
+      // Compute RMS² energy from the cleaned samples (use left channel as representative)
       const samples = tempBuf.getChannelData(0);
       let sumSq = 0;
       for (let i = 0; i < samples.length; i++) sumSq += samples[i] * samples[i];
@@ -645,6 +661,7 @@ export default function Scripter() {
     source.connect(analyser);
     bdSourceRef.current = source;
     bdAnalyserRef.current = analyser;
+    bdAnalyserRRef.current = null; // mic is mono — no right-channel analyser
     bdLoop();
   }, [bdLoop]);
 
@@ -654,11 +671,24 @@ export default function Scripter() {
    * raw source so the spectrum display shows all bands regardless of selection.
    */
   const bdBuildFilters = useCallback((ctx: AudioContext, source: AudioNode) => {
-    // Raw analyser for spectrum display + beat detection
+    // Raw analyser for spectrum display + beat detection (left/mono channel)
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 2048;
-    source.connect(analyser);
+
+    // Split into stereo so vocal removal (phase cancellation) can operate on both
+    // channels independently.  A ChannelSplitter always outputs 2 outputs; if the
+    // source is mono the second output will be silence — that is fine because
+    // bdLoop checks for the right-channel analyser before building the stereo buffer.
+    const splitter = ctx.createChannelSplitter(2);
+    source.connect(splitter);
+    splitter.connect(analyser, 0); // left channel → primary analyser (spectrum display)
+
+    const analyserR = ctx.createAnalyser();
+    analyserR.fftSize = 2048;
+    splitter.connect(analyserR, 1); // right channel → secondary analyser
+
     bdAnalyserRef.current = analyser;
+    bdAnalyserRRef.current = analyserR;
 
     // 3× cascaded HP + 3× cascaded LP per band → Gain → destination
     // 6th-order roll-off (~−120 dB/oct) for tight inter-band isolation.
@@ -767,6 +797,7 @@ export default function Scripter() {
     bdFilterGainsRef.current = [];
     bdUsingVideoRef.current = false;
     bdAnalyserRef.current = null;
+    bdAnalyserRRef.current = null;
 
     // Only close the AudioContext for non-video sessions
     if (!isVideo && bdAudioCtxRef.current) {
