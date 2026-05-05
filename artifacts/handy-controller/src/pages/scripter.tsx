@@ -3175,14 +3175,21 @@ export default function Scripter() {
           {!vtAnalyzing && (
             <div className="flex-1 flex flex-col gap-2 min-h-0 justify-start">
               {vtLastScanCount !== null && (
-                <div className={`rounded-lg border px-3 py-2 flex items-center gap-2 ${vtLastScanCancelled ? "border-muted-foreground/30 bg-muted/30" : vtLastScanCount === 0 ? "border-amber-500/30 bg-amber-500/5" : "border-primary/30 bg-primary/5"}`}>
-                  <span className={`text-xs font-medium ${vtLastScanCancelled ? "text-muted-foreground" : vtLastScanCount === 0 ? "text-amber-500" : "text-primary"}`}>
-                    {vtLastScanCancelled ? "Scan cancelled" : "Scan complete"}
-                  </span>
-                  <span className="text-xs text-muted-foreground">—</span>
-                  <span className={`text-xs font-mono font-semibold ${vtLastScanCancelled ? "text-muted-foreground" : vtLastScanCount === 0 ? "text-amber-500" : "text-primary"}`}>
-                    {vtLastScanCount} marker{vtLastScanCount === 1 ? "" : "s"} {vtLastScanCancelled ? "found so far" : "found"}
-                  </span>
+                <div className={`rounded-lg border px-3 py-2 flex flex-col gap-1 ${vtLastScanCancelled ? "border-muted-foreground/30 bg-muted/30" : vtLastScanCount === 0 ? "border-amber-500/30 bg-amber-500/5" : "border-primary/30 bg-primary/5"}`}>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-medium ${vtLastScanCancelled ? "text-muted-foreground" : vtLastScanCount === 0 ? "text-amber-500" : "text-primary"}`}>
+                      {vtLastScanCancelled ? "Scan cancelled" : "Scan complete"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">—</span>
+                    <span className={`text-xs font-mono font-semibold ${vtLastScanCancelled ? "text-muted-foreground" : vtLastScanCount === 0 ? "text-amber-500" : "text-primary"}`}>
+                      {vtLastScanCount} marker{vtLastScanCount === 1 ? "" : "s"} {vtLastScanCancelled ? "found so far" : "found"}
+                    </span>
+                  </div>
+                  {!vtLastScanCancelled && vtLastScanCount === 0 && (
+                    <p className="text-xs text-amber-500/80">
+                      Try widening the tolerance, redrawing the zone over a clearer pattern edge, or resampling the pattern.
+                    </p>
+                  )}
                 </div>
               )}
               <div className="rounded-lg border border-border/50 bg-card/40 p-3 flex flex-col gap-2">
