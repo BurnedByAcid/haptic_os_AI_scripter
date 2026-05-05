@@ -167,6 +167,32 @@
   }
 }
 
+@keyframes dot-sweep {
+  to { transform: rotate(360deg); }
+}
+
+.dot-checking {
+  background: conic-gradient(
+    rgba(245, 158, 11, 0)    0deg,
+    rgba(245, 158, 11, 0.85) 200deg,
+    rgba(252, 211, 77, 1)    270deg,
+    rgba(245, 158, 11, 0)    360deg
+  );
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dot-checking {
+    animation: dot-sweep 1s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-checking {
+    background: rgb(245, 158, 11);
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   @keyframes btn-shimmer-sweep {
     0%   { transform: translateX(-160%) skewX(-18deg); opacity: 0; }
