@@ -15,6 +15,8 @@ interface HandyStatus {
   checking: boolean;
   battery?: number;
   charging: boolean;
+  deviceModel?: string;
+  firmwareVersion?: string;
 }
 
 interface HandyContextType extends HandyStatus {
@@ -36,6 +38,8 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(false);
   const [battery, setBattery] = useState<number | undefined>(undefined);
   const [charging, setCharging] = useState(false);
+  const [deviceModel, setDeviceModel] = useState<string | undefined>(undefined);
+  const [firmwareVersion, setFirmwareVersion] = useState<string | undefined>(undefined);
 
   const mountedRef = useRef(true);
 
@@ -69,6 +73,8 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
       setConnected(false);
       setBattery(undefined);
       setCharging(false);
+      setDeviceModel(undefined);
+      setFirmwareVersion(undefined);
       return;
     }
 
@@ -96,9 +102,21 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
         setChecking(false);
       };
 
-      sse.addEventListener("device_connected", () => {
+      sse.addEventListener("device_connected", (e: MessageEvent) => {
         if (!mountedRef.current || cancelled) return;
         setConnected(true);
+        setDeviceModel(undefined);
+        setFirmwareVersion(undefined);
+        try {
+          const data = JSON.parse(e.data as string) as {
+            hardware?: string;
+            info?: { fw_version?: string };
+          };
+          if (data.hardware) setDeviceModel(data.hardware);
+          if (data.info?.fw_version) setFirmwareVersion(data.info.fw_version);
+        } catch {
+          // Ignore malformed or missing payload
+        }
       });
 
       sse.addEventListener("device_disconnected", () => {
@@ -106,6 +124,8 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
         setConnected(false);
         setBattery(undefined);
         setCharging(false);
+        setDeviceModel(undefined);
+        setFirmwareVersion(undefined);
       });
 
       sse.addEventListener("battery_changed", (e: MessageEvent) => {
@@ -160,6 +180,8 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
     setConnected(false);
     setBattery(undefined);
     setCharging(false);
+    setDeviceModel(undefined);
+    setFirmwareVersion(undefined);
 
     if (!newKey) return;
 
@@ -175,7 +197,7 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
   }, [checkOnce]);
 
   return (
-    <HandyContext.Provider value={{ key, updateKey, connected, checking, battery, charging }}>
+    <HandyContext.Provider value={{ key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion }}>
       {children}
     </HandyContext.Provider>
   );

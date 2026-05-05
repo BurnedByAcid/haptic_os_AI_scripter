@@ -93,7 +93,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { key, updateKey, connected, checking, battery, charging } = useHandy();
+  const { key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion } = useHandy();
   const [inputKey, setInputKey] = useState(key);
   const { toast } = useToast();
   const { user } = useUser();
@@ -203,7 +203,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   connected ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" :
                   "bg-red-500"
                 }`}
-                title={checking ? "Checking..." : connected ? `Connected${battery !== undefined ? ` · ${battery}%${charging ? " ⚡" : ""}` : ""}` : "Disconnected"}
+                title={
+                  checking ? "Checking..." :
+                  connected ? [
+                    "Connected",
+                    battery !== undefined ? `${battery}%${charging ? " ⚡" : ""}` : null,
+                    deviceModel ?? null,
+                    firmwareVersion ? `fw ${firmwareVersion}` : null,
+                  ].filter(Boolean).join(" · ") :
+                  "Disconnected"
+                }
               />
               {/* Expand button */}
               <button
@@ -247,6 +256,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </button>
                 </div>
               </div>
+
+              {connected && (deviceModel || firmwareVersion) && (
+                <p className="text-[10px] text-muted-foreground leading-snug mt-1">
+                  {[deviceModel, firmwareVersion ? `fw ${firmwareVersion}` : null].filter(Boolean).join(" · ")}
+                </p>
+              )}
 
               <div className="space-y-2">
                 {/* Device selector */}
