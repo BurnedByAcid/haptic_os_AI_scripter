@@ -59,12 +59,31 @@ function getStaticPlatformThumbnail(url: string): string | null {
   return null;
 }
 
+/**
+ * Reads a CSS custom property from the document root and returns it as an
+ * `hsl(...)` color string so it can be embedded directly in SVG markup.
+ * Falls back to the provided default if the DOM is unavailable or the variable
+ * is not set.
+ */
+function readCssColor(varName: string, fallback: string): string {
+  try {
+    const val = getComputedStyle(document.documentElement)
+      .getPropertyValue(varName)
+      .trim();
+    if (val) {
+      // If the value is already a complete color expression, use it as-is.
+      const isComplete = /^(#|rgb|hsl|oklch|color\()/i.test(val);
+      return isComplete ? val : `hsl(${val})`;
+    }
+  } catch { /* ignore — SSR or tests */ }
+  return fallback;
+}
+
 /** Builds the neutral placeholder SVG used when no platform match exists. */
 function getPlaceholderThumbnail(): string {
-  // Colors derived from the app's red/warm dark palette (--card, --muted, --muted-foreground)
-  const bg = "#190b0b";   // hsl(0 40% 7%)  — matches --card
-  const box = "#221616";  // hsl(0 20% 11%) — matches --muted
-  const icon = "#a38f8f"; // hsl(0 10% 60%) — matches --muted-foreground
+  const bg   = readCssColor("--card",             "hsl(0 40% 7%)");
+  const box  = readCssColor("--muted",            "hsl(0 20% 11%)");
+  const icon = readCssColor("--muted-foreground", "hsl(0 10% 60%)");
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180">
     <rect width="320" height="180" fill="${bg}"/>
     <rect x="130" y="55" width="60" height="70" rx="4" fill="${box}"/>
