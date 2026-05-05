@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Scissors } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Scissors, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
@@ -72,7 +72,14 @@ const DEVICES = [
 
 type DeviceId = typeof DEVICES[number]["id"];
 
-const NAV_ITEMS = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  requiresPro: boolean;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/",          label: "Dashboard",      icon: Home,      requiresPro: false },
   { href: "/player",    label: "Player",          icon: PlaySquare, requiresPro: false },
   { href: "/scripter",  label: "Scripter",        icon: Mic,       requiresPro: false },
