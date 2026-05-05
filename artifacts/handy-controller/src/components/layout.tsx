@@ -97,12 +97,14 @@ const MODE_HAMP = 0;
 // const MODE_HDSP = 1;  // no dedicated page; no nav suggestion needed
 const MODE_HSSP = 2;
 
+const MODE_LABELS: Record<number, string> = { 0: "HAMP", 1: "HDSP", 2: "HSSP" };
+
 /** Pages that are "wrong" when the device is in HAMP mode. */
 const HAMP_MISMATCH_PAGES = new Set(["/scripter", "/player"]);
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
-  const { key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion, modeChangedEvent } = useHandy();
+  const { key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion, mode, modeChangedEvent } = useHandy();
   const [inputKey, setInputKey] = useState(key);
   const { toast } = useToast();
   const { user } = useUser();
@@ -278,6 +280,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   "Disconnected"
                 }
               />
+              {/* Mode badge (collapsed) */}
+              {connected && mode !== undefined && (
+                <span className="text-[9px] font-bold font-mono leading-none px-1 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
+                  {MODE_LABELS[mode] ?? mode}
+                </span>
+              )}
               {/* Expand button */}
               <button
                 className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -310,6 +318,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     }`}
                     title={checking ? "Checking..." : connected ? `Connected${battery !== undefined ? ` · ${battery}%${charging ? " ⚡" : ""}` : ""}` : "Disconnected"}
                   />
+                  {/* Mode badge (expanded) */}
+                  {connected && mode !== undefined && (
+                    <span className="text-[9px] font-bold font-mono leading-none px-1 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
+                      {MODE_LABELS[mode] ?? mode}
+                    </span>
+                  )}
                   {/* Collapse button */}
                   <button
                     className="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
