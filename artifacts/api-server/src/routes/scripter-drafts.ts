@@ -55,7 +55,7 @@ router.get("/scripter-drafts", async (req: Request, res: Response) => {
 router.get("/scripter-drafts/:slot", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const slot = parseSlot(req.params.slot);
+  const slot = parseSlot(String(req.params.slot));
   if (slot === null) { res.status(400).json({ error: "Invalid slot — only 1 draft slot is available." }); return; }
   try {
     await pruneExpired(auth.userId);
@@ -80,7 +80,7 @@ router.get("/scripter-drafts/:slot", async (req: Request, res: Response) => {
 router.put("/scripter-drafts/:slot", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const slot = parseSlot(req.params.slot);
+  const slot = parseSlot(String(req.params.slot));
   if (slot === null) { res.status(400).json({ error: "Invalid slot — only 1 draft slot is available." }); return; }
 
   try {
@@ -155,7 +155,7 @@ router.put("/scripter-drafts/:slot", writeLimiter, async (req: Request, res: Res
 router.delete("/scripter-drafts/:slot", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const slot = parseSlot(req.params.slot);
+  const slot = parseSlot(String(req.params.slot));
   if (slot === null) { res.status(400).json({ error: "Invalid slot — only 1 draft slot is available." }); return; }
   try {
     const plan = await getPlan(auth.userId);

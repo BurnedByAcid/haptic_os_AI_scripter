@@ -76,7 +76,7 @@ async function seedLegacyIfEmpty(
 router.get("/library/:libraryId/funscripts", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const libraryId = parseId(req.params.libraryId);
+  const libraryId = parseId(String(req.params.libraryId));
   if (libraryId === null) { res.status(400).json({ error: "Invalid library id" }); return; }
   try {
     const owned = await ownLibraryEntry(auth.userId, libraryId);
@@ -105,8 +105,8 @@ router.get("/library/:libraryId/funscripts", async (req: Request, res: Response)
 router.get("/library/:libraryId/funscripts/:id", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const libraryId = parseId(req.params.libraryId);
-  const id = parseId(req.params.id);
+  const libraryId = parseId(String(req.params.libraryId));
+  const id = parseId(String(req.params.id));
   if (libraryId === null || id === null) { res.status(400).json({ error: "Invalid id" }); return; }
   try {
     const { rows } = await pool.query(
@@ -129,7 +129,7 @@ router.get("/library/:libraryId/funscripts/:id", async (req: Request, res: Respo
 router.post("/library/:libraryId/funscripts", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const libraryId = parseId(req.params.libraryId);
+  const libraryId = parseId(String(req.params.libraryId));
   if (libraryId === null) { res.status(400).json({ error: "Invalid library id" }); return; }
 
   try {
@@ -239,8 +239,8 @@ router.post("/library/:libraryId/funscripts", writeLimiter, async (req: Request,
 router.put("/library/:libraryId/funscripts/:id", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const libraryId = parseId(req.params.libraryId);
-  const id = parseId(req.params.id);
+  const libraryId = parseId(String(req.params.libraryId));
+  const id = parseId(String(req.params.id));
   if (libraryId === null || id === null) { res.status(400).json({ error: "Invalid id" }); return; }
 
   try {
@@ -343,8 +343,8 @@ router.put("/library/:libraryId/funscripts/:id", writeLimiter, async (req: Reque
 router.delete("/library/:libraryId/funscripts/:id", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const libraryId = parseId(req.params.libraryId);
-  const id = parseId(req.params.id);
+  const libraryId = parseId(String(req.params.libraryId));
+  const id = parseId(String(req.params.id));
   if (libraryId === null || id === null) { res.status(400).json({ error: "Invalid id" }); return; }
   const client = await pool.connect();
   try {

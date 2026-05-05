@@ -68,7 +68,7 @@ router.get("/scripter-sessions", async (req: Request, res: Response) => {
 router.get("/scripter-sessions/:id", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const id = parseId(req.params.id);
+  const id = parseId(String(req.params.id));
   if (id === null) { res.status(400).json({ error: "Invalid session id" }); return; }
   try {
     const { rows } = await pool.query(
@@ -133,7 +133,7 @@ router.post("/scripter-sessions", writeLimiter, async (req: Request, res: Respon
 router.put("/scripter-sessions/:id", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const id = parseId(req.params.id);
+  const id = parseId(String(req.params.id));
   if (id === null) { res.status(400).json({ error: "Invalid session id" }); return; }
 
   try {
@@ -179,7 +179,7 @@ router.put("/scripter-sessions/:id", writeLimiter, async (req: Request, res: Res
 router.patch("/scripter-sessions/:id", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const id = parseId(req.params.id);
+  const id = parseId(String(req.params.id));
   if (id === null) { res.status(400).json({ error: "Invalid session id" }); return; }
 
   try {
@@ -220,7 +220,7 @@ router.patch("/scripter-sessions/:id", writeLimiter, async (req: Request, res: R
 router.post("/scripter-sessions/:id/duplicate", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const id = parseId(req.params.id);
+  const id = parseId(String(req.params.id));
   if (id === null) { res.status(400).json({ error: "Invalid session id" }); return; }
 
   try {
@@ -278,7 +278,7 @@ router.post("/scripter-sessions/:id/duplicate", writeLimiter, async (req: Reques
 router.delete("/scripter-sessions/:id", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const id = parseId(req.params.id);
+  const id = parseId(String(req.params.id));
   if (id === null) { res.status(400).json({ error: "Invalid session id" }); return; }
 
   try {
