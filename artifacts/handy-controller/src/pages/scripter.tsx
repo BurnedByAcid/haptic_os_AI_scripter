@@ -498,6 +498,7 @@ export default function Scripter() {
     screamSuppression: false,
   });
   const bdCleanOptsRef = useRef(bdCleanOpts);
+  const [bdIsStereo, setBdIsStereo] = useState(false);
 
   useEffect(() => { bdSensitivityRef.current = bdSensitivity; }, [bdSensitivity]);
   useEffect(() => { bdIsRecordingRef.current = bdIsRecording; }, [bdIsRecording]);
@@ -704,6 +705,7 @@ export default function Scripter() {
     bdSourceRef.current = source;
     bdAnalyserRef.current = analyser;
     bdAnalyserRRef.current = null; // mic is mono — no right-channel analyser
+    setBdIsStereo(false);
     bdLoop();
   }, [bdLoop]);
 
@@ -731,6 +733,7 @@ export default function Scripter() {
 
     bdAnalyserRef.current = analyser;
     bdAnalyserRRef.current = analyserR;
+    setBdIsStereo(true);
 
     // 3× cascaded HP + 3× cascaded LP per band → Gain → destination
     // 6th-order roll-off (~−120 dB/oct) for tight inter-band isolation.
@@ -840,6 +843,7 @@ export default function Scripter() {
     bdUsingVideoRef.current = false;
     bdAnalyserRef.current = null;
     bdAnalyserRRef.current = null;
+    setBdIsStereo(false);
 
     // Only close the AudioContext for non-video sessions
     if (!isVideo && bdAudioCtxRef.current) {
@@ -2651,8 +2655,21 @@ export default function Scripter() {
                             )}
                           </div>
                         </div>
-                        <div>
-                          <p className="text-[10px] font-medium text-foreground leading-tight">{label}</p>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="text-[10px] font-medium text-foreground leading-tight">{label}</p>
+                            {key === "vocalRemoval" && (
+                              bdIsStereo ? (
+                                <span className="inline-flex items-center rounded px-1 py-px text-[8px] font-semibold leading-none bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                  Stereo ✓
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center rounded px-1 py-px text-[8px] font-semibold leading-none bg-muted/60 text-muted-foreground border border-border/40" title="Phase-cancellation has no effect on mono sources">
+                                  Mono — no effect
+                                </span>
+                              )
+                            )}
+                          </div>
                           <p className="text-[9px] text-muted-foreground leading-snug">{desc}</p>
                         </div>
                       </label>
