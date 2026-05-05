@@ -377,16 +377,17 @@ export default function AudioCleaner() {
 
   const handleCancel = useCallback(() => {
     runIdRef.current++;
-    // Detach the current ffmpeg instance so the next run starts fresh with a
-    // clean virtual filesystem — the old run keeps its locally-captured `ff`
-    // reference and continues to completion in the background, but alive()
-    // will be false at every checkpoint so it never mutates React state.
+    // Grab the instance before nulling the ref so we can terminate it.
+    const ff = ffmpegRef.current;
     ffmpegRef.current = null;
     ffmpegLoaded.current = false;
+    // Terminate the worker immediately — this causes the in-flight exec() /
+    // writeFile() promise to reject right away so processFile() can exit
+    // without waiting for the full ffmpeg run to complete.
+    try { ff?.terminate(); } catch { /* ignore if already terminated */ }
     stopPlayback();
-    // Show "Cancelling…" immediately so the user knows the click was received.
-    // The progress card stays visible until processFile's next alive() check
-    // calls resetAfterCancel(), which snaps the UI back to "ready".
+    // "Cancelling…" is shown briefly; the catch block in processFile will
+    // call resetAfterCancel() once the rejected promise unwinds.
     setCancelling(true);
     setStatusMsg("Cancelling…");
   }, [stopPlayback]);
