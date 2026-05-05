@@ -109,8 +109,12 @@ export default function AudioCleaner() {
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState("");
 
+  const [processingTime, setProcessingTime] = useState<number | null>(null);
+  const [outputSize, setOutputSize] = useState<number | null>(null);
+
   const [swapDragOver, setSwapDragOver] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const processingStartRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const changeFileInputRef = useRef<HTMLInputElement>(null);
   const ffmpegRef = useRef<FFmpeg | null>(null);
@@ -166,6 +170,9 @@ export default function AudioCleaner() {
     setStatusMsg("Loading audio engine…");
     setProcessedBuffer(null);
     setWavBlob(null);
+    setProcessingTime(null);
+    setOutputSize(null);
+    processingStartRef.current = performance.now();
     stopPlayback();
 
     // Close any previous AudioContext before creating a new one
@@ -238,8 +245,13 @@ export default function AudioCleaner() {
       setStatusMsg("Encoding output…");
       const blob = encodeWav(decoded);
       if (!alive()) { resetAfterCancel(); return; }
+      const elapsedMs = processingStartRef.current !== null
+        ? performance.now() - processingStartRef.current
+        : null;
       setWavBlob(blob);
       setProcessedBuffer(decoded);
+      setOutputSize(blob.size);
+      if (elapsedMs !== null) setProcessingTime(Math.round(elapsedMs) / 1000);
       setProgress(100);
       setStep("done");
 
@@ -355,9 +367,17 @@ export default function AudioCleaner() {
     setErrorMsg("");
     setProcessedBuffer(null);
     setWavBlob(null);
+    setProcessingTime(null);
+    setOutputSize(null);
     setFileName("");
     setOptions({ vocalRemoval: true, impactSuppression: true, screamSuppression: false });
   }, [stopPlayback]);
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${bytes} B`;
+  };
 
   const toggleOption = (key: keyof Options) => {
     setOptions(prev => ({ ...prev, [key]: !prev[key] }));
@@ -556,6 +576,22 @@ export default function AudioCleaner() {
           {step === "done" && processedBuffer && (
             <Card className="bg-card/50 border-primary/20">
               <CardContent className="pt-5 flex flex-col gap-3">
+                {(processingTime !== null || outputSize !== null) && (
+                  <div className="flex items-center gap-4 px-1 py-1.5 rounded-lg bg-muted/30 border border-border/40 text-xs text-muted-foreground">
+                    {processingTime !== null && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary/70 inline-block" />
+                        Processed in {processingTime.toFixed(1)}s
+                      </span>
+                    )}
+                    {outputSize !== null && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary/70 inline-block" />
+                        Output: {formatFileSize(outputSize)} WAV
+                      </span>
+                    )}
+                  </div>
+                )}
                 <div className="flex gap-3">
                   <Button
                     variant="outline"
