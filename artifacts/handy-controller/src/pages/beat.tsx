@@ -12,6 +12,11 @@ import AudioCleaner from "@/pages/audio-cleaner";
 export default function Beat() {
   useFeatureTracking("beat");
   const { key, connected } = useHandy();
+
+  const defaultTab = (() => {
+    const param = new URLSearchParams(window.location.search).get("tab");
+    return param === "cleaner" ? "cleaner" : "beat";
+  })();
   const [isActive, setIsActive] = useState(false);
   const [sensitivity, setSensitivity] = useState(1.5);
   const [bpm, setBpm] = useState(0);
@@ -163,7 +168,7 @@ export default function Beat() {
         {!connected && <div className="text-destructive font-medium text-sm">Device Not Connected</div>}
       </div>
 
-      <Tabs defaultValue="beat">
+      <Tabs defaultValue={defaultTab}>
         <TabsList className="mb-6">
           <TabsTrigger value="beat">Beat Detector</TabsTrigger>
           <TabsTrigger value="cleaner">Audio Cleaner</TabsTrigger>

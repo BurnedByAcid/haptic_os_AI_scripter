@@ -148,7 +148,7 @@ function Router() {
       <Route path="/library"       component={() => <ProtectedRoute component={MyLibrary} />} />
       <Route path="/games"     component={() => <ProtectedRoute component={Games} />} />
       <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
-      <Route path="/audio-cleaner" component={() => <Redirect to="/beat" />} />
+      <Route path="/audio-cleaner" component={() => <Redirect to="/beat?tab=cleaner" />} />
       <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
       <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
       <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
