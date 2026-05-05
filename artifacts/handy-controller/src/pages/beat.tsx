@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
 import { useFeatureTracking } from "@/hooks/use-analytics";
 import { useHandy } from "@/hooks/use-handy";
 import { setHDSP } from "@/lib/handyApi";
@@ -9,14 +10,17 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Mic, Upload, Square } from "lucide-react";
 import AudioCleaner from "@/pages/audio-cleaner";
 
+function getTabFromSearch() {
+  const param = new URLSearchParams(window.location.search).get("tab");
+  return param === "cleaner" ? "cleaner" : "beat";
+}
+
 export default function Beat() {
   useFeatureTracking("beat");
   const { key, connected } = useHandy();
 
-  const defaultTab = (() => {
-    const param = new URLSearchParams(window.location.search).get("tab");
-    return param === "cleaner" ? "cleaner" : "beat";
-  })();
+  const [, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState<string>(getTabFromSearch);
   const [isActive, setIsActive] = useState(false);
   const [sensitivity, setSensitivity] = useState(1.5);
   const [bpm, setBpm] = useState(0);
@@ -88,6 +92,17 @@ export default function Beat() {
       sourceRef.current.mediaStream.getTracks().forEach(t => t.stop());
     }
     if (audioCtxRef.current) audioCtxRef.current.close();
+  };
+
+  useEffect(() => {
+    const onPopState = () => setActiveTab(getTabFromSearch());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setLocation(tab === "beat" ? "/beat" : `/beat?tab=${tab}`);
   };
 
   useEffect(() => {
@@ -168,7 +183,7 @@ export default function Beat() {
         {!connected && <div className="text-destructive font-medium text-sm">Device Not Connected</div>}
       </div>
 
-      <Tabs defaultValue={defaultTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="mb-6">
           <TabsTrigger value="beat">Beat Detector</TabsTrigger>
           <TabsTrigger value="cleaner">Audio Cleaner</TabsTrigger>
