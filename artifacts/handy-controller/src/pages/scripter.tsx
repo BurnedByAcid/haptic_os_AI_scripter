@@ -27,6 +27,7 @@ import { AUDIO_CLEANER_SESSION_KEY } from "@/pages/audio-cleaner";
 import { applyVocalRemoval, applyImpactSuppression, applyScreamSuppression } from "@/lib/audio-dsp";
 import { useAppSettings, type ScriptOutputFiletype } from "@/hooks/use-app-settings";
 import { actionsToCSV, triggerDownload } from "@/lib/script-export";
+import { attachHlsSource, detachHls, isHlsUrl } from "@/lib/hls-video";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -368,6 +369,8 @@ export default function Scripter() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Cleanup fn returned by attachHlsSource — called when video URL changes or on unmount.
+  const hlsCleanupRef = useRef<(() => void) | null>(null);
   const isDragging = useRef(false);
   // Clipboard: relative-time offsets so paste anchors to playhead
   const clipboardRef = useRef<Array<{ relTime: number; pos: number }>>([]);
@@ -1536,12 +1539,14 @@ export default function Scripter() {
         `${API_BASE}/api/video/resolve?url=${encodeURIComponent(trimmed)}`,
         { headers }
       );
-      const data = await res.json() as { token?: string; title?: string; error?: string };
+      const data = await res.json() as { token?: string; title?: string; isHls?: boolean; error?: string };
       if (!res.ok || !data.token) {
         setUrlError(data.error ?? "Could not resolve that URL. Try a direct .mp4 link, load a file, or paste the site's embed code.");
         return;
       }
-      const proxyUrl = `${API_BASE}/api/video/stream/${data.token}`;
+      const proxyUrl = data.isHls
+        ? `${API_BASE}/api/video/hls/${data.token}/manifest.m3u8`
+        : `${API_BASE}/api/video/stream/${data.token}`;
       setVideoUrl(proxyUrl);
       setVideoFileName(data.title ?? "video");
       setUrlDialogOpen(false);
@@ -1608,6 +1613,40 @@ export default function Scripter() {
     video.addEventListener("timeupdate", updateTime);
     return () => video.removeEventListener("timeupdate", updateTime);
   }, [videoUrl]);
+
+  // ── HLS attachment ─────────────────────────────────────────────────────────
+  // When videoUrl is an HLS manifest, attach it via hls.js (or native HLS on
+  // Safari). For regular file/URL sources the <video src=…> attribute handles it.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
+
+    // Tear down any prior HLS instance first
+    if (hlsCleanupRef.current) {
+      hlsCleanupRef.current();
+      hlsCleanupRef.current = null;
+    }
+
+    if (isHlsUrl(videoUrl)) {
+      // Remove the src attribute so hls.js can control the element via MSE
+      video.removeAttribute("src");
+      video.load();
+      hlsCleanupRef.current = attachHlsSource(video, videoUrl);
+    }
+    // Non-HLS: the <video src={videoUrl}> JSX attribute handles it
+  }, [videoUrl]);
+
+  // Clean up HLS on unmount
+  useEffect(() => {
+    return () => {
+      if (hlsCleanupRef.current) {
+        hlsCleanupRef.current();
+        hlsCleanupRef.current = null;
+      }
+      const video = videoRef.current;
+      if (video) detachHls(video);
+    };
+  }, []);
 
   // ─── Timeline Editor keyboard shortcuts ───
   // Active only when Timeline tab is open. Uses stable refs so the listener
@@ -2451,7 +2490,7 @@ export default function Scripter() {
         <div ref={videoContainerRef} className="flex-1 min-h-0 bg-black relative">
           <video
             ref={videoRef}
-            src={videoUrl ?? undefined}
+            src={videoUrl && !isHlsUrl(videoUrl) ? videoUrl : undefined}
             crossOrigin="anonymous"
             className="w-full h-full object-contain"
             preload="auto"

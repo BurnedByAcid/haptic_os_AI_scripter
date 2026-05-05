@@ -15,6 +15,7 @@ import { validateAndParseFunscriptFile } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { buildScriptExport, triggerDownload } from "@/lib/script-export";
+import { attachHlsSource, detachHls, isHlsUrl } from "@/lib/hls-video";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -121,6 +122,8 @@ export default function Player() {
   const hadHsspErrorRef = useRef(false);
   const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  // Cleanup fn returned by attachHlsSource — called when video URL changes or on unmount.
+  const hlsCleanupRef = useRef<(() => void) | null>(null);
 
   // Script recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -297,6 +300,40 @@ export default function Player() {
     }
   }, [activeScript, key, recordAppModeChange]);
 
+  // ── HLS attachment ─────────────────────────────────────────────────────────
+  // When videoUrl is an HLS manifest, attach it via hls.js (or native HLS on
+  // Safari). For regular file/URL sources the <video src=…> attribute handles it.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
+
+    // Tear down any prior HLS instance
+    if (hlsCleanupRef.current) {
+      hlsCleanupRef.current();
+      hlsCleanupRef.current = null;
+    }
+
+    if (isHlsUrl(videoUrl)) {
+      // Remove the src attribute so hls.js can manage it via MSE
+      video.removeAttribute("src");
+      video.load();
+      hlsCleanupRef.current = attachHlsSource(video, videoUrl);
+    }
+    // Non-HLS: the <video src={videoUrl}> attribute handles it
+  }, [videoUrl]);
+
+  useEffect(() => {
+    // Clean up HLS on unmount
+    return () => {
+      if (hlsCleanupRef.current) {
+        hlsCleanupRef.current();
+        hlsCleanupRef.current = null;
+      }
+      const video = videoRef.current;
+      if (video) detachHls(video);
+    };
+  }, []);
+
   useEffect(() => {
     if (videoRef.current) {
       syncEngine.setVideo(videoRef.current);
@@ -358,7 +395,7 @@ export default function Player() {
         `${API_BASE}/api/video/resolve?url=${encodeURIComponent(pageUrl)}`,
         { headers }
       );
-      const data = await res.json() as { cdnUrl?: string; error?: string };
+      const data = await res.json() as { token?: string; cdnUrl?: string; isHls?: boolean; error?: string };
       if (!res.ok || !data.cdnUrl) {
         toast({
           title: "Couldn't resolve video URL",
@@ -366,6 +403,10 @@ export default function Player() {
           variant: "destructive",
         });
         return null;
+      }
+      // For HLS streams use the rewriting proxy; for plain video use CDN URL directly.
+      if (data.isHls && data.token) {
+        return `${API_BASE}/api/video/hls/${data.token}/manifest.m3u8`;
       }
       return data.cdnUrl;
     } catch {
@@ -611,7 +652,7 @@ export default function Player() {
                 <div className="flex-1 min-h-0 relative group">
                   <video
                     ref={videoRef}
-                    src={videoUrl}
+                    src={videoUrl && !isHlsUrl(videoUrl) ? videoUrl : undefined}
                     className="w-full h-full object-contain"
                     onPlay={handlePlay}
                     onPause={handlePause}
