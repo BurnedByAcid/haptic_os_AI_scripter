@@ -299,6 +299,31 @@ function buildSubManifestProxyUrl(req: Request, token: string, playlistUrl: stri
   return `${base}/api/video/hls/${token}/sub-manifest?url=${encodeURIComponent(playlistUrl)}`;
 }
 
+// ── Sub-manifest cache ────────────────────────────────────────────────────────
+// Keeps the raw (pre-rewrite) playlist text for a short TTL so that hls.js
+// polling several times per second does not hammer the upstream CDN.
+const SUB_MANIFEST_CACHE_TTL_MS = 2_000;
+
+interface SubManifestCacheEntry {
+  text: string;
+  expiresAt: number;
+}
+const subManifestCache = new Map<string, SubManifestCacheEntry>();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of subManifestCache) if (v.expiresAt <= now) subManifestCache.delete(k);
+}, SUB_MANIFEST_CACHE_TTL_MS).unref();
+
+async function fetchTextCached(url: string): Promise<string> {
+  const now = Date.now();
+  const cached = subManifestCache.get(url);
+  if (cached && cached.expiresAt > now) return cached.text;
+  const text = await fetchText(url);
+  subManifestCache.set(url, { text, expiresAt: now + SUB_MANIFEST_CACHE_TTL_MS });
+  return text;
+}
+
 // ── GET /api/video/hls/:token/sub-manifest ────────────────────────────────────
 // Fetches a variant (sub) playlist from a multi-bitrate master, rewrites its
 // segment URIs through our segment proxy, and returns it as a media playlist.
@@ -316,7 +341,7 @@ router.get("/video/hls/:token/sub-manifest", async (req: Request, res: Response)
   }
 
   try {
-    const playlistText = await fetchText(playlistUrl);
+    const playlistText = await fetchTextCached(playlistUrl);
     const base = playlistUrl.substring(0, playlistUrl.lastIndexOf("/") + 1);
     const token = String(req.params.token);
 
