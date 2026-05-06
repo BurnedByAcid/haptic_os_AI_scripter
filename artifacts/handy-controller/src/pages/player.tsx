@@ -113,6 +113,8 @@ export default function Player() {
   const [videoMode, setVideoMode] = useState<VideoMode>("file");
   const [urlInput, setUrlInput] = useState("");
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  const [videoLabel, setVideoLabel] = useState<string | null>(null);
+  const [videoLabelIsFile, setVideoLabelIsFile] = useState(false);
   const [scripts, setScripts] = useState<(Funscript | null)[]>([null, null, null, null]);
   const [activeScriptIdx, setActiveScriptIdx] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -221,8 +223,9 @@ export default function Player() {
   // Runs once on mount. For unknown page URLs (e.g. txxx.com, spankbang.com) we
   // resolve via yt-dlp rather than falling back to a broken iframe embed.
   useEffect(() => {
-    const pendingVideoUrl = localStorage.getItem("handy_pending_video_url");
-    const pendingScript   = localStorage.getItem("handy_pending_script");
+    const pendingVideoUrl  = localStorage.getItem("handy_pending_video_url");
+    const pendingVideoName = localStorage.getItem("handy_pending_video_name");
+    const pendingScript    = localStorage.getItem("handy_pending_script");
 
     localStorage.removeItem("handy_pending_video_url");
     localStorage.removeItem("handy_pending_video_name");
@@ -244,6 +247,8 @@ export default function Player() {
       setVideoUrl(pendingVideoUrl);
       setEmbedUrl(null);
       setVideoMode("file");
+      setVideoLabel(pendingVideoName ?? pendingVideoUrl);
+      setVideoLabelIsFile(true);
       return;
     }
 
@@ -255,6 +260,8 @@ export default function Player() {
       setVideoUrl(detected.embedUrl);
       setEmbedUrl(null);
       setVideoMode("url");
+      setVideoLabel(pendingVideoUrl);
+      setVideoLabelIsFile(false);
       return;
     }
 
@@ -263,6 +270,8 @@ export default function Player() {
       setEmbedUrl(detected.embedUrl);
       setVideoUrl(null);
       setVideoMode("embed");
+      setVideoLabel(pendingVideoUrl);
+      setVideoLabelIsFile(false);
       return;
     }
 
@@ -275,6 +284,8 @@ export default function Player() {
         setVideoUrl(cdnUrl);
         setEmbedUrl(null);
         setVideoMode("url");
+        setVideoLabel(pendingVideoUrl);
+        setVideoLabelIsFile(false);
       }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -379,7 +390,7 @@ export default function Player() {
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) { setVideoUrl(URL.createObjectURL(file)); setVideoMode("file"); setEmbedUrl(null); }
+    if (file) { setVideoUrl(URL.createObjectURL(file)); setVideoMode("file"); setEmbedUrl(null); setVideoLabel(file.name); setVideoLabelIsFile(true); }
   };
 
   const [urlResolving, setUrlResolving] = useState(false);
@@ -429,6 +440,8 @@ export default function Player() {
       setEmbedUrl(src);
       setVideoUrl(null);
       setVideoMode("embed");
+      setVideoLabel(raw);
+      setVideoLabelIsFile(false);
       return;
     }
 
@@ -440,6 +453,8 @@ export default function Player() {
       setVideoUrl(detected.embedUrl);
       setEmbedUrl(null);
       setVideoMode("url");
+      setVideoLabel(raw);
+      setVideoLabelIsFile(false);
       return;
     }
 
@@ -448,6 +463,8 @@ export default function Player() {
       setEmbedUrl(detected.embedUrl);
       setVideoUrl(null);
       setVideoMode("embed");
+      setVideoLabel(raw);
+      setVideoLabelIsFile(false);
       return;
     }
 
@@ -459,6 +476,8 @@ export default function Player() {
       setVideoUrl(cdnUrl);
       setEmbedUrl(null);
       setVideoMode("url");
+      setVideoLabel(raw);
+      setVideoLabelIsFile(false);
     }
     // If resolution fails, resolvePageUrl already shows a toast.
   };
@@ -641,6 +660,15 @@ export default function Player() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
         <div className="lg:col-span-2 flex flex-col gap-4">
+          {/* Video source label */}
+          {(videoUrl || embedUrl) && videoLabel && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+              {videoLabelIsFile
+                ? <Video className="h-3.5 w-3.5 shrink-0" />
+                : <Link2 className="h-3.5 w-3.5 shrink-0" />}
+              <span className="truncate">{videoLabel}</span>
+            </div>
+          )}
           {/* Video + Waveform resizable container */}
           <div className="flex flex-col" style={{ height: `${TOTAL_HEIGHT}px` }}>
             {/* Video card */}
