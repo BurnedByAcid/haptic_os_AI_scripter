@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, RefObject } from "react";
+import Hls, { Events, type ManifestParsedData } from "hls.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,6 +9,7 @@ import {
   StepBack, StepForward,
   Maximize2, Minimize2,
 } from "lucide-react";
+import { getHls } from "@/lib/hls-video";
 
 const FRAME_S = 1 / 30;
 
@@ -45,6 +47,14 @@ export function VideoControlBar({
   const [scrubbing, setScrubbing] = useState(false);
   const [hovering, setHovering] = useState(false);
 
+  // HLS quality selector.
+  // `hlsLevels`    — quality levels reported by the manifest (empty = no HLS or single-level)
+  // `selectedLevel` — user's explicit choice: -1 = Auto (ABR), ≥0 = pinned level.
+  //                   Deliberately NOT updated by LEVEL_SWITCHED so "Auto" stays selected
+  //                   even while hls.js is internally switching quality via ABR.
+  const [hlsLevels, setHlsLevels] = useState<{ height: number; bitrate: number }[]>([]);
+  const [selectedLevel, setSelectedLevel] = useState<number>(-1);
+
   const rafRef = useRef<number | null>(null);
   const scrubBarRef = useRef<HTMLDivElement>(null);
 
@@ -64,6 +74,76 @@ export function VideoControlBar({
       rafRef.current = null;
     }
   }, []);
+
+  // HLS quality level subscription.
+  //
+  // Timing guarantee for source switches: player.tsx calls video.load() and then
+  // attachHlsSource() synchronously in a single effect. The browser dispatches the
+  // `loadstart` event as a queued task (not a microtask), so by the time our
+  // loadstart handler runs, attachHlsSource has already stored the new Hls instance
+  // in the WeakMap. getHls(video) therefore reliably returns the new instance.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    let hlsCleanup: (() => void) | null = null;
+
+    const subscribeToHls = () => {
+      hlsCleanup?.();
+      hlsCleanup = null;
+
+      const hls = getHls(video);
+      if (!hls) {
+        setHlsLevels([]);
+        setSelectedLevel(-1);
+        return;
+      }
+
+      const onManifestParsed = (_event: Events.MANIFEST_PARSED, data: ManifestParsedData) => {
+        setHlsLevels(data.levels.map(l => ({ height: l.height, bitrate: l.bitrate })));
+        // Reset to Auto whenever a new manifest loads — do not carry over a pinned
+        // level from a previous stream that may have a different level index set.
+        setSelectedLevel(-1);
+      };
+
+      // Manifest already available (component mounted after MANIFEST_PARSED fired).
+      if (hls.levels.length > 0) {
+        setHlsLevels(hls.levels.map(l => ({ height: l.height, bitrate: l.bitrate })));
+        // Restore user intent: if hls.currentLevel is -1 (auto) keep Auto selected;
+        // otherwise a previous pinned level is in effect — honour it.
+        setSelectedLevel(hls.currentLevel === -1 ? -1 : hls.currentLevel);
+      }
+
+      hls.on(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+
+      hlsCleanup = () => {
+        hls.off(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+      };
+    };
+
+    subscribeToHls();
+
+    const onLoadStart = () => subscribeToHls();
+    video.addEventListener("loadstart", onLoadStart);
+
+    return () => {
+      video.removeEventListener("loadstart", onLoadStart);
+      hlsCleanup?.();
+      setHlsLevels([]);
+      setSelectedLevel(-1);
+    };
+  }, [videoRef]);
+
+  const handleHlsLevelChange = useCallback((value: string) => {
+    const video = videoRef.current;
+    if (!video) return;
+    const hls = getHls(video);
+    if (!hls) return;
+    const level = parseInt(value, 10);
+    // Write to hls.currentLevel: -1 re-enables ABR, ≥0 pins a specific level.
+    hls.currentLevel = level;
+    setSelectedLevel(level);
+  }, [videoRef]);
 
   // Fullscreen sync
   useEffect(() => {
@@ -306,11 +386,32 @@ export function VideoControlBar({
           </div>
         )}
 
+        {/* HLS quality selector — only shown for multi-level HLS streams */}
+        {hlsLevels.length > 1 && (
+          <select
+            value={selectedLevel}
+            onChange={e => handleHlsLevelChange(e.target.value)}
+            className="ml-auto h-7 rounded text-xs bg-background/70 border border-border/50 text-muted-foreground hover:text-foreground px-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/50"
+            title="Video quality"
+          >
+            <option value={-1}>Auto</option>
+            {[...hlsLevels]
+              .map((l, i) => ({ ...l, index: i }))
+              .sort((a, b) => b.height - a.height)
+              .map(({ height, bitrate, index }) => (
+                <option key={index} value={index}>
+                  {height}p
+                  {bitrate > 0 ? ` · ${Math.round(bitrate / 1000)}k` : ""}
+                </option>
+              ))}
+          </select>
+        )}
+
         {/* Fullscreen */}
         <Button
           size="icon"
           variant="ghost"
-          className="h-7 w-7 text-muted-foreground hover:text-foreground ml-auto"
+          className={`h-7 w-7 text-muted-foreground hover:text-foreground ${hlsLevels.length > 1 || extraControls ? "" : "ml-auto"}`}
           onClick={toggleFullscreen}
           title={fullscreen ? "Exit fullscreen" : "Fullscreen"}
         >

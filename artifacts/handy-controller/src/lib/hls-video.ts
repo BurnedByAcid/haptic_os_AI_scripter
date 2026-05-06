@@ -71,6 +71,14 @@ export function attachHlsSource(
 }
 
 /**
+ * Returns the active hls.js instance bound to `video`, if any.
+ * Returns undefined for native HLS (Safari) or non-HLS sources.
+ */
+export function getHls(video: HTMLVideoElement): Hls | undefined {
+  return hlsInstances.get(video);
+}
+
+/**
  * Returns true if the given URL looks like an HLS manifest.
  */
 export function isHlsUrl(url: string): boolean {
