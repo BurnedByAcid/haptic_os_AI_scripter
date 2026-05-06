@@ -2479,8 +2479,8 @@ export default function Scripter() {
           >
             <FilePlus className="mr-1.5 h-3.5 w-3.5" /> New Script
           </Button>
-          <Button size="sm" onClick={() => setSaveDialogOpen(true)} disabled={points.length === 0} data-testid="button-export-script">
-            <BookmarkPlus className="mr-1.5 h-3.5 w-3.5" /> Save Script
+          <Button size="sm" onClick={() => setSaveDialogOpen(true)} disabled={points.length === 0} data-testid="button-export-script" title={`Export as .${scriptOutputFiletype}`}>
+            <BookmarkPlus className="mr-1.5 h-3.5 w-3.5" /> Export <span className="ml-1 opacity-60 font-mono text-[0.7em]">.{scriptOutputFiletype}</span>
           </Button>
         </div>
       </div>
