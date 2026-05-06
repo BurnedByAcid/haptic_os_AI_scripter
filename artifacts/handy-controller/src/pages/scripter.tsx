@@ -214,15 +214,15 @@ export default function Scripter() {
   const [realtimeTest, setRealtimeTest] = useState(false);
 
   // ─── Layout state ───
-  const [tabsOpen, setTabsOpen] = useState(false);
-
   function getTabFromSearch(): "beat" | "timeline" | "visual" {
     const param = new URLSearchParams(window.location.search).get("tab");
     if (param === "timeline" || param === "visual") return param;
     return "beat";
   }
 
-  const [activeTab, setActiveTab] = useState<"beat" | "timeline" | "visual">(getTabFromSearch);
+  const initialTab = getTabFromSearch();
+  const [tabsOpen, setTabsOpen] = useState(initialTab === "timeline" || initialTab === "visual");
+  const [activeTab, setActiveTab] = useState<"beat" | "timeline" | "visual">(initialTab);
 
   // ─── Timeline Editor state ───
   const [tlZoomLevel, setTlZoomLevel] = useState(3); // 0 = max zoom (2 s), 9 = min (60 s)
@@ -357,7 +357,11 @@ export default function Scripter() {
 
   // ─── Sync active tab to URL ───
   useEffect(() => {
-    const onPopState = () => setActiveTab(getTabFromSearch());
+    const onPopState = () => {
+      const tab = getTabFromSearch();
+      setActiveTab(tab);
+      if (tab !== "beat") setTabsOpen(true);
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
