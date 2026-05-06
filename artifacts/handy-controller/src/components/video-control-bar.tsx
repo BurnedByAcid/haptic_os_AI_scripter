@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, RefObject } from "react";
-import Hls, { Events, type ManifestParsedData } from "hls.js";
+import Hls, { Events, type ManifestParsedData, type LevelSwitchedData } from "hls.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -54,6 +54,8 @@ export function VideoControlBar({
   //                   even while hls.js is internally switching quality via ABR.
   const [hlsLevels, setHlsLevels] = useState<{ height: number; bitrate: number }[]>([]);
   const [selectedLevel, setSelectedLevel] = useState<number>(-1);
+  // Tracks the level hls.js is actually playing when Auto is active (-1 = not yet known)
+  const [autoLevel, setAutoLevel] = useState<number>(-1);
 
   const rafRef = useRef<number | null>(null);
   const scrubBarRef = useRef<HTMLDivElement>(null);
@@ -96,6 +98,7 @@ export function VideoControlBar({
       if (!hls) {
         setHlsLevels([]);
         setSelectedLevel(-1);
+        setAutoLevel(-1);
         return;
       }
 
@@ -104,6 +107,13 @@ export function VideoControlBar({
         // Reset to Auto whenever a new manifest loads — do not carry over a pinned
         // level from a previous stream that may have a different level index set.
         setSelectedLevel(-1);
+        setAutoLevel(-1);
+      };
+
+      const onLevelSwitched = (_event: Events.LEVEL_SWITCHED, data: LevelSwitchedData) => {
+        // Always track the level hls.js is actually playing so we can show it
+        // when the user has Auto selected.
+        setAutoLevel(data.level);
       };
 
       // Manifest already available (component mounted after MANIFEST_PARSED fired).
@@ -112,12 +122,17 @@ export function VideoControlBar({
         // Restore user intent: if hls.currentLevel is -1 (auto) keep Auto selected;
         // otherwise a previous pinned level is in effect — honour it.
         setSelectedLevel(hls.currentLevel === -1 ? -1 : hls.currentLevel);
+        // Seed autoLevel: use whatever is currently active, or -1 if ABR hasn't
+        // picked a level yet (currentLevel -1 means no level known).
+        setAutoLevel(hls.currentLevel >= 0 ? hls.currentLevel : -1);
       }
 
       hls.on(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+      hls.on(Hls.Events.LEVEL_SWITCHED, onLevelSwitched);
 
       hlsCleanup = () => {
         hls.off(Hls.Events.MANIFEST_PARSED, onManifestParsed);
+        hls.off(Hls.Events.LEVEL_SWITCHED, onLevelSwitched);
       };
     };
 
@@ -131,6 +146,7 @@ export function VideoControlBar({
       hlsCleanup?.();
       setHlsLevels([]);
       setSelectedLevel(-1);
+      setAutoLevel(-1);
     };
   }, [videoRef]);
 
@@ -394,7 +410,11 @@ export function VideoControlBar({
             className="ml-auto h-7 rounded text-xs bg-background/70 border border-border/50 text-muted-foreground hover:text-foreground px-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/50"
             title="Video quality"
           >
-            <option value={-1}>Auto</option>
+            <option value={-1}>
+              {selectedLevel === -1 && autoLevel >= 0 && hlsLevels[autoLevel]
+                ? `Auto (${hlsLevels[autoLevel].height}p)`
+                : "Auto"}
+            </option>
             {[...hlsLevels]
               .map((l, i) => ({ ...l, index: i }))
               .sort((a, b) => b.height - a.height)
