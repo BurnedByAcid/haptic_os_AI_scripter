@@ -66,10 +66,6 @@ export default defineConfig({
     fs: {
       strict: true,
     },
-    headers: {
-      "Cross-Origin-Opener-Policy": "same-origin",
-      "Cross-Origin-Embedder-Policy": "require-corp",
-    },
     proxy: {
       "/api": {
         target: "http://localhost:8080",
@@ -82,9 +78,5 @@ export default defineConfig({
     port,
     host: "0.0.0.0",
     allowedHosts: true,
-    headers: {
-      "Cross-Origin-Opener-Policy": "same-origin",
-      "Cross-Origin-Embedder-Policy": "require-corp",
-    },
   },
 });
