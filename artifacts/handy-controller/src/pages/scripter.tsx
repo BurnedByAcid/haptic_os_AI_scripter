@@ -497,6 +497,8 @@ export default function Scripter() {
   // ─── Beat Detector state ───
   const bdCanvasRef = useRef<HTMLCanvasElement>(null);
   const [bdIsActive, setBdIsActive] = useState(false);
+  const [bdEverActive, setBdEverActive] = useState(false);
+  const bdEverActiveRef = useRef(false);
   const [bdBpm, setBdBpm] = useState(0);
   const [bdFromCleaner, setBdFromCleaner] = useState<string | null>(() =>
     sessionStorage.getItem(AUDIO_CLEANER_SESSION_KEY)
@@ -578,6 +580,11 @@ export default function Scripter() {
     const canvas = bdCanvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    if (!bdEverActiveRef.current) {
+      bdEverActiveRef.current = true;
+      setBdEverActive(true);
+    }
 
     const binCount = analyser.frequencyBinCount; // fftSize/2 = 1024
     const freqData = new Uint8Array(binCount);
@@ -2690,7 +2697,7 @@ export default function Scripter() {
             )}
             <div className="flex-1 bg-black rounded-lg border border-border/50 overflow-hidden relative min-h-0">
               <canvas ref={bdCanvasRef} className="w-full h-full absolute inset-0" width={800} height={300} />
-              {!bdIsActive && (
+              {!bdIsActive && !bdEverActive && (
                 <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
                   Select an input source to begin
                 </div>
