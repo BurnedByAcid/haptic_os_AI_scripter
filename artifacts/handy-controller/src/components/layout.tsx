@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { ToastAction } from "@/components/ui/toast";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Settings, type LucideIcon } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Settings, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { PlanBadge } from "@/components/plan-badge";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useAppSettings, type Theme, type ScriptOutputFiletype } from "@/hooks/use-app-settings";
+import { useBlockedReport } from "@/contexts/blocked-report-context";
 
 
 // ─── Supported devices ────────────────────────────────────────────────────────
@@ -114,6 +115,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { isAdmin, isPro, plan } = useSubscription();
   const appSettings = useAppSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { openBlockedReport } = useBlockedReport();
 
   // ─── Device mode watcher ──────────────────────────────────────────────────
   // Track last interaction time so we can auto-navigate if the user is idle.
@@ -662,6 +664,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <option value="funscript">.funscript</option>
                 <option value="csv">.csv</option>
               </select>
+            </div>
+
+            {/* Feedback */}
+            <div className="border-t border-border pt-4">
+              <button
+                onClick={() => {
+                  setSettingsOpen(false);
+                  openBlockedReport({ kind: "other", item: "general", blockMessage: "User-submitted feedback" });
+                }}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <MessageSquare size={15} className="flex-shrink-0" />
+                Send feedback / report an issue
+              </button>
             </div>
           </div>
 

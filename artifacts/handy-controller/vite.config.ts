@@ -63,6 +63,9 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
+    headers: {
+      "Cross-Origin-Embedder-Policy": "unsafe-none",
+    },
     fs: {
       strict: true,
     },

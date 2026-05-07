@@ -31,8 +31,15 @@ export async function getStatus(key: string): Promise<HandyStatusResult> {
     let mode: number | undefined;
     if (connRes.status === "fulfilled" && connRes.value.ok) {
       const d = await connRes.value.json();
-      // v3: result.connected nested under result wrapper
-      connected = !!(d.result?.connected ?? d.connected);
+      // v3: /connected returns {"result": true} (boolean) or {"result": {"connected": true}} (object)
+      // Also handle legacy flat {"connected": true} shape just in case.
+      if (typeof d.result === "boolean") {
+        connected = d.result;
+      } else if (typeof d.result?.connected === "boolean") {
+        connected = d.result.connected;
+      } else {
+        connected = !!d.connected;
+      }
     }
     if (infoRes.status === "fulfilled" && infoRes.value.ok) {
       const d = await infoRes.value.json();
