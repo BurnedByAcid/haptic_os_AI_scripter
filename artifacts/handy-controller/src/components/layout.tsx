@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { PlanBadge } from "@/components/plan-badge";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useAppSettings, type Theme, type ScriptOutputFiletype } from "@/hooks/use-app-settings";
-import { useBlockedReport } from "@/contexts/blocked-report-context";
+import { Textarea } from "@/components/ui/textarea";
 
 
 // ─── Supported devices ────────────────────────────────────────────────────────
@@ -104,6 +104,8 @@ const MODE_LABELS: Record<number, string> = { 0: "HAMP", 1: "HDSP", 2: "HSSP" };
 /** Pages that are "wrong" when the device is in HAMP mode. */
 const HAMP_MISMATCH_PAGES = new Set(["/scripter", "/player"]);
 
+const API = import.meta.env.VITE_API_URL ?? "";
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const { key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion, mode, modeChangedEvent } = useHandy();
@@ -115,7 +117,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { isAdmin, isPro, plan } = useSubscription();
   const appSettings = useAppSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { openBlockedReport } = useBlockedReport();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
 
   // ─── Device mode watcher ──────────────────────────────────────────────────
   // Track last interaction time so we can auto-navigate if the user is idle.
@@ -219,6 +223,36 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setHandle("");
     setHandleDialogOpen(false);
   }, [handleStorageKey]);
+
+  const handleFeedbackSubmit = async () => {
+    if (!feedbackText.trim()) return;
+    setFeedbackSubmitting(true);
+    try {
+      const res = await fetch(`${API}/api/block-reports`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "feedback",
+          item: "general",
+          blockMessage: "",
+          reason: feedbackText.trim(),
+          userEmail: user?.primaryEmailAddress?.emailAddress ?? null,
+        }),
+      });
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      toast({ title: "Feedback sent", description: "Thanks for letting us know!" });
+      setFeedbackOpen(false);
+      setFeedbackText("");
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Couldn't send feedback",
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setFeedbackSubmitting(false);
+    }
+  };
 
   // Display name shown in the sidebar
   const displayName = handle || user?.fullName || user?.primaryEmailAddress?.emailAddress || "Account";
@@ -685,7 +719,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <button
                 onClick={() => {
                   setSettingsOpen(false);
-                  openBlockedReport({ kind: "other", item: "general", blockMessage: "User-submitted feedback" });
+                  setFeedbackText("");
+                  setFeedbackOpen(true);
                 }}
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
@@ -708,6 +743,50 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Button>
             <Button onClick={() => setSettingsOpen(false)}>
               Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Feedback dialog */}
+      <Dialog open={feedbackOpen} onOpenChange={(o) => !feedbackSubmitting && setFeedbackOpen(o)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              Send Feedback
+            </DialogTitle>
+            <DialogDescription className="text-sm">
+              What's on your mind? We read every message.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <label
+              htmlFor="feedback-text"
+              className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block"
+            >
+              Your feedback
+            </label>
+            <Textarea
+              id="feedback-text"
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              rows={5}
+              maxLength={2000}
+              placeholder="Tell us what's on your mind…"
+              data-testid="textarea-feedback"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setFeedbackOpen(false)} disabled={feedbackSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleFeedbackSubmit}
+              disabled={feedbackSubmitting || !feedbackText.trim()}
+              data-testid="button-submit-feedback"
+            >
+              {feedbackSubmitting ? "Sending…" : "Send"}
             </Button>
           </DialogFooter>
         </DialogContent>
