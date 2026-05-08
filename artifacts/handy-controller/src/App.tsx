@@ -5,6 +5,7 @@ import { publishableKeyFromHost } from "@clerk/react/internal";
 import { dark } from "@clerk/themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
@@ -191,6 +192,7 @@ function ClerkProviderWithRouter() {
                   <Router />
                 </Layout>
                 <Toaster />
+                <SonnerToaster />
               </BlockedReportProvider>
             </HandyProvider>
           </AppSettingsProvider>

@@ -1,9 +1,25 @@
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
+import { toast } from "sonner";
 import App from "./App";
 import "./index.css";
 
-registerSW({ immediate: true });
+let toastId: string | number | undefined;
+
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    if (toastId !== undefined) return;
+    toastId = toast("Update available", {
+      description: "A new version of HapticOS is ready.",
+      duration: Infinity,
+      action: {
+        label: "Reload",
+        onClick: () => updateSW(true),
+      },
+    });
+  },
+});
 
 // In dev mode, Vite's runtime-error overlay listens for window "error" events
 // in the bubble phase. Media element errors (video/audio source failures) are
