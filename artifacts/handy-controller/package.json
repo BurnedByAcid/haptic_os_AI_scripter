@@ -10,7 +10,8 @@
     "serve": "vite preview --config vite.config.ts --host 0.0.0.0",
     "typecheck": "tsc --build ../../tsconfig.json && tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "generate:og-image": "node scripts/gen-og-image.mjs"
+    "generate:og-image": "node scripts/gen-og-image.mjs",
+    "sync-ffmpeg": "node scripts/sync-ffmpeg.mjs"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -83,6 +84,7 @@
   "dependencies": {
     "@clerk/react": "^6.4.5",
     "@clerk/themes": "^2.4.57",
+    "@ffmpeg/core": "0.12.6",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@resvg/resvg-js": "^2.6.2",

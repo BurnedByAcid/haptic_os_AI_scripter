@@ -127,10 +127,10 @@ export default function AudioCleaner() {
   const loadFFmpeg = useCallback(async () => {
     if (ffmpegLoaded.current) return;
     const ff = new FFmpeg();
-    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     await ff.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+      coreURL: await toBlobURL(`${base}/ffmpeg/ffmpeg-core.js`, "text/javascript"),
+      wasmURL: await toBlobURL(`${base}/ffmpeg/ffmpeg-core.wasm`, "application/wasm"),
     });
     ff.on("progress", ({ progress: p }) => setProgress(Math.round(p * 100)));
     ffmpegRef.current = ff;
