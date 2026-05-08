@@ -8,14 +8,11 @@ import { setHDSP, stopDevice } from "@/lib/handyApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, Zap, Link2, Video, Circle, StopCircle, Download, Loader2, CheckCircle2, WifiOff } from "lucide-react";
-import { FunscriptWaveform } from "@/components/funscript-waveform";
+import { Upload, Zap, Link2, Video, Loader2, CheckCircle2, WifiOff } from "lucide-react";
 import { VideoControlBar } from "@/components/video-control-bar";
 import { useToast } from "@/hooks/use-toast";
 import { validateAndParseFunscriptFile } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
-import { useAppSettings } from "@/hooks/use-app-settings";
-import { buildScriptExport, triggerDownload } from "@/lib/script-export";
 import { attachHlsSource, detachHls, isHlsUrl } from "@/lib/hls-video";
 import { getEntry, LibraryEntry } from "@/lib/db";
 import { PlayerQueue, QueueNav, QueueState } from "@/components/player-queue";
@@ -78,8 +75,6 @@ function detectEmbedUrl(raw: string): { embedUrl: string; mode: VideoMode } | nu
   }
 }
 
-interface RecordedAction { at: number; pos: number }
-
 function SyncBadge({ status }: { status: HSSPStatus }) {
   if (status === "uploading") {
     return (
@@ -120,7 +115,6 @@ export default function Player() {
   const { isPro, isLoaded: planLoaded } = useSubscription();
   const { getToken } = useAuth();
   const { toast } = useToast();
-  const { scriptOutputFiletype } = useAppSettings();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoMode, setVideoMode] = useState<VideoMode>("file");
   const [urlInput, setUrlInput] = useState("");
@@ -148,76 +142,10 @@ export default function Player() {
   // resolved pair key to be immediately treated as already-saved.
   const fromLibraryRef = useRef(false);
 
-  // Script recording state
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordedActions, setRecordedActions] = useState<RecordedAction[]>([]);
-  const recordRef = useRef({ isRecording: false, actions: [] as RecordedAction[] });
-
-  // Resizable video / waveform panels
-  const TOTAL_HEIGHT = 500;
-  const HANDLE_HEIGHT = 8;
-  const MIN_VIDEO_HEIGHT = 200;
-  const MIN_WAVEFORM_HEIGHT = 60;
-  const [videoHeight, setVideoHeight] = useState(380);
-  const waveformHeight = TOTAL_HEIGHT - HANDLE_HEIGHT - videoHeight;
-  const dragStartRef = useRef<{ startY: number; startVideoHeight: number } | null>(null);
-  const dragCleanupRef = useRef<(() => void) | null>(null);
-  const dragHandleRef = useRef<HTMLDivElement>(null);
 
   // ── Playlist queue state ───────────────────────────────────────────────────
   const [queueState, setQueueState] = useState<QueueState | null>(null);
 
-  const startDrag = useCallback((startY: number) => {
-    dragStartRef.current = { startY, startVideoHeight: videoHeight };
-
-    const onMove = (ev: MouseEvent | TouchEvent) => {
-      if (!dragStartRef.current) return;
-      ev.preventDefault();
-      const y = "touches" in ev ? (ev as TouchEvent).touches[0].clientY : (ev as MouseEvent).clientY;
-      const delta = y - dragStartRef.current.startY;
-      const newVideoHeight = Math.min(
-        TOTAL_HEIGHT - HANDLE_HEIGHT - MIN_WAVEFORM_HEIGHT,
-        Math.max(MIN_VIDEO_HEIGHT, dragStartRef.current.startVideoHeight + delta)
-      );
-      setVideoHeight(newVideoHeight);
-    };
-
-    const onUp = () => {
-      dragStartRef.current = null;
-      dragCleanupRef.current = null;
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("touchmove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      window.removeEventListener("touchend", onUp);
-    };
-
-    dragCleanupRef.current = onUp;
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("touchmove", onMove, { passive: false });
-    window.addEventListener("mouseup", onUp);
-    window.addEventListener("touchend", onUp);
-  }, [videoHeight]);
-
-  const handleMouseDragStart = useCallback((e: React.MouseEvent) => {
-    startDrag(e.clientY);
-  }, [startDrag]);
-
-  // Attach a non-passive touchstart listener to the drag handle so preventDefault works
-  useEffect(() => {
-    const handle = dragHandleRef.current;
-    if (!handle) return;
-    const onTouchStart = (e: TouchEvent) => {
-      e.preventDefault();
-      startDrag(e.touches[0].clientY);
-    };
-    handle.addEventListener("touchstart", onTouchStart, { passive: false });
-    return () => handle.removeEventListener("touchstart", onTouchStart);
-  }, [startDrag]);
-
-  // Clean up any active drag listeners when the component unmounts
-  useEffect(() => {
-    return () => { dragCleanupRef.current?.(); };
-  }, []);
 
   // Keep engine keys in sync
   useEffect(() => {
@@ -603,11 +531,6 @@ export default function Player() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hsspStatus]);
 
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) { setVideoUrl(URL.createObjectURL(file)); setVideoMode("file"); setEmbedUrl(null); setVideoLabel(file.name); setVideoLabelIsFile(true); }
-  };
-
   const [urlResolving, setUrlResolving] = useState(false);
 
   const handleUrlLoad = async () => {
@@ -738,39 +661,6 @@ export default function Player() {
 
   useEffect(() => () => { if (finishTimerRef.current) clearTimeout(finishTimerRef.current); }, []);
 
-  // Recording
-  const startRecording = () => {
-    recordRef.current = { isRecording: true, actions: [] };
-    setRecordedActions([]);
-    setIsRecording(true);
-  };
-
-  const recordPoint = () => {
-    if (!videoRef.current || !recordRef.current.isRecording) return;
-    const at = Math.round(videoRef.current.currentTime * 1000);
-    const action = { at, pos: recordRef.current.actions.length % 2 === 0 ? 100 : 0 };
-    recordRef.current.actions = [...recordRef.current.actions, action];
-    setRecordedActions([...recordRef.current.actions]);
-  };
-
-  const stopRecording = () => {
-    setIsRecording(false);
-    recordRef.current.isRecording = false;
-    const actions = recordRef.current.actions;
-    if (actions.length < 2) return;
-    const script: Funscript = { actions };
-    const newScripts = [...scripts];
-    newScripts[activeScriptIdx] = script;
-    setScripts(newScripts);
-  };
-
-  const downloadRecordedScript = () => {
-    const actions = recordedActions;
-    if (!actions.length) return;
-    const { content, mimeType, ext } = buildScriptExport(actions, scriptOutputFiletype);
-    triggerDownload(content, `recorded.${ext}`, mimeType);
-  };
-
   const hasVideo = videoUrl || embedUrl;
 
   // Queue nav extra controls for the video control bar — only truthy when rendered
@@ -848,8 +738,8 @@ export default function Player() {
               </>
             ) : (
               <Button className="h-9 relative px-4 text-sm">
-                <span>Browse Files</span>
-                <input type="file" accept="video/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleVideoUpload} />
+                <span>Load Script</span>
+                <input type="file" accept=".funscript,.json" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => handleScriptUpload(0, e)} />
               </Button>
             )}
           </div>
@@ -877,13 +767,8 @@ export default function Player() {
               <span className="truncate" title={videoLabel}>{videoLabel}</span>
             </div>
           )}
-          {/* Video + Waveform resizable container */}
-          <div className="flex flex-col" style={{ height: `${TOTAL_HEIGHT}px` }}>
-            {/* Video card */}
-            <Card
-              className="bg-black overflow-hidden relative border-border/50 flex flex-col flex-shrink-0"
-              style={{ height: `${videoHeight}px` }}
-            >
+          {/* Video card */}
+          <Card className="bg-black overflow-hidden relative border-border/50 flex flex-col" style={{ minHeight: "380px" }}>
               {videoUrl ? (
                 <div className="flex-1 min-h-0 relative group">
                   <video
@@ -900,7 +785,7 @@ export default function Player() {
                   />
 
                   {/* Tap-anywhere Finish Mode zone */}
-                  {isPlaying && connected && !finishMode && !isRecording && (
+                  {isPlaying && connected && !finishMode && (
                     <div
                       className="absolute inset-0 flex items-end justify-center pb-6 cursor-pointer select-none"
                       onClick={e => { e.stopPropagation(); triggerFinishMode(); }}
@@ -908,18 +793,6 @@ export default function Player() {
                     >
                       <div className="opacity-0 hover:opacity-100 transition-opacity duration-200 bg-black/60 backdrop-blur text-white text-sm font-bold px-6 py-3 rounded-full border border-white/30 flex items-center gap-2 pointer-events-none">
                         <Zap className="h-4 w-4 text-primary" /> Tap anywhere → Finish Mode
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recording overlay */}
-                  {isRecording && (
-                    <div className="absolute inset-0 border-4 border-red-500 pointer-events-none">
-                      <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-sm font-bold px-3 py-1.5 rounded-full">
-                        <Circle className="h-3 w-3 fill-white animate-pulse" /> RECORDING
-                      </div>
-                      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white text-xs bg-black/60 backdrop-blur px-3 py-1.5 rounded-full">
-                        {recordedActions.length} strokes recorded
                       </div>
                     </div>
                   )}
@@ -941,17 +814,12 @@ export default function Player() {
                     allow="autoplay; fullscreen; picture-in-picture"
                     title="Embedded video"
                   />
-                  {recordedActions.length > 0 && (
-                    <div className="absolute top-3 right-3 bg-black/80 text-white text-xs px-3 py-1.5 rounded-full">
-                      {recordedActions.length} strokes recorded
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
                   <Upload className="h-12 w-12 mb-4 opacity-50" />
                   <h3 className="text-xl font-medium text-foreground mb-2">No Video Loaded</h3>
-                  <p className="mb-4 max-w-sm text-sm">Load a local file or paste a URL from YouTube, Pornhub, xVideos, and more.</p>
+                  <p className="mb-4 max-w-sm text-sm">Use "Load Script" to pick a .funscript file, or switch to Video URL to paste a link from YouTube, Pornhub, xVideos, and more.</p>
                 </div>
               )}
 
@@ -960,95 +828,11 @@ export default function Player() {
                 <div className="bg-card/80 border-t border-border/40 px-4 py-2 flex-shrink-0">
                   <VideoControlBar
                     videoRef={videoRef}
-                    extraControls={
-                      isRecording || hasQueueNav ? (
-                        <>
-                          {isRecording && (
-                            <Button size="sm" variant="destructive" onClick={recordPoint} className="text-xs h-7 gap-1.5 font-bold">
-                              ● STROKE
-                            </Button>
-                          )}
-                          {queueNavControls}
-                        </>
-                      ) : undefined
-                    }
+                    extraControls={hasQueueNav ? queueNavControls : undefined}
                   />
                 </div>
               )}
             </Card>
-
-            {/* Drag handle */}
-            <div
-              ref={dragHandleRef}
-              className="flex-shrink-0 h-2 flex items-center justify-center cursor-row-resize group relative z-10 select-none"
-              style={{ touchAction: "none" }}
-              onMouseDown={handleMouseDragStart}
-            >
-              <div className="w-full h-px bg-border/50 group-hover:bg-primary/50 transition-colors duration-150" />
-              <div className="absolute flex items-center justify-center w-10 h-4 rounded-sm bg-border/80 group-hover:bg-primary/30 transition-colors duration-150 border border-border group-hover:border-primary/50">
-                <div className="flex flex-col gap-[3px]">
-                  <div className="w-5 h-px bg-muted-foreground/60 group-hover:bg-primary/80 transition-colors duration-150 rounded-full" />
-                  <div className="w-5 h-px bg-muted-foreground/60 group-hover:bg-primary/80 transition-colors duration-150 rounded-full" />
-                </div>
-              </div>
-            </div>
-
-            {/* Funscript waveform */}
-            <Card
-              className="border-border/50 bg-card/50 overflow-hidden flex flex-col flex-shrink-0"
-              style={{ height: `${waveformHeight}px` }}
-            >
-              <div className="px-4 pt-3 pb-1 flex items-center justify-between flex-shrink-0">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Waveform</span>
-                {activeScript && (
-                  <span className="text-[10px] text-muted-foreground">{activeScript.actions.length} points · click to seek</span>
-                )}
-              </div>
-              <FunscriptWaveform
-                script={activeScript ?? null}
-                videoRef={videoRef}
-                className="w-full flex-1 min-h-0"
-              />
-            </Card>
-          </div>
-
-          {/* Script recorder */}
-          <Card className="border-border/50 bg-card/50">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-foreground">Script Recorder</span>
-                <span className="text-xs text-muted-foreground">
-                  {isRecording ? `${recordedActions.length} strokes` : recordedActions.length > 0 ? `${recordedActions.length} strokes saved to Slot 0${activeScriptIdx + 1}` : "Click record, then tap STROKE while watching"}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                {!isRecording ? (
-                  <Button size="sm" variant="outline" className="gap-1.5 text-xs border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300" onClick={startRecording} disabled={!hasVideo}>
-                    <Circle className="h-3 w-3 fill-red-400" /> Start Recording
-                  </Button>
-                ) : (
-                  <>
-                    <Button size="sm" variant="destructive" onClick={recordPoint} className="text-xs gap-1.5 font-bold">
-                      ● STROKE
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={stopRecording} className="text-xs gap-1.5">
-                      <StopCircle className="h-3.5 w-3.5" /> Stop & Save
-                    </Button>
-                  </>
-                )}
-                {!isRecording && recordedActions.length > 0 && (
-                  <Button size="sm" variant="ghost" className="text-xs gap-1.5 text-muted-foreground hover:text-foreground ml-auto" onClick={downloadRecordedScript}>
-                    <Download className="h-3.5 w-3.5" /> Download .funscript
-                  </Button>
-                )}
-              </div>
-              {embedUrl && (
-                <p className="text-[11px] text-amber-400/80 mt-2">
-                  Note: Embedded players don't expose playback time. Use the STROKE button to manually mark stroke moments.
-                </p>
-              )}
-            </CardContent>
-          </Card>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -1076,52 +860,6 @@ export default function Player() {
                 {finishMode ? "Burst Active..." : "Trigger Finish"}
               </Button>
               {!connected && <p className="text-xs text-muted-foreground mt-2">Connect device to use Finish Mode</p>}
-            </CardContent>
-          </Card>
-          <Card className="flex-1 border-primary/20 bg-card/50">
-            <CardHeader>
-              <CardTitle>Scripts</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[0, 1, 2, 3].map(idx => (
-                <div
-                  key={idx}
-                  className={`p-4 rounded-lg border-2 transition-all cursor-pointer flex flex-col gap-2 ${
-                    activeScriptIdx === idx
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                  onClick={() => setActiveScriptIdx(idx)}
-                >
-                  <div className="flex justify-between items-center">
-                    <span className="font-mono font-bold">SLOT 0{idx + 1}</span>
-                    <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                      {["Low", "Med", "High", "Max"][idx]} Intensity
-                    </span>
-                  </div>
-
-                  {scripts[idx] ? (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-primary">
-                        Loaded ({scripts[idx]?.actions.length} points)
-                      </span>
-                      {idx === activeScriptIdx && hsspStatus !== "idle" && (
-                        <SyncBadge status={hsspStatus} />
-                      )}
-                    </div>
-                  ) : (
-                    <Button size="sm" className="w-full relative text-xs h-8">
-                      <span>Load Script</span>
-                      <input
-                        type="file"
-                        accept=".funscript,.json"
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                        onChange={(e) => handleScriptUpload(idx, e)}
-                      />
-                    </Button>
-                  )}
-                </div>
-              ))}
             </CardContent>
           </Card>
         </div>
