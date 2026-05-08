@@ -360,7 +360,7 @@ export default function Scripter() {
     const onPopState = () => {
       const tab = getTabFromSearch();
       setActiveTab(tab);
-      if (tab !== "beat") setTabsOpen(true);
+      setTabsOpen(tab !== "beat");
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -2659,7 +2659,15 @@ export default function Scripter() {
             variant="ghost"
             size="icon"
             className="h-6 w-6 ml-auto text-muted-foreground hover:text-foreground"
-            onClick={() => setTabsOpen(o => !o)}
+            onClick={() => {
+              const next = !tabsOpen;
+              setTabsOpen(next);
+              if (!next) {
+                setLocation("/scripter");
+              } else if (activeTab !== "beat") {
+                setLocation(`/scripter?tab=${activeTab}`);
+              }
+            }}
             title={tabsOpen ? "Collapse tools" : "Expand tools"}
           >
             {tabsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
