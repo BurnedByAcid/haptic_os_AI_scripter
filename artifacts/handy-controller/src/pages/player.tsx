@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@clerk/react";
 import { useFeatureTracking } from "@/hooks/use-analytics";
 import { useHandy } from "@/hooks/use-handy";
+import { useSubscription } from "@/hooks/use-subscription";
 import { syncEngine, hsspEngine, Funscript, HSSPStatus } from "@/lib/scriptSync";
 import { setHDSP, stopDevice } from "@/lib/handyApi";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,8 @@ import { buildScriptExport, triggerDownload } from "@/lib/script-export";
 import { attachHlsSource, detachHls, isHlsUrl } from "@/lib/hls-video";
 import { getEntry, LibraryEntry } from "@/lib/db";
 import { PlayerQueue, QueueNav, QueueState } from "@/components/player-queue";
+import { SaveScriptDialog } from "@/components/save-script-dialog";
+import { SaveToLibraryNudge } from "@/components/save-to-library-nudge";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -114,6 +117,7 @@ interface FSAFileHandle extends FileSystemFileHandle {
 export default function Player() {
   useFeatureTracking("player");
   const { key, connected, recordAppModeChange } = useHandy();
+  const { isPro, isLoaded: planLoaded } = useSubscription();
   const { getToken } = useAuth();
   const { toast } = useToast();
   const { scriptOutputFiletype } = useAppSettings();
@@ -134,6 +138,15 @@ export default function Player() {
   const videoRef = useRef<HTMLVideoElement>(null);
   // Cleanup fn returned by attachHlsSource — called when video URL changes or on unmount.
   const hlsCleanupRef = useRef<(() => void) | null>(null);
+
+  // ─── Save dialog + nudge ───
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  // Pair-scoped saved tracking: the nudge hides when the current pair key matches
+  // the key that was saved. Naturally reappears when video or script changes.
+  const [savedPairKey, setSavedPairKey] = useState<string | null>(null);
+  // Ref set at mount if content was opened from the library — causes the first
+  // resolved pair key to be immediately treated as already-saved.
+  const fromLibraryRef = useRef(false);
 
   // Script recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -366,12 +379,14 @@ export default function Player() {
     const pendingVideoName = localStorage.getItem("handy_pending_video_name");
     const pendingScript    = localStorage.getItem("handy_pending_script");
     const pendingPlaylist  = localStorage.getItem("handy_pending_playlist");
+    const pendingLibraryId = localStorage.getItem("handy_pending_library_id");
 
     localStorage.removeItem("handy_pending_video_url");
     localStorage.removeItem("handy_pending_video_name");
     localStorage.removeItem("handy_pending_script");
     localStorage.removeItem("handy_pending_script_name");
     localStorage.removeItem("handy_pending_playlist");
+    localStorage.removeItem("handy_pending_library_id");
 
     // ── Playlist queue ──────────────────────────────────────────────────────
     if (pendingPlaylist) {
@@ -390,6 +405,9 @@ export default function Player() {
         }
       } catch { /* ignore malformed */ }
     }
+
+    // If content came from the user's own library it's already saved — suppress nudge.
+    if (pendingLibraryId) fromLibraryRef.current = true;
 
     if (pendingScript) {
       try {
@@ -765,6 +783,23 @@ export default function Player() {
     />
   ) : undefined;
 
+  // Compute a stable pair key from current video + script identity.
+  // Changes naturally when either the video source or active script changes.
+  const currentPairKey = hasVideo && activeScript && activeScript.actions.length > 0
+    ? `${videoUrl ?? embedUrl ?? ""}:${activeScript.actions.length}:${activeScript.actions[0].at}`
+    : null;
+
+  // When content was loaded from the library, mark the first resolved pair key as
+  // already-saved so the nudge never shows for existing library entries.
+  useEffect(() => {
+    if (currentPairKey && fromLibraryRef.current) {
+      setSavedPairKey(currentPairKey);
+      fromLibraryRef.current = false;
+    }
+  }, [currentPairKey]);
+
+  const alreadySaved = currentPairKey !== null && currentPairKey === savedPairKey;
+
   return (
     <div className="p-6 h-full flex flex-col max-w-[1600px] mx-auto gap-6">
       <div className="flex items-center justify-between">
@@ -825,6 +860,11 @@ export default function Player() {
           )}
         </CardContent>
       </Card>
+
+      {/* Save-to-Library nudge (subscribers only, once video + script are cued) */}
+      {planLoaded && isPro && currentPairKey !== null && !alreadySaved && (
+        <SaveToLibraryNudge onSave={() => setSaveDialogOpen(true)} />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
         <div className="lg:col-span-2 flex flex-col gap-4">
@@ -1086,6 +1126,24 @@ export default function Player() {
           </Card>
         </div>
       </div>
+
+      {/* Save Script Dialog — opened by the Save-to-Library nudge */}
+      {saveDialogOpen && activeScript && (
+        <SaveScriptDialog
+          open={saveDialogOpen}
+          onClose={() => setSaveDialogOpen(false)}
+          scriptJson={JSON.stringify(activeScript)}
+          videoUrl={videoUrl}
+          videoFileName={videoLabelIsFile ? videoLabel : null}
+          suggestedTitle={videoLabel ?? ""}
+          onDownload={() => {
+            const { content, mimeType, ext } = buildScriptExport(activeScript.actions, scriptOutputFiletype);
+            triggerDownload(content, `script.${ext}`, mimeType);
+            setSaveDialogOpen(false);
+          }}
+          onSavedSuccess={() => { if (currentPairKey) setSavedPairKey(currentPairKey); }}
+        />
+      )}
     </div>
   );
 }

@@ -1161,6 +1161,7 @@ export default function MyLibrary() {
       localStorage.setItem("handy_pending_script", funscript);
       localStorage.setItem("handy_pending_script_name", displayName);
       localStorage.setItem("handy_pending_video_url", videoUrl);
+      localStorage.setItem("handy_pending_library_id", String(entry.id));
       setLocation("/player");
     } catch {
       toast({ title: "Could not load into player", variant: "destructive" });
