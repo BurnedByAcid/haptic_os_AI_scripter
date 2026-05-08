@@ -2057,9 +2057,13 @@ export default function Scripter() {
     } catch (err) {
       console.error("[VideoAnalysis] scan failed:", err);
     } finally {
-      setVtLastScanCancelled(vtCancelRef.current);
+      const wasCancelled = vtCancelRef.current;
+      setVtLastScanCancelled(wasCancelled);
       setVtLastScanCount(vtMarkerCountRef.current);
       setVtAnalyzing(false);
+      if (wasCancelled) {
+        toast({ title: "Scan cancelled" });
+      }
     }
   };
 
