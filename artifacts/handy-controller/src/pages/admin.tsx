@@ -159,7 +159,13 @@ function useAdminFeedback(isAdmin: boolean) {
   useEffect(() => { load(); }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = filter === "all" ? data : data.filter((f) => f.category === filter);
-  return { data: filtered, total: data.length, loading, error, refresh: load, filter, setFilter };
+  const counts = {
+    all: data.length,
+    bug: data.filter((f) => f.category === "bug").length,
+    suggestion: data.filter((f) => f.category === "suggestion").length,
+    other: data.filter((f) => f.category === "other").length,
+  };
+  return { data: filtered, total: data.length, counts, loading, error, refresh: load, filter, setFilter };
 }
 
 export default function Admin() {
@@ -167,7 +173,7 @@ export default function Admin() {
   const { getToken } = useAuth();
   const { toast } = useToast();
   const { data: analytics, loading: analyticsLoading, error: analyticsError, refresh } = useAdminAnalytics(isLoaded && isAdmin);
-  const { data: feedbackList, total: feedbackTotal, loading: feedbackLoading, error: feedbackError, refresh: refreshFeedback, filter: feedbackFilter, setFilter: setFeedbackFilter } = useAdminFeedback(isLoaded && isAdmin);
+  const { data: feedbackList, total: feedbackTotal, counts: feedbackCounts, loading: feedbackLoading, error: feedbackError, refresh: refreshFeedback, filter: feedbackFilter, setFilter: setFeedbackFilter } = useAdminFeedback(isLoaded && isAdmin);
 
   const [targetEmail, setTargetEmail] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<Plan>("pro");
@@ -490,7 +496,7 @@ export default function Admin() {
                   }`}
                 >
                   {Icon && <Icon className="h-3 w-3" />}
-                  {labels[cat]}
+                  {labels[cat]} ({feedbackCounts[cat]})
                 </button>
               );
             })}
