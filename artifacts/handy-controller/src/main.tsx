@@ -1,6 +1,9 @@
 import { createRoot } from "react-dom/client";
+import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import "./index.css";
+
+registerSW({ immediate: true });
 
 // In dev mode, Vite's runtime-error overlay listens for window "error" events
 // in the bubble phase. Media element errors (video/audio source failures) are
