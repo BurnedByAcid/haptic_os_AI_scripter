@@ -3,7 +3,7 @@ import {
   Shield, Search, Crown, Zap, ShieldCheck, AlertCircle,
   Users, TrendingUp, FileText, Star, Heart, Eye,
   Gamepad2, Music, Play, BookOpen, Sliders, PenLine,
-  Ticket, RefreshCw, BarChart3, UserPlus,
+  Ticket, RefreshCw, BarChart3, UserPlus, MessageSquare, Bug, Lightbulb, MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,11 +122,52 @@ function useAdminAnalytics(isAdmin: boolean) {
   return { data, loading, error, refresh: load };
 }
 
+interface FeedbackEntry {
+  id: number;
+  user_id: string | null;
+  user_email: string | null;
+  category: "bug" | "suggestion" | "other";
+  message: string;
+  created_at: string;
+}
+
+function useAdminFeedback(isAdmin: boolean) {
+  const { getToken } = useAuth();
+  const [data, setData] = useState<FeedbackEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "bug" | "suggestion" | "other">("all");
+
+  const load = async () => {
+    if (!isAdmin) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/admin/feedback`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to load feedback");
+      setData(await res.json() as FeedbackEntry[]);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = filter === "all" ? data : data.filter((f) => f.category === filter);
+  return { data: filtered, total: data.length, loading, error, refresh: load, filter, setFilter };
+}
+
 export default function Admin() {
   const { isAdmin, isLoaded } = useSubscription();
   const { getToken } = useAuth();
   const { toast } = useToast();
   const { data: analytics, loading: analyticsLoading, error: analyticsError, refresh } = useAdminAnalytics(isLoaded && isAdmin);
+  const { data: feedbackList, total: feedbackTotal, loading: feedbackLoading, error: feedbackError, refresh: refreshFeedback, filter: feedbackFilter, setFilter: setFeedbackFilter } = useAdminFeedback(isLoaded && isAdmin);
 
   const [targetEmail, setTargetEmail] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<Plan>("pro");
@@ -414,6 +455,78 @@ export default function Admin() {
           >
             {loading ? "Updating..." : `Set plan to ${selectedPlan}`}
           </Button>
+        </div>
+      </Card>
+
+      {/* Feedback */}
+      <Card className="border-border/40 bg-card/60">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MessageSquare className="h-4 w-4 text-primary" />
+              User Feedback
+              <span className="text-xs font-normal text-muted-foreground ml-1">({feedbackTotal})</span>
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={refreshFeedback} disabled={feedbackLoading} className="h-7 w-7 p-0">
+              <RefreshCw className={`h-3.5 w-3.5 ${feedbackLoading ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+          <CardDescription>All submitted feedback, newest first.</CardDescription>
+        </CardHeader>
+        <div className="px-6 pb-2">
+          <div className="flex gap-1.5 flex-wrap">
+            {(["all", "bug", "suggestion", "other"] as const).map((cat) => {
+              const icons = { all: null, bug: Bug, suggestion: Lightbulb, other: MessageCircle };
+              const labels = { all: "All", bug: "Bug", suggestion: "Suggestion", other: "Other" };
+              const Icon = icons[cat];
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setFeedbackFilter(cat)}
+                  className={`flex items-center gap-1 text-xs py-1 px-2.5 rounded-full border transition-colors ${
+                    feedbackFilter === cat
+                      ? "border-primary bg-primary/10 text-primary font-semibold"
+                      : "border-border/40 text-muted-foreground hover:border-border"
+                  }`}
+                >
+                  {Icon && <Icon className="h-3 w-3" />}
+                  {labels[cat]}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="px-6 pb-6">
+          {feedbackError && (
+            <p className="text-sm text-red-400 py-4">{feedbackError}</p>
+          )}
+          {!feedbackError && feedbackList.length === 0 && (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              {feedbackLoading ? "Loading…" : "No feedback yet."}
+            </p>
+          )}
+          <div className="space-y-2 mt-2">
+            {feedbackList.map((entry) => {
+              const catIcon = { bug: Bug, suggestion: Lightbulb, other: MessageCircle }[entry.category];
+              const CatIcon = catIcon;
+              const catColor = { bug: "text-red-400", suggestion: "text-yellow-400", other: "text-blue-400" }[entry.category];
+              const catBg = { bug: "bg-red-500/10 border-red-500/20", suggestion: "bg-yellow-500/10 border-yellow-500/20", other: "bg-blue-500/10 border-blue-500/20" }[entry.category];
+              return (
+                <div key={entry.id} className={`rounded-lg border p-3 text-sm space-y-1.5 ${catBg}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className={`flex items-center gap-1 text-xs font-semibold capitalize ${catColor}`}>
+                      <CatIcon className="h-3 w-3" />
+                      {entry.category}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {entry.user_email ?? "anonymous"} · {new Date(entry.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-foreground/90 whitespace-pre-wrap leading-snug">{entry.message}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </Card>
     </div>

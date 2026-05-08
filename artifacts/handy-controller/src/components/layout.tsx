@@ -119,6 +119,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackCategory, setFeedbackCategory] = useState<"bug" | "suggestion" | "other">("other");
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
 
   // ─── Device mode watcher ──────────────────────────────────────────────────
@@ -236,13 +237,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
           item: "general",
           blockMessage: "",
           reason: feedbackText.trim(),
+          category: feedbackCategory,
           userEmail: user?.primaryEmailAddress?.emailAddress ?? null,
+          userId: user?.id ?? null,
         }),
       });
       if (!res.ok) throw new Error(`Server returned ${res.status}`);
       toast({ title: "Feedback sent", description: "Thanks for letting us know!" });
       setFeedbackOpen(false);
       setFeedbackText("");
+      setFeedbackCategory("other");
     } catch (err) {
       toast({
         variant: "destructive",
@@ -749,7 +753,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </Dialog>
 
       {/* Feedback dialog */}
-      <Dialog open={feedbackOpen} onOpenChange={(o) => !feedbackSubmitting && setFeedbackOpen(o)}>
+      <Dialog open={feedbackOpen} onOpenChange={(o) => { if (!feedbackSubmitting) { setFeedbackOpen(o); if (!o) { setFeedbackText(""); setFeedbackCategory("other"); } } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -760,25 +764,49 @@ export function Layout({ children }: { children: React.ReactNode }) {
               What's on your mind? We read every message.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-2">
-            <label
-              htmlFor="feedback-text"
-              className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block"
-            >
-              Your feedback
-            </label>
-            <Textarea
-              id="feedback-text"
-              value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
-              rows={5}
-              maxLength={2000}
-              placeholder="Tell us what's on your mind…"
-              data-testid="textarea-feedback"
-            />
+          <div className="py-2 space-y-3">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Category</p>
+              <div className="flex gap-2">
+                {(["bug", "suggestion", "other"] as const).map((cat) => {
+                  const labels = { bug: "🐛 Bug", suggestion: "💡 Suggestion", other: "💬 Other" };
+                  const active = feedbackCategory === cat;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setFeedbackCategory(cat)}
+                      className={`flex-1 text-xs py-1.5 px-2 rounded-md border transition-colors ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary font-semibold"
+                          : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
+                      }`}
+                    >
+                      {labels[cat]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor="feedback-text"
+                className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1 block"
+              >
+                Your message
+              </label>
+              <Textarea
+                id="feedback-text"
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                rows={5}
+                maxLength={2000}
+                placeholder="Tell us what's on your mind…"
+                data-testid="textarea-feedback"
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setFeedbackOpen(false)} disabled={feedbackSubmitting}>
+            <Button variant="ghost" onClick={() => { setFeedbackOpen(false); setFeedbackText(""); setFeedbackCategory("other"); }} disabled={feedbackSubmitting}>
               Cancel
             </Button>
             <Button

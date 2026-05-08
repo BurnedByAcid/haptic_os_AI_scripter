@@ -136,6 +136,15 @@ export const chatMessagesTable = pgTable("chat_messages", {
   createdAt:      timestamp("created_at").notNull().defaultNow(),
 });
 
+export const feedbackTable = pgTable("feedback", {
+  id:        integer("id").generatedAlwaysAsIdentity().primaryKey(),
+  userId:    text("user_id"),
+  userEmail: text("user_email"),
+  category:  text("category").notNull().default("other"),
+  message:   text("message").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(usersTable).omit({ createdAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof usersTable.$inferSelect;

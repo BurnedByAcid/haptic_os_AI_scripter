@@ -248,4 +248,38 @@ router.get("/admin/analytics", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/admin/feedback
+ *
+ * Returns the 200 most recent feedback submissions in descending order.
+ * Requires admin plan.
+ */
+router.get("/admin/feedback", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+
+  const caller = await clerkClient.users.getUser(auth.userId);
+  const callerPlan = (caller.publicMetadata as Record<string, unknown>)?.plan;
+  if (callerPlan !== "admin") {
+    res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT id, user_id, user_email, category, message, created_at
+       FROM feedback
+       ORDER BY created_at DESC
+       LIMIT 200`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error("admin/feedback error:", err);
+    res.status(500).json({ error: "Failed to load feedback" });
+  }
+});
+
 export default router;
