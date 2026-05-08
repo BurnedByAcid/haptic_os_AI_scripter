@@ -110,6 +110,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const { key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion, mode, modeChangedEvent } = useHandy();
   const [inputKey, setInputKey] = useState(key);
+  const [keyError, setKeyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (connected) setKeyError(null);
+  }, [connected]);
   const { toast } = useToast();
   const { user } = useUser();
   const { signOut, openSignIn } = useClerk();
@@ -265,20 +270,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const handleSaveKey = () => {
     const trimmed = inputKey.trim();
     if (trimmed !== inputKey) setInputKey(trimmed);
+    setKeyError(null);
     updateKey(trimmed, (reason) => {
       if (reason === "network_error") {
+        setKeyError("Network error — check your internet connection and try again.");
         toast({
           title: "Network error",
           description: "Check your internet connection and try again.",
           variant: "destructive",
         });
       } else if (reason === "invalid_key") {
+        setKeyError("Invalid key — double-check it at handyfeeling.com/my-handy.");
         toast({
           title: "Invalid connection key",
           description: "That key wasn't accepted — double-check it at handyfeeling.com/my-handy.",
           variant: "destructive",
         });
       } else {
+        setKeyError("Device didn't respond — make sure it's powered on and in range.");
         toast({
           title: "Device not connected",
           description: "The key is valid but the device didn't respond — make sure it's powered on and in range.",
@@ -434,16 +443,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <Input
                     type="text"
                     value={inputKey}
-                    onChange={e => setInputKey(e.target.value)}
+                    onChange={e => { setInputKey(e.target.value); setKeyError(null); }}
                     onKeyDown={e => { if (e.key === "Enter") handleSaveKey(); }}
                     placeholder={device.placeholder}
-                    className="h-8 text-xs font-mono"
+                    className={`h-8 text-xs font-mono${keyError ? " border-destructive focus-visible:ring-destructive" : ""}`}
                     data-testid="input-connection-key"
                   />
                   <Button size="sm" onClick={handleSaveKey} className="h-8 px-3" data-testid="button-save-key">
                     Save
                   </Button>
                 </div>
+                {keyError && (
+                  <p className="text-[10px] text-destructive leading-snug" data-testid="key-error-message">
+                    {keyError}
+                  </p>
+                )}
                 <p className="text-[10px] text-muted-foreground leading-snug">{device.hint}</p>
                 {device.mode === "intiface" && (
                   <a
