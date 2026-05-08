@@ -2729,16 +2729,20 @@ export default function Scripter() {
             )}
             <div className="flex-1 bg-black rounded-lg border border-border/50 overflow-hidden relative min-h-0">
               <canvas ref={bdCanvasRef} className="w-full h-full absolute inset-0" width={800} height={300} />
-              {!bdIsActive && !bdEverActive && (
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-                  Select an input source to begin
-                </div>
-              )}
-              {!bdIsActive && bdEverActive && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+              <div
+                className="absolute inset-0 flex items-center justify-center transition-opacity duration-300"
+                style={{
+                  opacity: bdIsActive ? 0 : 1,
+                  pointerEvents: bdIsActive ? "none" : "auto",
+                  background: bdEverActive ? "rgba(0,0,0,0.4)" : "transparent",
+                }}
+              >
+                {bdEverActive ? (
                   <span className="text-white/80 text-sm">Audio stopped — select a source to resume</span>
-                </div>
-              )}
+                ) : (
+                  <span className="text-muted-foreground text-sm">Select an input source to begin</span>
+                )}
+              </div>
               {bdIsRecording && (
                 <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-xs font-bold px-3 py-1.5 rounded-full">
                   <span className="h-2 w-2 rounded-full bg-white animate-pulse inline-block" /> REC · {bdPointsAdded} points
