@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { getStatus } from "@/lib/handyApi";
+import { getStatus, type HandyFailureReason } from "@/lib/handyApi";
 import { BASE } from "@/lib/handyApi";
 
 // Back-off constants for SSE reconnection
@@ -30,7 +30,7 @@ export interface ModeChangedEvent {
 
 interface HandyContextType extends HandyStatus {
   key: string;
-  updateKey: (k: string, onFailure?: () => void) => void;
+  updateKey: (k: string, onFailure?: (reason: HandyFailureReason) => void) => void;
   /** Current device mode: 0=HAMP, 1=HDSP, 2=HSSP. undefined if unknown. */
   mode: number | undefined;
   /**
@@ -84,18 +84,18 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
   // Single status check via REST. Used for:
   //   1. The initial state snapshot before SSE is established
   //   2. The fallback triggered when SSE drops
-  const checkOnce = useCallback(async (k: string): Promise<boolean> => {
-    if (!k || !mountedRef.current) return false;
+  const checkOnce = useCallback(async (k: string): Promise<{ connected: boolean; failureReason?: HandyFailureReason }> => {
+    if (!k || !mountedRef.current) return { connected: false };
     setChecking(true);
     try {
       const res = await getStatus(k);
-      if (!mountedRef.current) return false;
+      if (!mountedRef.current) return { connected: false };
       setConnected(res.connected);
       if (typeof res.mode === "number") setMode(res.mode);
-      return res.connected;
+      return { connected: res.connected, failureReason: res.failureReason };
     } catch {
       if (mountedRef.current) setConnected(false);
-      return false;
+      return { connected: false, failureReason: "network_error" };
     } finally {
       if (mountedRef.current) setChecking(false);
     }
@@ -203,7 +203,7 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
         // SSE dropped — close, fall back to a single REST check, then retry
         sse?.close();
         sse = null;
-        void checkOnce(key);
+        void checkOnce(key); // result used only for side-effects (setConnected)
         retryTimer = setTimeout(() => {
           retryDelay = Math.min(retryDelay * 2, SSE_RETRY_MAX_MS);
           connect();
@@ -224,8 +224,8 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
   // Called when the user clicks Save (or presses Enter) next to the connection
   // key. Persists the new key, then runs up to SAVE_MAX_ATTEMPTS attempts
   // spaced by SAVE_RETRY_SPACING_MS. If all attempts fail the optional
-  // onFailure callback is invoked (used by layout.tsx to show an error toast).
-  const updateKey = useCallback((newKey: string, onFailure?: () => void) => {
+  // onFailure callback is invoked with the failure reason (used by layout.tsx to show an error toast).
+  const updateKey = useCallback((newKey: string, onFailure?: (reason: HandyFailureReason) => void) => {
     localStorage.setItem("handy_connection_key", newKey);
     setKey(newKey);
     setConnected(false);
@@ -240,10 +240,10 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
     const tryOnce = async () => {
       if (!mountedRef.current) return;
       attempts += 1;
-      const ok = await checkOnce(newKey);
-      if (ok) return;
+      const result = await checkOnce(newKey);
+      if (result.connected) return;
       if (attempts >= SAVE_MAX_ATTEMPTS || !mountedRef.current) {
-        if (!ok && mountedRef.current) onFailure?.();
+        if (!result.connected && mountedRef.current) onFailure?.(result.failureReason ?? "device_offline");
         return;
       }
       setTimeout(() => { void tryOnce(); }, SAVE_RETRY_SPACING_MS);

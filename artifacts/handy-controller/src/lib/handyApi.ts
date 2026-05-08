@@ -14,42 +14,65 @@ const headers = (key: string) => ({
   "Accept": "application/json"
 });
 
+export type HandyFailureReason = "invalid_key" | "network_error" | "device_offline";
+
 export interface HandyStatusResult {
   connected: boolean;
   battery?: number;
   mode?: number;
+  failureReason?: HandyFailureReason;
 }
 
 export async function getStatus(key: string): Promise<HandyStatusResult> {
-  try {
-    const [connRes, infoRes] = await Promise.allSettled([
-      fetch(`${BASE}/connected`, { headers: headers(key) }),
-      fetch(`${BASE}/info`, { headers: headers(key) })
-    ]);
-    let connected = false;
-    let battery: number | undefined;
-    let mode: number | undefined;
-    if (connRes.status === "fulfilled" && connRes.value.ok) {
-      const d = await connRes.value.json();
-      // v3: /connected returns {"result": true} (boolean) or {"result": {"connected": true}} (object)
-      // Also handle legacy flat {"connected": true} shape just in case.
-      if (typeof d.result === "boolean") {
-        connected = d.result;
-      } else if (typeof d.result?.connected === "boolean") {
-        connected = d.result.connected;
-      } else {
-        connected = !!d.connected;
-      }
-    }
-    if (infoRes.status === "fulfilled" && infoRes.value.ok) {
-      const d = await infoRes.value.json();
-      // v3 DeviceInfo no longer carries battery — battery comes from SSE events
-      mode = d.result?.mode ?? d.mode;
-    }
-    return { connected, battery, mode };
-  } catch {
-    return { connected: false };
+  const [connRes, infoRes] = await Promise.allSettled([
+    fetch(`${BASE}/connected`, { headers: headers(key) }),
+    fetch(`${BASE}/info`, { headers: headers(key) })
+  ]);
+
+  // Network error — fetch itself rejected (e.g. no internet, DNS failure)
+  if (connRes.status === "rejected") {
+    return { connected: false, failureReason: "network_error" };
   }
+
+  const connResp = connRes.value;
+
+  // 401 = invalid/unknown connection key
+  if (connResp.status === 401) {
+    return { connected: false, failureReason: "invalid_key" };
+  }
+
+  // Other non-OK responses (4xx/5xx) are treated as transient server/network errors
+  if (!connResp.ok) {
+    return { connected: false, failureReason: "network_error" };
+  }
+
+  const d = await connResp.json();
+  let connected = false;
+  // v3: /connected returns {"result": true} (boolean) or {"result": {"connected": true}} (object)
+  // Also handle legacy flat {"connected": true} shape just in case.
+  if (typeof d.result === "boolean") {
+    connected = d.result;
+  } else if (typeof d.result?.connected === "boolean") {
+    connected = d.result.connected;
+  } else {
+    connected = !!d.connected;
+  }
+
+  // 200 OK with result: false — key is recognised by the API, but the physical
+  // device is powered off or out of Bluetooth range.
+  if (!connected) {
+    return { connected: false, failureReason: "device_offline" };
+  }
+
+  let battery: number | undefined;
+  let mode: number | undefined;
+  if (infoRes.status === "fulfilled" && infoRes.value.ok) {
+    const info = await infoRes.value.json();
+    // v3 DeviceInfo no longer carries battery — battery comes from SSE events
+    mode = info.result?.mode ?? info.mode;
+  }
+
+  return { connected, battery, mode };
 }
 
 export async function setMode(key: string, mode: number): Promise<void> {

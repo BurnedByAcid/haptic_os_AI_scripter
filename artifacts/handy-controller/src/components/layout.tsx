@@ -227,12 +227,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const handleSaveKey = () => {
     const trimmed = inputKey.trim();
     if (trimmed !== inputKey) setInputKey(trimmed);
-    updateKey(trimmed, () => {
-      toast({
-        title: "Connection failed",
-        description: "Couldn't connect to your Handy — make sure it's powered on and your key is correct (handyfeeling.com/my-handy).",
-        variant: "destructive",
-      });
+    updateKey(trimmed, (reason) => {
+      if (reason === "network_error") {
+        toast({
+          title: "Network error",
+          description: "Check your internet connection and try again.",
+          variant: "destructive",
+        });
+      } else if (reason === "invalid_key") {
+        toast({
+          title: "Invalid connection key",
+          description: "That key wasn't accepted — double-check it at handyfeeling.com/my-handy.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Device not connected",
+          description: "The key is valid but the device didn't respond — make sure it's powered on and in range.",
+          variant: "destructive",
+        });
+      }
     });
   };
 
