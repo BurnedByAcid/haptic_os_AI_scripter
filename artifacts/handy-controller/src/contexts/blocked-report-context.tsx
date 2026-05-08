@@ -3,7 +3,7 @@ import { useUser } from "@clerk/react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ToastAction } from "@/components/ui/toast";
+import { ToastAction, type ToastActionElement } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
 
 const API = import.meta.env.VITE_API_URL ?? "";
@@ -27,14 +27,14 @@ export interface OpenBlockedReportOpts {
 interface BlockedReportContextValue {
   openBlockedReport: (opts: OpenBlockedReportOpts) => void;
   /** Returns a ToastAction node that opens the report dialog with the given context. */
-  reportAction: (opts: OpenBlockedReportOpts) => ReturnType<typeof ToastAction>;
+  reportAction: (opts: OpenBlockedReportOpts) => ToastActionElement;
   /**
    * Returns a ToastAction node that combines an "Upgrade" call-to-action
    * (links to `/upgrade`) with the standard "Think this is in error?"
    * report action. Use for plan-cap blocks where users may want to either
    * upgrade or dispute the block.
    */
-  upgradeAndReportAction: (opts: OpenBlockedReportOpts) => ReturnType<typeof ToastAction>;
+  upgradeAndReportAction: (opts: OpenBlockedReportOpts) => ToastActionElement;
 }
 
 const Ctx = createContext<BlockedReportContextValue | null>(null);

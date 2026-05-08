@@ -109,6 +109,10 @@ export default function Scripter() {
   const [, setLocation] = useLocation();
   const { scriptOutputFiletype } = useAppSettings();
 
+  // ─── Mount tracking (used by effects that must not run after unmount) ───
+  const mountedRef = useRef(true);
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
+
   // ─── Dirty / unsaved-work tracking ───
   // We snapshot the "clean" `Point[]` array reference. Dirty = the live
   // `points` reference is no longer the snapshot. React always swaps the

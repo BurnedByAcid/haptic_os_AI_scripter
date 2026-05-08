@@ -922,6 +922,7 @@ export default function MyLibrary() {
   const { isPro } = useSubscription();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { reportAction } = useBlockedReport();
   const { scriptOutputFiletype } = useAppSettings();
   const [location, setLocation] = useLocation();
   const [deletingId, setDeletingId] = useState<number | null>(null);
