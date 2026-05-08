@@ -2702,6 +2702,11 @@ export default function Scripter() {
                   Select an input source to begin
                 </div>
               )}
+              {!bdIsActive && bdEverActive && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <span className="text-white/80 text-sm">Audio stopped — select a source to resume</span>
+                </div>
+              )}
               {bdIsRecording && (
                 <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white text-xs font-bold px-3 py-1.5 rounded-full">
                   <span className="h-2 w-2 rounded-full bg-white animate-pulse inline-block" /> REC · {bdPointsAdded} points
