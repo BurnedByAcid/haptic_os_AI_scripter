@@ -1,5 +1,7 @@
-import { Tag, X, Check } from "lucide-react";
+import { Tag, X, Check, Search } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -38,10 +40,17 @@ export function TagPicker({
   buttonLabel?: string;
   buttonSize?: "sm" | "default";
 }) {
+  const [search, setSearch] = useState("");
   const cap = mode === "filter" ? MAX_TAG_FILTERS : MAX_TAGS_PER_ENTRY;
   const atCap = selected.length >= cap;
   const label =
     buttonLabel ?? (mode === "filter" ? "Filter by tag" : "Tags");
+
+  const filteredTags = search.trim()
+    ? LIBRARY_TAGS.filter((tag) =>
+        tag.toLowerCase().includes(search.trim().toLowerCase())
+      )
+    : LIBRARY_TAGS;
 
   function toggle(tag: LibraryTag) {
     if (selected.includes(tag)) {
@@ -53,7 +62,7 @@ export function TagPicker({
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(open) => { if (!open) setSearch(""); }}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
@@ -70,44 +79,65 @@ export function TagPicker({
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center justify-between">
-          <span>Tags</span>
-          <span className="font-normal normal-case">
-            {selected.length}/{cap}
-          </span>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {LIBRARY_TAGS.map((tag) => {
-          const isSelected = selected.includes(tag);
-          const disabled = !isSelected && atCap;
-          return (
-            <DropdownMenuItem
-              key={tag}
-              onSelect={(e) => {
-                e.preventDefault(); // keep menu open for multi-select
-                if (!disabled) toggle(tag);
-              }}
-              disabled={disabled}
-              className="text-xs gap-2"
-              data-testid={`menu-tag-${tag}`}
-            >
-              <span
-                className={`flex h-4 w-4 items-center justify-center rounded-sm border ${
-                  isSelected
-                    ? "bg-primary border-primary text-primary-foreground"
-                    : "border-border/60"
-                }`}
-              >
-                {isSelected && <Check className="h-3 w-3" />}
-              </span>
-              <span className="flex-1">{tag}</span>
-            </DropdownMenuItem>
-          );
-        })}
+      <DropdownMenuContent align="start" className="w-56 p-0">
+        <div className="p-2 pb-1">
+          <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center justify-between px-0 pt-0 pb-1.5">
+            <span>Tags</span>
+            <span className="font-normal normal-case">
+              {selected.length}/{cap}
+            </span>
+          </DropdownMenuLabel>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tags…"
+              className="h-7 pl-6 text-xs"
+              data-testid="tag-picker-search"
+              onKeyDown={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+        <DropdownMenuSeparator className="my-0" />
+        <div className="max-h-72 overflow-y-auto">
+          {filteredTags.length === 0 ? (
+            <div className="px-2 py-3 text-center text-[11px] text-muted-foreground">
+              No tags match "{search}"
+            </div>
+          ) : (
+            filteredTags.map((tag) => {
+              const isSelected = selected.includes(tag);
+              const disabled = !isSelected && atCap;
+              return (
+                <DropdownMenuItem
+                  key={tag}
+                  onSelect={(e) => {
+                    e.preventDefault(); // keep menu open for multi-select
+                    if (!disabled) toggle(tag);
+                  }}
+                  disabled={disabled}
+                  className="text-xs gap-2"
+                  data-testid={`menu-tag-${tag}`}
+                >
+                  <span
+                    className={`flex h-4 w-4 items-center justify-center rounded-sm border ${
+                      isSelected
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "border-border/60"
+                    }`}
+                  >
+                    {isSelected && <Check className="h-3 w-3" />}
+                  </span>
+                  <span className="flex-1">{tag}</span>
+                </DropdownMenuItem>
+              );
+            })
+          )}
+        </div>
         {atCap && (
           <>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="my-0" />
             <div className="px-2 py-1.5 text-[11px] text-amber-400">
               {mode === "filter"
                 ? `Up to ${cap} tags at a time. Remove one to add another.`
