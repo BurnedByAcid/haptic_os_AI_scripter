@@ -664,7 +664,7 @@ export default function Community() {
             {filtered.map((s) => {
               const isOwner = user?.id === s.user_id;
               return (
-                <Card key={s.id} className="border-border/50 bg-card/50 hover:border-primary/30 transition-colors flex flex-col">
+                <Card key={s.id} className="relative border-border/50 bg-card/50 hover:border-primary/30 transition-colors flex flex-col card-gradient-shimmer">
                   <CardContent className="pt-5 pb-4 flex flex-col flex-1 gap-3">
                     <div className="flex items-start gap-2">
                       <VideoIcon url={s.video_url} />

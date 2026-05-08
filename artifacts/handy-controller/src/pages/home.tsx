@@ -111,7 +111,7 @@ export default function Home() {
                 <Card className={`h-full transition-colors bg-card/50 relative ${
                   disabled
                     ? "opacity-60 cursor-not-allowed border-border/30"
-                    : "cursor-pointer hover:border-primary/50 hover:bg-card/80 group"
+                    : "cursor-pointer hover:border-primary/50 hover:bg-card/80 group card-gradient-shimmer"
                 }`}>
                   {locked && (
                     <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
