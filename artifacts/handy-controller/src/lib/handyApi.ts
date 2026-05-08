@@ -20,6 +20,8 @@ export interface HandyStatusResult {
   connected: boolean;
   battery?: number;
   mode?: number;
+  deviceModel?: string;
+  firmwareVersion?: string;
   failureReason?: HandyFailureReason;
 }
 
@@ -66,13 +68,19 @@ export async function getStatus(key: string): Promise<HandyStatusResult> {
 
   let battery: number | undefined;
   let mode: number | undefined;
+  let deviceModel: string | undefined;
+  let firmwareVersion: string | undefined;
   if (infoRes.status === "fulfilled" && infoRes.value.ok) {
     const info = await infoRes.value.json();
     // v3 DeviceInfo no longer carries battery — battery comes from SSE events
-    mode = info.result?.mode ?? info.mode;
+    const result = info.result ?? info;
+    mode = result.mode;
+    // hardware = device model (e.g. "H01", "H02"), fw_version = firmware string
+    if (result.hardware) deviceModel = String(result.hardware);
+    if (result.fw_version) firmwareVersion = String(result.fw_version);
   }
 
-  return { connected, battery, mode };
+  return { connected, battery, mode, deviceModel, firmwareVersion };
 }
 
 export async function setMode(key: string, mode: number): Promise<void> {

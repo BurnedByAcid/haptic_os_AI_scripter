@@ -92,6 +92,12 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current) return { connected: false };
       setConnected(res.connected);
       if (typeof res.mode === "number") setMode(res.mode);
+      // Populate model/firmware from REST as a fallback — SSE device_connected
+      // will overwrite these if it fires, giving SSE natural precedence.
+      if (res.connected) {
+        if (res.deviceModel) setDeviceModel(res.deviceModel);
+        if (res.firmwareVersion) setFirmwareVersion(res.firmwareVersion);
+      }
       return { connected: res.connected, failureReason: res.failureReason };
     } catch {
       if (mountedRef.current) setConnected(false);
@@ -140,8 +146,8 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
       sse.addEventListener("device_connected", (e: MessageEvent) => {
         if (!mountedRef.current || cancelled) return;
         setConnected(true);
-        setDeviceModel(undefined);
-        setFirmwareVersion(undefined);
+        // Only overwrite model/firmware when the SSE payload actually carries them;
+        // preserve any REST fallback values set by checkOnce() when fields are absent.
         try {
           const data = JSON.parse(e.data as string) as {
             hardware?: string;
