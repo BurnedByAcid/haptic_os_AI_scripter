@@ -666,7 +666,7 @@ export default function Player() {
               {videoLabelIsFile
                 ? <Video className="h-3.5 w-3.5 shrink-0" />
                 : <Link2 className="h-3.5 w-3.5 shrink-0" />}
-              <span className="truncate">{videoLabel}</span>
+              <span className="truncate" title={videoLabel}>{videoLabel}</span>
             </div>
           )}
           {/* Video + Waveform resizable container */}
