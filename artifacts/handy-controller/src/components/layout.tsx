@@ -1,7 +1,8 @@
 import { Link, useLocation } from "wouter";
 import { ToastAction } from "@/components/ui/toast";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Settings, Check, type LucideIcon } from "lucide-react";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Settings, Check, WifiOff, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -110,6 +111,7 @@ const API = import.meta.env.VITE_API_URL ?? "";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
+  const isOnline = useOnlineStatus();
   const { key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion, mode, modeChangedEvent, recordAppModeChange } = useHandy();
   const [inputKey, setInputKey] = useState(key);
   const [keyError, setKeyError] = useState<string | null>(null);
@@ -719,6 +721,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-background">
+        {/* Offline banner */}
+        <div
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium bg-yellow-500/10 border-b border-yellow-500/30 text-yellow-600 dark:text-yellow-400 transition-all duration-300 overflow-hidden ${
+            isOnline ? "max-h-0 py-0 opacity-0 border-b-0" : "max-h-10 opacity-100"
+          }`}
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <WifiOff size={14} className="flex-shrink-0" />
+          <span>You're offline — live features like device syncing and script downloads won't work until you reconnect.</span>
+        </div>
         <div className="flex-1 overflow-y-auto">
           {children}
         </div>
