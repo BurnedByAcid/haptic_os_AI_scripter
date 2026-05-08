@@ -16,6 +16,8 @@ import { useBlockedReport } from "@/contexts/blocked-report-context";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { buildScriptExport, triggerDownload } from "@/lib/script-export";
 import { attachHlsSource, detachHls, isHlsUrl } from "@/lib/hls-video";
+import { getEntry, LibraryEntry } from "@/lib/db";
+import { PlayerQueue, QueueNav, QueueState } from "@/components/player-queue";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -103,6 +105,12 @@ function SyncBadge({ status }: { status: HSSPStatus }) {
   return null;
 }
 
+// File System Access API types for loading library entries with file handles
+interface FSAFileHandle extends FileSystemFileHandle {
+  queryPermission(desc: { mode: "read" | "readwrite" }): Promise<PermissionState>;
+  requestPermission(desc: { mode: "read" | "readwrite" }): Promise<PermissionState>;
+}
+
 export default function Player() {
   useFeatureTracking("player");
   const { key, connected, recordAppModeChange } = useHandy();
@@ -142,6 +150,9 @@ export default function Player() {
   const dragStartRef = useRef<{ startY: number; startVideoHeight: number } | null>(null);
   const dragCleanupRef = useRef<(() => void) | null>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
+
+  // ── Playlist queue state ───────────────────────────────────────────────────
+  const [queueState, setQueueState] = useState<QueueState | null>(null);
 
   const startDrag = useCallback((startY: number) => {
     dragStartRef.current = { startY, startVideoHeight: videoHeight };
@@ -219,18 +230,166 @@ export default function Player() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load item passed from Library / Community.
-  // Runs once on mount. For unknown page URLs (e.g. txxx.com, spankbang.com) we
-  // resolve via yt-dlp rather than falling back to a broken iframe embed.
+  // ── Resolve a page URL to a direct CDN URL via yt-dlp on the backend ────────
+  // Declared here (before loadLibraryEntry) so it is initialized before the
+  // useCallback dependency array that references it is evaluated.
+  const resolvePageUrl = useCallback(async (pageUrl: string): Promise<string | null> => {
+    try {
+      const token = await getToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(
+        `${API_BASE}/api/video/resolve?url=${encodeURIComponent(pageUrl)}`,
+        { headers }
+      );
+      const data = await res.json() as { token?: string; cdnUrl?: string; isHls?: boolean; error?: string };
+      if (!res.ok || !data.cdnUrl) {
+        toast({
+          title: "Couldn't resolve video URL",
+          description: data.error ?? "Paste a direct .mp4 link or load a file instead.",
+          variant: "destructive",
+        });
+        return null;
+      }
+      if (data.isHls && data.token) {
+        return `${API_BASE}/api/video/hls/${data.token}/manifest.m3u8`;
+      }
+      return data.cdnUrl;
+    } catch {
+      toast({ title: "Network error resolving video URL", variant: "destructive" });
+      return null;
+    }
+  }, [getToken, toast]);
+
+  // ── Load a LibraryEntry in-memory (for queue navigation) ──────────────────
+  // Mirrors the single-item pendingVideoUrl flow: blob/file refs use as-is,
+  // known embed platforms are rewritten, unknown page URLs go through yt-dlp.
+  const loadLibraryEntry = useCallback(async (entry: LibraryEntry) => {
+    if (entry.url) {
+      const raw = entry.url;
+
+      // Local blob/file references — use as-is
+      if (raw.startsWith("blob:") || raw.startsWith("file:")) {
+        setVideoUrl(raw);
+        setEmbedUrl(null);
+        setVideoMode("file");
+        setVideoLabel(entry.name);
+        setVideoLabelIsFile(true);
+        return;
+      }
+
+      const detected = detectEmbedUrl(raw);
+      if (!detected) return; // malformed URL
+
+      if (detected.mode === "url") {
+        // Direct video file (.mp4 / .webm / etc.)
+        setVideoUrl(detected.embedUrl);
+        setEmbedUrl(null);
+        setVideoMode("url");
+        setVideoLabel(entry.name);
+        setVideoLabelIsFile(false);
+        return;
+      }
+
+      if (detected.embedUrl !== raw) {
+        // Known embed platform — rewritten URL (YouTube, Pornhub, etc.)
+        setEmbedUrl(detected.embedUrl);
+        setVideoUrl(null);
+        setVideoMode("embed");
+        setVideoLabel(entry.name);
+        setVideoLabelIsFile(false);
+        return;
+      }
+
+      // Unknown page URL — resolve via yt-dlp for direct playback
+      setUrlResolving(true);
+      const cdnUrl = await resolvePageUrl(raw);
+      setUrlResolving(false);
+      if (cdnUrl) {
+        setVideoUrl(cdnUrl);
+        setEmbedUrl(null);
+        setVideoMode("url");
+        setVideoLabel(entry.name);
+        setVideoLabelIsFile(false);
+      }
+      return;
+    }
+
+    // ── Local file / blob entry ───────────────────────────────────────────
+    let url: string | null = null;
+
+    if (entry.fileHandle) {
+      try {
+        const fsaHandle = entry.fileHandle as unknown as FSAFileHandle;
+        let perm = await fsaHandle.queryPermission({ mode: "read" });
+        if (perm !== "granted") {
+          perm = await fsaHandle.requestPermission({ mode: "read" });
+        }
+        if (perm === "granted") {
+          const file = await fsaHandle.getFile();
+          url = URL.createObjectURL(file);
+        }
+      } catch { /* fall through to blob */ }
+    }
+
+    if (!url && entry.blob) {
+      url = URL.createObjectURL(entry.blob);
+    }
+
+    if (!url) return;
+
+    if (entry.type === "video") {
+      setVideoUrl(url);
+      setEmbedUrl(null);
+      setVideoMode("file");
+      setVideoLabel(entry.name);
+      setVideoLabelIsFile(true);
+    } else {
+      try {
+        const file = entry.blob ?? (entry.fileHandle ? await entry.fileHandle.getFile() : null);
+        if (file) {
+          const text = await (file as Blob).text();
+          try {
+            const script = parseFunscript(JSON.parse(text));
+            setScripts([script, null, null, null]);
+            setActiveScriptIdx(0);
+          } catch { /* ignore invalid script */ }
+        }
+      } catch { /* ignore */ }
+    }
+  }, [resolvePageUrl]);
+
+  // ── Load item passed from Library / Community ──────────────────────────────
+  // Runs once on mount.
   useEffect(() => {
     const pendingVideoUrl  = localStorage.getItem("handy_pending_video_url");
     const pendingVideoName = localStorage.getItem("handy_pending_video_name");
     const pendingScript    = localStorage.getItem("handy_pending_script");
+    const pendingPlaylist  = localStorage.getItem("handy_pending_playlist");
 
     localStorage.removeItem("handy_pending_video_url");
     localStorage.removeItem("handy_pending_video_name");
     localStorage.removeItem("handy_pending_script");
     localStorage.removeItem("handy_pending_script_name");
+    localStorage.removeItem("handy_pending_playlist");
+
+    // ── Playlist queue ──────────────────────────────────────────────────────
+    if (pendingPlaylist) {
+      try {
+        const parsed = JSON.parse(pendingPlaylist) as QueueState;
+        if (Array.isArray(parsed.itemIds) && parsed.itemIds.length > 0) {
+          const startIndex = typeof parsed.index === "number" && parsed.index >= 0 && parsed.index < parsed.itemIds.length
+            ? parsed.index
+            : 0;
+          setQueueState({ itemIds: parsed.itemIds, index: startIndex, playlistName: parsed.playlistName });
+          // Load the entry at startIndex
+          void getEntry(parsed.itemIds[startIndex]).then(entry => {
+            if (entry) loadLibraryEntry(entry);
+          });
+          return;
+        }
+      } catch { /* ignore malformed */ }
+    }
 
     if (pendingScript) {
       try {
@@ -291,6 +450,49 @@ export default function Player() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Queue navigation helpers ───────────────────────────────────────────────
+  const jumpToQueueIndex = useCallback(async (idx: number) => {
+    if (!queueState) return;
+    const entry = await getEntry(queueState.itemIds[idx]);
+    if (!entry) return;
+    setQueueState(prev => prev ? { ...prev, index: idx } : null);
+    await loadLibraryEntry(entry);
+  }, [queueState, loadLibraryEntry]);
+
+  const handleQueuePrev = useCallback(() => {
+    if (!queueState || queueState.index === 0) return;
+    jumpToQueueIndex(queueState.index - 1);
+  }, [queueState, jumpToQueueIndex]);
+
+  const handleQueueNext = useCallback(() => {
+    if (!queueState || queueState.index >= queueState.itemIds.length - 1) return;
+    jumpToQueueIndex(queueState.index + 1);
+  }, [queueState, jumpToQueueIndex]);
+
+  const handleQueueJump = useCallback((idx: number, entry: LibraryEntry) => {
+    setQueueState(prev => prev ? { ...prev, index: idx } : null);
+    loadLibraryEntry(entry);
+  }, [loadLibraryEntry]);
+
+  // ── Video ended — auto-advance queue ──────────────────────────────────────
+  const queueStateRef = useRef(queueState);
+  useEffect(() => { queueStateRef.current = queueState; }, [queueState]);
+  const jumpToQueueIndexRef = useRef(jumpToQueueIndex);
+  useEffect(() => { jumpToQueueIndexRef.current = jumpToQueueIndex; }, [jumpToQueueIndex]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onEnded = () => {
+      const qs = queueStateRef.current;
+      if (qs && qs.index < qs.itemIds.length - 1) {
+        jumpToQueueIndexRef.current(qs.index + 1);
+      }
+    };
+    video.addEventListener("ended", onEnded);
+    return () => video.removeEventListener("ended", onEnded);
+  }, []);
+
   const activeScript = scripts[activeScriptIdx];
 
   // Sync HDSP engine with active script
@@ -312,8 +514,6 @@ export default function Player() {
   }, [activeScript, key, recordAppModeChange]);
 
   // ── HLS attachment ─────────────────────────────────────────────────────────
-  // When videoUrl is an HLS manifest, attach it via hls.js (or native HLS on
-  // Safari). For regular file/URL sources the <video src=…> attribute handles it.
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoUrl) return;
@@ -362,15 +562,12 @@ export default function Player() {
   }, [isPlaying, hsspStatus]);
 
   // When HSSP becomes ready mid-playback, migrate from HDSP fallback to HSSP immediately.
-  // This effect only fires on hsspStatus changes to avoid running on every isPlaying toggle.
   useEffect(() => {
     if (hsspStatus === "ready" && isPlaying && videoRef.current) {
       const posMs = videoRef.current.currentTime * 1000;
       hsspEngine.play(posMs);
     }
 
-    // Track whether we've ever hit an error so we can detect recovery even
-    // though prepare() transitions error → uploading → ready (not directly).
     if (hsspStatus === "error") {
       hadHsspErrorRef.current = true;
     }
@@ -395,48 +592,14 @@ export default function Player() {
 
   const [urlResolving, setUrlResolving] = useState(false);
 
-  // Resolve a page URL to a direct CDN URL via yt-dlp on the backend.
-  // Returns the CDN URL on success, or null on failure (toast shown).
-  const resolvePageUrl = useCallback(async (pageUrl: string): Promise<string | null> => {
-    try {
-      const token = await getToken();
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch(
-        `${API_BASE}/api/video/resolve?url=${encodeURIComponent(pageUrl)}`,
-        { headers }
-      );
-      const data = await res.json() as { token?: string; cdnUrl?: string; isHls?: boolean; error?: string };
-      if (!res.ok || !data.cdnUrl) {
-        toast({
-          title: "Couldn't resolve video URL",
-          description: data.error ?? "Paste a direct .mp4 link or load a file instead.",
-          variant: "destructive",
-        });
-        return null;
-      }
-      // For HLS streams use the rewriting proxy; for plain video use CDN URL directly.
-      if (data.isHls && data.token) {
-        return `${API_BASE}/api/video/hls/${data.token}/manifest.m3u8`;
-      }
-      return data.cdnUrl;
-    } catch {
-      toast({ title: "Network error resolving video URL", variant: "destructive" });
-      return null;
-    }
-  }, [getToken, toast]);
-
   const handleUrlLoad = async () => {
     let raw = urlInput.trim();
     if (!raw) return;
 
-    // ── Embed-code handling ───────────────────────────────────────────────────
-    // If the user pasted an <iframe src="…"> snippet (copied from a site's
-    // share/embed menu), extract the src and use it directly as the embed URL.
     const embedMatch = raw.match(/src=["']([^"']+)["']/i);
     if (embedMatch) {
       const src = embedMatch[1];
-      try { new URL(src); } catch { return; } // malformed src — ignore
+      try { new URL(src); } catch { return; }
       setEmbedUrl(src);
       setVideoUrl(null);
       setVideoMode("embed");
@@ -446,9 +609,8 @@ export default function Player() {
     }
 
     const detected = detectEmbedUrl(raw);
-    if (!detected) return; // malformed URL
+    if (!detected) return;
 
-    // Direct video file (.mp4 / .webm / etc.) — load immediately.
     if (detected.mode === "url") {
       setVideoUrl(detected.embedUrl);
       setEmbedUrl(null);
@@ -458,7 +620,6 @@ export default function Player() {
       return;
     }
 
-    // Known embed platform: detectEmbedUrl rewrote the URL to an embed form.
     if (detected.embedUrl !== raw) {
       setEmbedUrl(detected.embedUrl);
       setVideoUrl(null);
@@ -468,7 +629,6 @@ export default function Player() {
       return;
     }
 
-    // Unknown page URL — try yt-dlp resolution for direct playback.
     setUrlResolving(true);
     const cdnUrl = await resolvePageUrl(raw);
     setUrlResolving(false);
@@ -479,7 +639,6 @@ export default function Player() {
       setVideoLabel(raw);
       setVideoLabelIsFile(false);
     }
-    // If resolution fails, resolvePageUrl already shows a toast.
   };
 
   const { reportAction } = useBlockedReport();
@@ -520,7 +679,6 @@ export default function Player() {
       const posMs = videoRef.current.currentTime * 1000;
       await hsspEngine.play(posMs);
     }
-    // HDSP fallback loop is started by the effect above
   }, [hsspStatus]);
 
   const handlePause = useCallback(async () => {
@@ -596,6 +754,16 @@ export default function Player() {
   };
 
   const hasVideo = videoUrl || embedUrl;
+
+  // Queue nav extra controls for the video control bar — only truthy when rendered
+  const hasQueueNav = queueState != null && queueState.itemIds.length > 1;
+  const queueNavControls = hasQueueNav ? (
+    <QueueNav
+      queue={queueState}
+      onPrev={handleQueuePrev}
+      onNext={handleQueueNext}
+    />
+  ) : undefined;
 
   return (
     <div className="p-6 h-full flex flex-col max-w-[1600px] mx-auto gap-6">
@@ -752,11 +920,18 @@ export default function Player() {
                 <div className="bg-card/80 border-t border-border/40 px-4 py-2 flex-shrink-0">
                   <VideoControlBar
                     videoRef={videoRef}
-                    extraControls={isRecording ? (
-                      <Button size="sm" variant="destructive" onClick={recordPoint} className="text-xs h-7 gap-1.5 font-bold">
-                        ● STROKE
-                      </Button>
-                    ) : undefined}
+                    extraControls={
+                      isRecording || hasQueueNav ? (
+                        <>
+                          {isRecording && (
+                            <Button size="sm" variant="destructive" onClick={recordPoint} className="text-xs h-7 gap-1.5 font-bold">
+                              ● STROKE
+                            </Button>
+                          )}
+                          {queueNavControls}
+                        </>
+                      ) : undefined
+                    }
                   />
                 </div>
               )}
@@ -837,6 +1012,14 @@ export default function Player() {
         </div>
 
         <div className="flex flex-col gap-4">
+          {/* Queue panel — shown only when a playlist is active */}
+          {queueState && (
+            <PlayerQueue
+              queue={queueState}
+              onJump={handleQueueJump}
+            />
+          )}
+
           <Card className="border-primary/20 bg-card/50">
             <CardHeader>
               <CardTitle>Finish Mode</CardTitle>

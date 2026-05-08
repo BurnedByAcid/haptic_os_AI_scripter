@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { getAllEntries, addEntry, deleteEntry, updateEntry, LibraryEntry } from "@/lib/db";
+import { getAllEntries, addEntry, deleteEntry, updateEntry, LibraryEntry, Playlist, getAllPlaylists, addPlaylist, updatePlaylist, deletePlaylist } from "@/lib/db";
 import { Card, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check, Pencil } from "lucide-react";
+import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check, Pencil, ListVideo, Plus } from "lucide-react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { validateVideoUrl, validateAndParseFunscriptFile, sanitizeName } from "@/lib/validation";
@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { getHostLabel } from "@/lib/url-utils";
+import { PlaylistEditorDialog } from "@/components/playlist-editor-dialog";
 
 // File System Access API types (Chrome/Edge, not yet in standard TS lib)
 interface FSAFileHandle extends FileSystemFileHandle {
@@ -113,12 +114,16 @@ function getThumbnailForUrl(url: string): Promise<string> {
   return Promise.resolve(getStaticUrlThumbnail(url));
 }
 
+type LibraryTab = "library" | "playlists";
+
 export default function Library() {
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
   const [search, setSearch] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { reportAction } = useBlockedReport();
+
+  const [activeTab, setActiveTab] = useState<LibraryTab>("library");
 
   const [showUrlForm, setShowUrlForm] = useState(false);
   const [urlInput, setUrlInput] = useState("");
@@ -131,13 +136,24 @@ export default function Library() {
   const [editUrl, setEditUrl] = useState("");
   const [editSaving, setEditSaving] = useState(false);
 
+  // Playlist state
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
+
   const loadEntries = async () => {
     const data = await getAllEntries();
     setEntries(data.sort((a, b) => b.addedAt - a.addedAt));
   };
 
+  const loadPlaylists = async () => {
+    const data = await getAllPlaylists();
+    setPlaylists(data.sort((a, b) => b.createdAt - a.createdAt));
+  };
+
   useEffect(() => {
     loadEntries();
+    loadPlaylists();
   }, []);
 
   useEffect(() => {
@@ -410,6 +426,44 @@ export default function Library() {
     }
   };
 
+  // ── Playlist handlers ───────────────────────────────────────────────────────
+
+  const handleSavePlaylist = async (name: string, itemIds: string[]) => {
+    if (editingPlaylist) {
+      await updatePlaylist({ ...editingPlaylist, name, itemIds });
+    } else {
+      await addPlaylist({ id: crypto.randomUUID(), name, itemIds, createdAt: Date.now() });
+    }
+    await loadPlaylists();
+    setEditorOpen(false);
+    setEditingPlaylist(null);
+  };
+
+  const handleDeletePlaylist = async (id: string) => {
+    await deletePlaylist(id);
+    await loadPlaylists();
+  };
+
+  const openNewPlaylist = () => {
+    setEditingPlaylist(null);
+    setEditorOpen(true);
+  };
+
+  const openEditPlaylist = (pl: Playlist) => {
+    setEditingPlaylist(pl);
+    setEditorOpen(true);
+  };
+
+  const handlePlayPlaylist = (pl: Playlist) => {
+    if (pl.itemIds.length === 0) {
+      toast({ title: "Playlist is empty", description: "Add some items before playing.", variant: "destructive" });
+      return;
+    }
+    const pendingPlaylist = { itemIds: pl.itemIds, index: 0, playlistName: pl.name };
+    localStorage.setItem("handy_pending_playlist", JSON.stringify(pendingPlaylist));
+    setLocation("/player");
+  };
+
   const filtered = entries.filter(e => e.name.toLowerCase().includes(search.toLowerCase()));
 
   const sharedEditProps = {
@@ -433,95 +487,242 @@ export default function Library() {
             <p className="text-muted-foreground">Manage your local videos and scripts.</p>
           </div>
           <div className="flex items-center gap-4">
-            <div className="w-64">
-              <Input
-                placeholder="Search library..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="bg-card"
-              />
-            </div>
-            <Button onClick={() => setShowUrlForm(v => !v)} data-testid="button-add-url">
-              <Link className="h-4 w-4 mr-2" /> Add URL
-            </Button>
-            {hasFSA ? (
-              <Button variant="default" onClick={handleBrowseFSA} data-testid="button-upload-library">
-                <FolderOpen className="h-4 w-4 mr-2" /> Browse Files
-              </Button>
-            ) : (
-              <Button variant="default" className="relative cursor-pointer" data-testid="button-upload-library">
-                <Upload className="h-4 w-4 mr-2" /> Upload
-                <input
-                  type="file"
-                  accept="video/*,.funscript,.json"
-                  multiple
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                  onChange={handleUpload}
-                />
+            {activeTab === "library" && (
+              <>
+                <div className="w-64">
+                  <Input
+                    placeholder="Search library..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="bg-card"
+                  />
+                </div>
+                <Button onClick={() => setShowUrlForm(v => !v)} data-testid="button-add-url">
+                  <Link className="h-4 w-4 mr-2" /> Add URL
+                </Button>
+                {hasFSA ? (
+                  <Button variant="default" onClick={handleBrowseFSA} data-testid="button-upload-library">
+                    <FolderOpen className="h-4 w-4 mr-2" /> Browse Files
+                  </Button>
+                ) : (
+                  <Button variant="default" className="relative cursor-pointer" data-testid="button-upload-library">
+                    <Upload className="h-4 w-4 mr-2" /> Upload
+                    <input
+                      type="file"
+                      accept="video/*,.funscript,.json"
+                      multiple
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={handleUpload}
+                    />
+                  </Button>
+                )}
+              </>
+            )}
+            {activeTab === "playlists" && (
+              <Button onClick={openNewPlaylist}>
+                <Plus className="h-4 w-4 mr-2" /> New Playlist
               </Button>
             )}
           </div>
         </div>
 
-        {showUrlForm && (
-          <div className="rounded-xl border border-border/60 bg-card/70 backdrop-blur p-4 flex flex-col gap-3 shadow-sm" data-testid="url-form">
-            <div className="flex items-center gap-2">
-              <Link className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm font-medium">Add video from URL</span>
+        {/* Tab switcher */}
+        <div className="flex items-center gap-1 border-b border-border/50 -mt-4">
+          <button
+            onClick={() => setActiveTab("library")}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === "library"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Film className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
+            Library
+          </button>
+          <button
+            onClick={() => setActiveTab("playlists")}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === "playlists"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ListVideo className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
+            Playlists
+            {playlists.length > 0 && (
+              <span className="ml-1.5 text-xs bg-muted px-1.5 py-0.5 rounded-full">{playlists.length}</span>
+            )}
+          </button>
+        </div>
+
+        {/* Library tab */}
+        {activeTab === "library" && (
+          <>
+            {showUrlForm && (
+              <div className="rounded-xl border border-border/60 bg-card/70 backdrop-blur p-4 flex flex-col gap-3 shadow-sm" data-testid="url-form">
+                <div className="flex items-center gap-2">
+                  <Link className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <span className="text-sm font-medium">Add video from URL</span>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    ref={urlInputRef}
+                    placeholder="Paste video URL (YouTube, Pornhub, xVideos, Vimeo, or direct .mp4/.webm)…"
+                    value={urlInput}
+                    onChange={e => setUrlInput(e.target.value)}
+                    onKeyDown={handleUrlKeyDown}
+                    className="flex-1 bg-background/50"
+                    data-testid="url-input"
+                  />
+                  <Input
+                    placeholder="Name (optional)"
+                    value={nameInput}
+                    onChange={e => setNameInput(e.target.value)}
+                    onKeyDown={handleUrlKeyDown}
+                    className="w-48 bg-background/50"
+                    data-testid="url-name-input"
+                  />
+                  <Button
+                    onClick={handleAddUrl}
+                    disabled={!urlInput.trim() || addingUrl}
+                    data-testid="url-confirm"
+                  >
+                    {addingUrl ? (
+                      <span className="flex items-center gap-1.5"><span className="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block" />Adding…</span>
+                    ) : (
+                      <><Check className="h-4 w-4 mr-1.5" />Add</>
+                    )}
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => { setShowUrlForm(false); setUrlInput(""); setNameInput(""); }} data-testid="url-cancel">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground ml-6">
+                  Supports YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo, or any direct .mp4/.webm URL
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 content-start">
+              {filtered.map(entry => (
+                entry.url
+                  ? <UrlEntryCard key={entry.id} entry={entry} onOpen={handleOpen} onDelete={handleDelete} {...sharedEditProps} />
+                  : <FileEntryCard key={entry.id} entry={entry} onOpen={handleOpen} onDelete={handleDelete} {...sharedEditProps} />
+              ))}
+              {filtered.length === 0 && (
+                <div className="col-span-full py-12 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-border/50 rounded-xl">
+                  <LibraryIcon className="h-12 w-12 mb-4 opacity-20" />
+                  <p>No entries found in library.</p>
+                </div>
+              )}
             </div>
-            <div className="flex gap-2">
-              <Input
-                ref={urlInputRef}
-                placeholder="Paste video URL (YouTube, Pornhub, xVideos, Vimeo, or direct .mp4/.webm)…"
-                value={urlInput}
-                onChange={e => setUrlInput(e.target.value)}
-                onKeyDown={handleUrlKeyDown}
-                className="flex-1 bg-background/50"
-                data-testid="url-input"
-              />
-              <Input
-                placeholder="Name (optional)"
-                value={nameInput}
-                onChange={e => setNameInput(e.target.value)}
-                onKeyDown={handleUrlKeyDown}
-                className="w-48 bg-background/50"
-                data-testid="url-name-input"
-              />
-              <Button
-                onClick={handleAddUrl}
-                disabled={!urlInput.trim() || addingUrl}
-                data-testid="url-confirm"
-              >
-                {addingUrl ? (
-                  <span className="flex items-center gap-1.5"><span className="animate-spin h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full inline-block" />Adding…</span>
-                ) : (
-                  <><Check className="h-4 w-4 mr-1.5" />Add</>
-                )}
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => { setShowUrlForm(false); setUrlInput(""); setNameInput(""); }} data-testid="url-cancel">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <p className="text-[11px] text-muted-foreground ml-6">
-              Supports YouTube, Pornhub, xVideos, xHamster, RedTube, Vimeo, or any direct .mp4/.webm URL
-            </p>
-          </div>
+          </>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 content-start">
-          {filtered.map(entry => (
-            entry.url
-              ? <UrlEntryCard key={entry.id} entry={entry} onOpen={handleOpen} onDelete={handleDelete} {...sharedEditProps} />
-              : <FileEntryCard key={entry.id} entry={entry} onOpen={handleOpen} onDelete={handleDelete} {...sharedEditProps} />
-          ))}
-          {filtered.length === 0 && (
-            <div className="col-span-full py-12 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-border/50 rounded-xl">
-              <LibraryIcon className="h-12 w-12 mb-4 opacity-20" />
-              <p>No entries found in library.</p>
-            </div>
-          )}
-        </div>
+        {/* Playlists tab */}
+        {activeTab === "playlists" && (
+          <div className="flex-1">
+            {playlists.length === 0 ? (
+              <div className="py-16 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-border/50 rounded-xl">
+                <ListVideo className="h-12 w-12 mb-4 opacity-20" />
+                <p className="mb-4">No playlists yet.</p>
+                <Button onClick={openNewPlaylist} variant="outline">
+                  <Plus className="h-4 w-4 mr-2" /> Create your first playlist
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {playlists.map(pl => {
+                  const count = pl.itemIds.length;
+                  return (
+                    <Card key={pl.id} className="bg-card/50 backdrop-blur overflow-hidden flex flex-col">
+                      {/* Header area */}
+                      <div className="flex-1 p-5 flex flex-col gap-2">
+                        <div className="flex items-start gap-3">
+                          <div className="bg-primary/10 rounded-lg p-2.5 shrink-0">
+                            <ListVideo className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-base leading-snug truncate">{pl.name}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {count} {count === 1 ? "item" : "items"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Preview of first few items */}
+                        {count > 0 && (
+                          <div className="mt-1 space-y-1">
+                            {pl.itemIds.slice(0, 3).map((id, idx) => {
+                              const entry = entries.find(e => e.id === id);
+                              return (
+                                <div key={id} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <span className="w-4 text-right shrink-0">{idx + 1}.</span>
+                                  {entry ? (
+                                    <>
+                                      {entry.type === "video"
+                                        ? <Film className="h-3 w-3 shrink-0" />
+                                        : <FileJson className="h-3 w-3 shrink-0" />}
+                                      <span className="truncate">{entry.name}</span>
+                                    </>
+                                  ) : (
+                                    <span className="opacity-50 italic">Missing</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            {count > 3 && (
+                              <p className="text-xs text-muted-foreground pl-5">+{count - 3} more…</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <CardFooter className="p-4 pt-0 gap-2 border-t border-border/30 mt-auto">
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handlePlayPlaylist(pl)}
+                          disabled={count === 0}
+                        >
+                          <Play className="h-4 w-4 mr-1.5" /> Play
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                          onClick={() => openEditPlaylist(pl)}
+                          title="Edit playlist"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => handleDeletePlaylist(pl.id)}
+                          title="Delete playlist"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      <PlaylistEditorDialog
+        open={editorOpen}
+        onClose={() => { setEditorOpen(false); setEditingPlaylist(null); }}
+        onSave={handleSavePlaylist}
+        playlist={editingPlaylist}
+        allEntries={entries}
+      />
     </TooltipProvider>
   );
 }
