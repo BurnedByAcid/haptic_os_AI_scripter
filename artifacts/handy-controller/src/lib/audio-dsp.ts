@@ -4,7 +4,15 @@
  * AudioContext to avoid allocating extra contexts.
  */
 
-export function applyVocalRemoval(buffer: AudioBuffer, ctx: AudioContext): AudioBuffer {
+/**
+ * Phase-cancellation vocal removal with adjustable blend strength.
+ * strength = 0 → passthrough, strength = 1 → full vocal removal (default).
+ */
+export function applyVocalRemoval(
+  buffer: AudioBuffer,
+  ctx: AudioContext,
+  strength = 1,
+): AudioBuffer {
   const numSamples = buffer.length;
   const numCh = buffer.numberOfChannels;
 
@@ -17,10 +25,12 @@ export function applyVocalRemoval(buffer: AudioBuffer, ctx: AudioContext): Audio
   const outL = outBuffer.getChannelData(0);
   const outR = outBuffer.getChannelData(1);
 
+  const blend = Math.max(0, Math.min(1, strength));
+
   for (let i = 0; i < numSamples; i++) {
     const side = (left[i] - right[i]) / 2;
-    outL[i] = side;
-    outR[i] = side;
+    outL[i] = side * blend + left[i] * (1 - blend);
+    outR[i] = side * blend + right[i] * (1 - blend);
   }
 
   return outBuffer;
@@ -74,20 +84,27 @@ export function applyImpactSuppression(
 }
 
 /**
- * First-order IIR low-pass at ~8 kHz followed by a peak hard-limiter.
+ * First-order IIR low-pass followed by a peak hard-limiter.
  * Tames screaming by rolling off high-frequency content and capping peaks.
+ *
+ * cutoffHz  — low-pass cutoff frequency in Hz (default 8000)
+ * peakLimit — hard clip ceiling 0–1 (default 0.6)
  */
-export function applyScreamSuppression(buffer: AudioBuffer, ctx: AudioContext): AudioBuffer {
+export function applyScreamSuppression(
+  buffer: AudioBuffer,
+  ctx: AudioContext,
+  cutoffHz = 8000,
+  peakLimit = 0.6,
+): AudioBuffer {
   const sampleRate = buffer.sampleRate;
   const numSamples = buffer.length;
   const numCh = buffer.numberOfChannels;
   const outBuffer = ctx.createBuffer(numCh, numSamples, buffer.sampleRate);
 
-  const cutoffFreq = 8000;
-  const RC = 1 / (2 * Math.PI * cutoffFreq);
+  const RC = 1 / (2 * Math.PI * cutoffHz);
   const dt = 1 / sampleRate;
   const alpha = dt / (RC + dt);
-  const peakLimit = 0.6;
+  const limit = Math.max(0.01, Math.min(1, peakLimit));
 
   for (let ch = 0; ch < numCh; ch++) {
     const input = buffer.getChannelData(ch);
@@ -96,7 +113,7 @@ export function applyScreamSuppression(buffer: AudioBuffer, ctx: AudioContext): 
     let prev = 0;
     for (let i = 0; i < numSamples; i++) {
       prev = prev + alpha * (input[i] - prev);
-      output[i] = Math.abs(prev) > peakLimit ? Math.sign(prev) * peakLimit : prev;
+      output[i] = Math.abs(prev) > limit ? Math.sign(prev) * limit : prev;
     }
   }
 

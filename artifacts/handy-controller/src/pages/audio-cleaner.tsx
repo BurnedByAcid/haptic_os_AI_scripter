@@ -89,6 +89,20 @@ interface Options {
   screamSuppression: boolean;
 }
 
+interface FilterParams {
+  vocalStrength: number;
+  impactRatio: number;
+  screamCutoff: number;
+  screamPeak: number;
+}
+
+const DEFAULT_PARAMS: FilterParams = {
+  vocalStrength: 100,
+  impactRatio: 4,
+  screamCutoff: 8000,
+  screamPeak: 0.6,
+};
+
 export default function AudioCleaner() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -101,6 +115,7 @@ export default function AudioCleaner() {
     impactSuppression: true,
     screamSuppression: false,
   });
+  const [params, setParams] = useState<FilterParams>({ ...DEFAULT_PARAMS });
 
   const [cancelling, setCancelling] = useState(false);
   const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
@@ -227,17 +242,17 @@ export default function AudioCleaner() {
 
       if (options.vocalRemoval) {
         setStatusMsg("Removing vocals…");
-        decoded = applyVocalRemoval(decoded, audioCtx);
+        decoded = applyVocalRemoval(decoded, audioCtx, params.vocalStrength / 100);
         if (!alive()) { resetAfterCancel(); return; }
       }
       if (options.impactSuppression) {
         setStatusMsg("Suppressing impact sounds…");
-        decoded = applyImpactSuppression(decoded, audioCtx);
+        decoded = applyImpactSuppression(decoded, audioCtx, 512, params.impactRatio);
         if (!alive()) { resetAfterCancel(); return; }
       }
       if (options.screamSuppression) {
         setStatusMsg("Suppressing screaming…");
-        decoded = applyScreamSuppression(decoded, audioCtx);
+        decoded = applyScreamSuppression(decoded, audioCtx, params.screamCutoff, params.screamPeak);
         if (!alive()) { resetAfterCancel(); return; }
       }
 
@@ -264,7 +279,7 @@ export default function AudioCleaner() {
       setErrorMsg(err instanceof Error ? err.message : "Unknown error");
       setStep("error");
     }
-  }, [options, loadFFmpeg, stopPlayback, toast]);
+  }, [options, params, loadFFmpeg, stopPlayback, toast]);
 
   const handleFileSelect = useCallback((file: File | null | undefined) => {
     if (!file) return;
@@ -371,6 +386,7 @@ export default function AudioCleaner() {
     setOutputSize(null);
     setFileName("");
     setOptions({ vocalRemoval: true, impactSuppression: true, screamSuppression: false });
+    setParams({ ...DEFAULT_PARAMS });
   }, [stopPlayback]);
 
   const formatFileSize = (bytes: number): string => {
@@ -381,6 +397,10 @@ export default function AudioCleaner() {
 
   const toggleOption = (key: keyof Options) => {
     setOptions(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const setParam = <K extends keyof FilterParams>(key: K, value: FilterParams[K]) => {
+    setParams(prev => ({ ...prev, [key]: value }));
   };
 
   return (
@@ -471,31 +491,15 @@ export default function AudioCleaner() {
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Removal Options</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {(
-                [
-                  { key: "vocalRemoval" as const, label: "Vocal / Voice Removal", desc: "Phase cancellation strips center-panned vocals" },
-                  { key: "impactSuppression" as const, label: "Impact / Slap Suppression", desc: "Transient limiter reduces sharp percussive spikes" },
-                  { key: "screamSuppression" as const, label: "Scream Suppression", desc: "High-freq rolloff + limiter tames screaming peaks" },
-                ]
-              ).map(({ key, label, desc }) => (
-                <label key={key} className="flex items-start gap-3 cursor-pointer group">
+            <CardContent className="space-y-4">
+
+              {/* Vocal Removal */}
+              <div className="space-y-2">
+                <label className="flex items-start gap-3 cursor-pointer group">
                   <div className="mt-0.5 relative">
-                    <input
-                      type="checkbox"
-                      checked={options[key]}
-                      onChange={() => toggleOption(key)}
-                      disabled={isProcessing}
-                      className="sr-only"
-                    />
-                    <div
-                      className={`h-4 w-4 rounded border transition-colors flex items-center justify-center ${
-                        options[key]
-                          ? "bg-primary border-primary"
-                          : "border-border bg-background group-hover:border-primary/50"
-                      } ${isProcessing ? "opacity-50" : ""}`}
-                    >
-                      {options[key] && (
+                    <input type="checkbox" checked={options.vocalRemoval} onChange={() => toggleOption("vocalRemoval")} disabled={isProcessing} className="sr-only" />
+                    <div className={`h-4 w-4 rounded border transition-colors flex items-center justify-center ${options.vocalRemoval ? "bg-primary border-primary" : "border-border bg-background group-hover:border-primary/50"} ${isProcessing ? "opacity-50" : ""}`}>
+                      {options.vocalRemoval && (
                         <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
                           <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
@@ -503,11 +507,128 @@ export default function AudioCleaner() {
                     </div>
                   </div>
                   <div>
-                    <p className={`text-sm font-medium ${isProcessing ? "text-muted-foreground" : "text-foreground"}`}>{label}</p>
-                    <p className="text-xs text-muted-foreground leading-snug">{desc}</p>
+                    <p className={`text-sm font-medium ${isProcessing ? "text-muted-foreground" : "text-foreground"}`}>Vocal / Voice Removal</p>
+                    <p className="text-xs text-muted-foreground leading-snug">Phase cancellation strips center-panned vocals</p>
                   </div>
                 </label>
-              ))}
+                {options.vocalRemoval && (
+                  <div className="ml-7 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Strength</span>
+                      <span className="text-xs font-medium text-foreground tabular-nums">{params.vocalStrength}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0} max={100} step={1}
+                      value={params.vocalStrength}
+                      disabled={isProcessing}
+                      onChange={e => setParam("vocalStrength", Number(e.target.value))}
+                      className="w-full h-1.5 accent-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    <div className="flex justify-between text-[10px] text-muted-foreground/60">
+                      <span>Subtle</span><span>Full removal</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Impact Suppression */}
+              <div className="space-y-2">
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <div className="mt-0.5 relative">
+                    <input type="checkbox" checked={options.impactSuppression} onChange={() => toggleOption("impactSuppression")} disabled={isProcessing} className="sr-only" />
+                    <div className={`h-4 w-4 rounded border transition-colors flex items-center justify-center ${options.impactSuppression ? "bg-primary border-primary" : "border-border bg-background group-hover:border-primary/50"} ${isProcessing ? "opacity-50" : ""}`}>
+                      {options.impactSuppression && (
+                        <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+                          <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium ${isProcessing ? "text-muted-foreground" : "text-foreground"}`}>Impact / Slap Suppression</p>
+                    <p className="text-xs text-muted-foreground leading-snug">Transient limiter reduces sharp percussive spikes</p>
+                  </div>
+                </label>
+                {options.impactSuppression && (
+                  <div className="ml-7 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Ratio</span>
+                      <span className="text-xs font-medium text-foreground tabular-nums">{params.impactRatio.toFixed(1)}:1</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1} max={10} step={0.5}
+                      value={params.impactRatio}
+                      disabled={isProcessing}
+                      onChange={e => setParam("impactRatio", Number(e.target.value))}
+                      className="w-full h-1.5 accent-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    <div className="flex justify-between text-[10px] text-muted-foreground/60">
+                      <span>Gentle</span><span>Aggressive</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Scream Suppression */}
+              <div className="space-y-2">
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <div className="mt-0.5 relative">
+                    <input type="checkbox" checked={options.screamSuppression} onChange={() => toggleOption("screamSuppression")} disabled={isProcessing} className="sr-only" />
+                    <div className={`h-4 w-4 rounded border transition-colors flex items-center justify-center ${options.screamSuppression ? "bg-primary border-primary" : "border-border bg-background group-hover:border-primary/50"} ${isProcessing ? "opacity-50" : ""}`}>
+                      {options.screamSuppression && (
+                        <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+                          <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium ${isProcessing ? "text-muted-foreground" : "text-foreground"}`}>Scream Suppression</p>
+                    <p className="text-xs text-muted-foreground leading-snug">High-freq rolloff + limiter tames screaming peaks</p>
+                  </div>
+                </label>
+                {options.screamSuppression && (
+                  <div className="ml-7 space-y-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Cutoff</span>
+                        <span className="text-xs font-medium text-foreground tabular-nums">{params.screamCutoff.toLocaleString()} Hz</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={1000} max={18000} step={500}
+                        value={params.screamCutoff}
+                        disabled={isProcessing}
+                        onChange={e => setParam("screamCutoff", Number(e.target.value))}
+                        className="w-full h-1.5 accent-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      <div className="flex justify-between text-[10px] text-muted-foreground/60">
+                        <span>Aggressive</span><span>Subtle</span>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Peak Limit</span>
+                        <span className="text-xs font-medium text-foreground tabular-nums">{params.screamPeak.toFixed(2)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.1} max={1.0} step={0.05}
+                        value={params.screamPeak}
+                        disabled={isProcessing}
+                        onChange={e => setParam("screamPeak", Number(e.target.value))}
+                        className="w-full h-1.5 accent-primary cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      <div className="flex justify-between text-[10px] text-muted-foreground/60">
+                        <span>Heavy clip</span><span>No clip</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
             </CardContent>
           </Card>
         </div>
