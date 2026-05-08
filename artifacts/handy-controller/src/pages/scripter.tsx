@@ -2835,7 +2835,7 @@ export default function Scripter() {
                   onClick={bdToggleRecord}
                 >
                   {bdIsRecording ? (
-                    <><Square className="mr-2 h-3.5 w-3.5" /> Stop</>
+                    <><Square className="mr-2 h-3.5 w-3.5" /> Stop <span className="ml-1 opacity-60 font-mono text-[0.7em]">.{scriptOutputFiletype}</span></>
                   ) : (
                     <><span className="mr-1.5 text-sm leading-none">●</span> Record to Script</>
                   )}
@@ -3517,7 +3517,7 @@ export default function Scripter() {
                       onClick={runAnalysis}
                       data-testid="button-vt-analyze"
                     >
-                      {vtAnalyzing ? `Analyzing... ${vtProgress}%` : "Analyze Video"}
+                      {vtAnalyzing ? `Analyzing... ${vtProgress}%` : <><span>Analyze Video</span><span className="ml-1.5 opacity-60 font-mono text-[0.7em]">.{scriptOutputFiletype}</span></>}
                     </Button>
                     <div className="flex justify-end">
                       <span className={`text-[10px] px-2 py-0.5 rounded-full border ${gpuMode === "webgpu" ? "border-primary/50 text-primary bg-primary/10" : gpuMode === "webgl" ? "border-primary/40 text-primary/80 bg-primary/5" : "border-muted-foreground/30 text-muted-foreground"}`}>
