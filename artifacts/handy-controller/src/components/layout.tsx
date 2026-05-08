@@ -1,17 +1,19 @@
 import { Link, useLocation } from "wouter";
 import { ToastAction } from "@/components/ui/toast";
 import { useHandy } from "@/hooks/use-handy";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Settings, type LucideIcon } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Settings, Check, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useClerk, Show } from "@clerk/react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PlanBadge } from "@/components/plan-badge";
 import { useSubscription } from "@/hooks/use-subscription";
 import { useAppSettings, type Theme, type ScriptOutputFiletype } from "@/hooks/use-app-settings";
 import { Textarea } from "@/components/ui/textarea";
+import { setMode as apiSetMode } from "@/lib/handyApi";
 
 
 // ─── Supported devices ────────────────────────────────────────────────────────
@@ -108,7 +110,7 @@ const API = import.meta.env.VITE_API_URL ?? "";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
-  const { key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion, mode, modeChangedEvent } = useHandy();
+  const { key, updateKey, connected, checking, battery, charging, deviceModel, firmwareVersion, mode, modeChangedEvent, recordAppModeChange } = useHandy();
   const [inputKey, setInputKey] = useState(key);
   const [keyError, setKeyError] = useState<string | null>(null);
 
@@ -126,6 +128,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackCategory, setFeedbackCategory] = useState<"bug" | "suggestion" | "other">("other");
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [modePopoverOpen, setModePopoverOpen] = useState(false);
+  const [modeChanging, setModeChanging] = useState(false);
+
+  // ─── Mode selector ────────────────────────────────────────────────────────
+  const handleModeSelect = useCallback(async (newMode: number) => {
+    if (modeChanging || newMode === mode) { setModePopoverOpen(false); return; }
+    setModeChanging(true);
+    setModePopoverOpen(false);
+    recordAppModeChange(newMode);
+    try {
+      await apiSetMode(key, newMode);
+    } catch {
+      toast({ variant: "destructive", title: "Mode change failed", description: "Couldn't switch mode — check your connection." });
+    } finally {
+      setModeChanging(false);
+    }
+  }, [modeChanging, mode, key, recordAppModeChange, toast]);
 
   // ─── Device mode watcher ──────────────────────────────────────────────────
   // Track last interaction time so we can auto-navigate if the user is idle.
@@ -352,9 +371,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
               />
               {/* Mode badge (collapsed) */}
               {connected && mode !== undefined && (
-                <span className="text-[9px] font-bold font-mono leading-none px-1 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
-                  {MODE_LABELS[mode] ?? mode}
-                </span>
+                <Popover open={modePopoverOpen} onOpenChange={setModePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="text-[9px] font-bold font-mono leading-none px-1 py-0.5 rounded bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 hover:border-primary/50 transition-colors cursor-pointer"
+                      title="Switch device mode"
+                      disabled={modeChanging}
+                    >
+                      {modeChanging ? "…" : (MODE_LABELS[mode] ?? mode)}
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="right" align="start" className="w-36 p-1">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-2 py-1">Switch mode</p>
+                    {([0, 1, 2] as const).map(m => (
+                      <button
+                        key={m}
+                        onClick={() => handleModeSelect(m)}
+                        className="flex items-center justify-between w-full px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+                      >
+                        <span className="font-mono font-bold text-xs">{MODE_LABELS[m]}</span>
+                        {mode === m && <Check size={12} className="text-primary" />}
+                      </button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
               )}
               {/* Expand button */}
               <button
@@ -390,9 +430,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   />
                   {/* Mode badge (expanded) */}
                   {connected && mode !== undefined && (
-                    <span className="text-[9px] font-bold font-mono leading-none px-1 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
-                      {MODE_LABELS[mode] ?? mode}
-                    </span>
+                    <Popover open={modePopoverOpen} onOpenChange={setModePopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          className="text-[9px] font-bold font-mono leading-none px-1 py-0.5 rounded bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 hover:border-primary/50 transition-colors cursor-pointer"
+                          title="Switch device mode"
+                          disabled={modeChanging}
+                        >
+                          {modeChanging ? "…" : (MODE_LABELS[mode] ?? mode)}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent side="bottom" align="end" className="w-36 p-1">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-2 py-1">Switch mode</p>
+                        {([0, 1, 2] as const).map(m => (
+                          <button
+                            key={m}
+                            onClick={() => handleModeSelect(m)}
+                            className="flex items-center justify-between w-full px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+                          >
+                            <span className="font-mono font-bold text-xs">{MODE_LABELS[m]}</span>
+                            {mode === m && <Check size={12} className="text-primary" />}
+                          </button>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
                   )}
                   {/* Collapse button */}
                   <button
