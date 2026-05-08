@@ -240,6 +240,12 @@
   border-radius: 50%;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .emblem-glow-layer {
+    transition: none;
+  }
+}
+
 .emblem-glow-layer--active {
   opacity: 1;
 }
@@ -297,6 +303,11 @@
     overflow: hidden;
     transition: filter 0.2s ease, box-shadow 0.2s ease;
   }
+  @media (prefers-reduced-motion: reduce) {
+    .btn-gradient-shimmer {
+      transition: none;
+    }
+  }
   .btn-gradient-shimmer::before {
     content: "";
     position: absolute;
@@ -324,4 +335,29 @@
 [data-no-pulse] .pulse-icon,
 [data-no-pulse] .animate-pulse {
   animation: none !important;
+}
+
+/* ─── Reduced-motion: suppress Tailwind animate-* utilities ─────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .animate-pulse,
+  .animate-bounce,
+  .animate-ping,
+  .animate-fade-in,
+  .animate-fade-out,
+  .animate-slide-in-from-top,
+  .animate-slide-in-from-bottom,
+  .animate-slide-in-from-left,
+  .animate-slide-in-from-right,
+  .animate-slide-out-to-top,
+  .animate-slide-out-to-bottom,
+  .animate-slide-out-to-left,
+  .animate-slide-out-to-right,
+  .animate-accordion-down,
+  .animate-accordion-up,
+  .animate-collapsible-down,
+  .animate-collapsible-up {
+    animation: none !important;
+    transition: none !important;
+  }
 }
