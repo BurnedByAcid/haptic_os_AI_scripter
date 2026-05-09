@@ -284,6 +284,23 @@ export default function Scripter() {
     }
   }, [markClean]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ─── HapticAI import: if the user navigated here from HapticAI with a
+  //     generated script stored in sessionStorage, load it automatically. ───
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("hapticai_import");
+      if (!raw) return;
+      sessionStorage.removeItem("hapticai_import");
+      const parsed = JSON.parse(raw) as { funscript?: string; name?: string };
+      if (!parsed.funscript) return;
+      const nextPoints = applyFunscriptJson(parsed.funscript, parsed.name ?? "HapticAI");
+      markClean(nextPoints);
+      toast({ title: "HapticAI script loaded", description: "Your generated script is ready to edit." });
+    } catch { /* silent */ }
+  // Only run once on mount; applyFunscriptJson and markClean are stable callbacks.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ─── Resume-draft picker on mount: show only when editor is empty and the
   //     user actually has saved drafts (subscriber or recently-downgraded). ───
   const resumeCheckedRef = useRef(false);

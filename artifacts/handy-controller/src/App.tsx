@@ -27,6 +27,7 @@ import Community from "@/pages/community";
 import Upgrade from "@/pages/upgrade";
 import Admin from "@/pages/admin";
 import MyLibrary from "@/pages/my-library";
+import HapticAI from "@/pages/haptic-ai";
 
 const queryClient = new QueryClient();
 
@@ -151,6 +152,7 @@ function Router() {
       <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
       <Route path="/audio-cleaner" component={() => <Redirect to="/beat?tab=cleaner" />} />
       <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
+      <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} />} />
       <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
       <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
       <Route path="/admin"        component={() => <ProtectedRoute component={Admin} />} />

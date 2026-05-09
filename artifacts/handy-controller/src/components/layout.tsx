@@ -3,7 +3,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { useHandy } from "@/hooks/use-handy";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useRetryQueue } from "@/hooks/use-retry-queue";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Settings, Check, WifiOff, type LucideIcon } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Settings, Check, WifiOff, Sparkles, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -85,12 +85,15 @@ interface NavItem {
   label: string;
   icon: LucideIcon;
   requiresPro: boolean;
+  subscriberOnly?: boolean;
+  badge?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/",          label: "Dashboard",      icon: Home,      requiresPro: false },
   { href: "/player",    label: "Player",          icon: PlaySquare, requiresPro: false },
   { href: "/scripter",  label: "Scripter",        icon: Mic,       requiresPro: false },
+  { href: "/haptic-ai", label: "HapticAI",        icon: Sparkles,  requiresPro: true, subscriberOnly: true, badge: "Beta" },
   { href: "/library",   label: "My Library",      icon: BookMarked, requiresPro: false },
   { href: "/community", label: "Community",       icon: Users,     requiresPro: false },
   { href: "/control",   label: "Manual Controls", icon: Settings2, requiresPro: false },
@@ -581,7 +584,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Nav */}
         <div className="flex-1 overflow-y-auto py-3">
           <nav className={`space-y-0.5 ${collapsed ? "px-1.5" : "px-2"}`}>
-            {NAV_ITEMS.map((item) => {
+            {NAV_ITEMS.filter(item => !(item.subscriberOnly && !isPro)).map((item) => {
               const Icon = item.icon;
               const isActive = location === item.href;
               const locked = item.requiresPro && !isPro;
@@ -597,7 +600,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     <Icon size={18} className="text-muted-foreground/35 flex-shrink-0" />
-                    {!collapsed && <span className="text-sm text-muted-foreground/35">{item.label}</span>}
+                    {!collapsed && (
+                      <span className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <span className="text-sm text-muted-foreground/35">{item.label}</span>
+                        {item.badge && (
+                          <span className="text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-muted/50 text-muted-foreground/40 border border-muted-foreground/20 leading-none flex-shrink-0">
+                            {item.badge}
+                          </span>
+                        )}
+                      </span>
+                    )}
                   </div>
                 );
               }
@@ -616,7 +628,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     <Icon size={18} className="flex-shrink-0" />
-                    {!collapsed && <span className="text-sm">{item.label}</span>}
+                    {!collapsed && (
+                      <span className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <span className="text-sm">{item.label}</span>
+                        {item.badge && (
+                          <span className={`text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded border leading-none flex-shrink-0 ${
+                            isActive
+                              ? "bg-primary/20 text-primary border-primary/40"
+                              : "bg-primary/10 text-primary/70 border-primary/25"
+                          }`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </span>
+                    )}
                   </div>
                 </Link>
               );
