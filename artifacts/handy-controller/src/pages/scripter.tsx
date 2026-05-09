@@ -433,6 +433,7 @@ export default function Scripter() {
   const [vtLastScanCancelled, setVtLastScanCancelled] = useState(false);
   const [vtStartTime, setVtStartTime] = useState(0);
   const [vtEndTime, setVtEndTime] = useState(0);
+  const [vtVideoDuration, setVtVideoDuration] = useState<number | null>(null);
   const [vtScanSpeed, setVtScanSpeed] = useState<"fast" | "accurate">(() => {
     try {
       const stored = localStorage.getItem("vt_scan_speed");
@@ -1527,6 +1528,7 @@ export default function Scripter() {
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setVtVideoDuration(null);
       setVideoUrl(URL.createObjectURL(file));
       setVideoFileName(file.name);
     }
@@ -1563,6 +1565,7 @@ export default function Scripter() {
     const isDirectVideo = /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(parsed.pathname);
     if (isDirectVideo && !fromEmbedCode) {
       const name = decodeURIComponent(parsed.pathname.split("/").pop() || "video");
+      setVtVideoDuration(null);
       setVideoUrl(trimmed);
       setVideoFileName(name);
       setUrlDialogOpen(false);
@@ -1592,6 +1595,7 @@ export default function Scripter() {
       const proxyUrl = data.isHls
         ? `${API_BASE}/api/video/hls/${data.token}/manifest.m3u8`
         : `${API_BASE}/api/video/stream/${data.token}`;
+      setVtVideoDuration(null);
       setVideoUrl(proxyUrl);
       setVideoFileName(data.title ?? "video");
       setUrlDialogOpen(false);
@@ -2726,7 +2730,7 @@ export default function Scripter() {
             className="w-full h-full object-contain"
             preload="auto"
             onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
-            onLoadedMetadata={e => setVtEndTime(Math.round(e.currentTarget.duration))}
+            onLoadedMetadata={e => { const dur = e.currentTarget.duration; if (isFinite(dur)) { setVtVideoDuration(dur); setVtEndTime(Math.round(dur)); } else { setVtVideoDuration(null); } }}
             onError={(e) => {
               // Prevent the MediaError from bubbling to the Vite runtime error overlay.
               e.preventDefault();
@@ -2740,6 +2744,7 @@ export default function Scripter() {
                 // Clear the stale URL so the empty-state placeholder reappears.
                 setVideoUrl(null);
                 setVideoFileName("");
+                setVtVideoDuration(null);
               }
             }}
           />
@@ -3659,8 +3664,19 @@ export default function Scripter() {
                         </div>
                         <p className="text-[10px] text-muted-foreground mt-1">
                           {vtScanSpeed === "accurate"
-                            ? "4× — catches beats at 120–160 BPM. A 30-min video takes ~8 min."
+                            ? "4× — catches beats at 120–160 BPM."
                             : "8× — faster scan but may miss rapid beats above ~120 BPM."}
+                          {videoUrl && vtVideoDuration != null && (() => {
+                            const playbackRate = vtScanSpeed === "fast" ? 8 : 4;
+                            const effectiveEnd = vtEndTime > 0 ? Math.min(vtEndTime, vtVideoDuration) : vtVideoDuration;
+                            const rangeSeconds = Math.max(0, effectiveEnd - vtStartTime);
+                            const estimatedSeconds = rangeSeconds / playbackRate;
+                            const rangeMinutes = Math.round(rangeSeconds / 60);
+                            const estimatedMinutes = Math.round(estimatedSeconds / 60);
+                            const rangeLabel = rangeMinutes < 1 ? `${Math.round(rangeSeconds)}s` : `${rangeMinutes}-min`;
+                            const estimateLabel = estimatedMinutes < 1 ? `~${Math.max(1, Math.round(estimatedSeconds))}s` : `~${estimatedMinutes} min`;
+                            return ` ${estimateLabel} for your ${rangeLabel} video.`;
+                          })()}
                         </p>
                       </>
                     )}
