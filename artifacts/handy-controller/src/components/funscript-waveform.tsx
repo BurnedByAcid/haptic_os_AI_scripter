@@ -4,6 +4,8 @@ import { Funscript } from "@/lib/scriptSync";
 interface FunscriptWaveformProps {
   script: Funscript | null;
   videoRef: RefObject<HTMLVideoElement | null>;
+  /** Division timestamps in ms — rendered as violet vertical lines on the waveform */
+  divisions?: number[];
   className?: string;
   style?: CSSProperties;
 }
@@ -33,7 +35,7 @@ function niceInterval(totalMs: number, canvasW: number): number {
   return candidates[candidates.length - 1];
 }
 
-export function FunscriptWaveform({ script, videoRef, className, style }: FunscriptWaveformProps) {
+export function FunscriptWaveform({ script, videoRef, divisions = [], className, style }: FunscriptWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number | null>(null);
   const lastCursorX = useRef<number>(-1);
@@ -109,6 +111,20 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
     ctx.stroke();
     ctx.shadowBlur = 0;
 
+    // ── Division lines (violet, drawn on top of waveform) ──
+    divisions.forEach(divMs => {
+      if (divMs < 0 || divMs > totalMs) return;
+      const x = xOf(divMs);
+      ctx.save();
+      ctx.strokeStyle = "rgba(139, 92, 246, 0.85)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, ph);
+      ctx.stroke();
+      ctx.restore();
+    });
+
     // ── X-axis: time tick marks + labels ──
     const interval = niceInterval(totalMs, w);
     ctx.font = LABEL_FONT;
@@ -142,7 +158,7 @@ export function FunscriptWaveform({ script, videoRef, className, style }: Funscr
     // 0% at bottom of plot area (above the time strip)
     ctx.textBaseline = "bottom";
     ctx.fillText("0%", 3, ph - 1);
-  }, [script]);
+  }, [script, divisions]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

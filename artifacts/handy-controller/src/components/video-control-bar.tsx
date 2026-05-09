@@ -26,6 +26,8 @@ interface VideoControlBarProps {
   containerRef?: RefObject<HTMLElement | null>;
   isEditor?: boolean;
   markers?: number[];
+  /** Division timestamps in ms — rendered as violet lines on the scrub bar */
+  divisions?: number[];
   extraControls?: React.ReactNode;
   className?: string;
 }
@@ -35,6 +37,7 @@ export function VideoControlBar({
   containerRef,
   isEditor = false,
   markers = [],
+  divisions = [],
   extraControls,
   className = "",
 }: VideoControlBarProps) {
@@ -330,6 +333,15 @@ export function VideoControlBar({
             key={i}
             className="absolute top-1/2 -translate-y-1/2 w-0.5 h-2.5 rounded-full bg-white/40 pointer-events-none"
             style={{ left: `${(ms / 1000 / duration) * 100}%` }}
+          />
+        ))}
+
+        {/* Division lines (violet) */}
+        {duration > 0 && divisions.map((ms, i) => (
+          <div
+            key={i}
+            className="absolute top-0 bottom-0 w-px pointer-events-none"
+            style={{ left: `${(ms / 1000 / duration) * 100}%`, background: "rgba(139, 92, 246, 0.85)" }}
           />
         ))}
 

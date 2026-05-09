@@ -275,6 +275,7 @@ export default function Scripter() {
         }));
       setPoints(imported);
       setSelectedIds(new Set());
+      setDivisions([]);
       markClean(imported);
       return imported;
     } catch {
@@ -409,6 +410,12 @@ export default function Scripter() {
   const [showPresetsPopup, setShowPresetsPopup] = useState(false);
   const [customPatternText, setCustomPatternText] = useState("");
   const toolsMenuRef = useRef<HTMLDivElement>(null);
+
+  // ─── Divisions state (in-memory only, cleared on new script) ───
+  const [divisions, setDivisions] = useState<{ id: string; time: number }[]>([]);
+  const [showDivisionsMenu, setShowDivisionsMenu] = useState(false);
+  const divisionsRef = useRef<{ id: string; time: number }[]>([]);
+  useEffect(() => { divisionsRef.current = divisions; }, [divisions]);
 
   // ─── Visual Trigger state ───
   const vtCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1158,6 +1165,20 @@ export default function Scripter() {
       });
     }
 
+    // ── Division lines (violet vertical lines) ──
+    divisions.forEach(div => {
+      const x = timeToX(div.time);
+      if (x < -1 || x > W + 1) return;
+      ctx.save();
+      ctx.strokeStyle = "rgba(139, 92, 246, 0.85)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+      ctx.stroke();
+      ctx.restore();
+    });
+
     // ── Rubber-band selection box ──
     const box = selBoxRef.current;
     if (box) {
@@ -1198,7 +1219,7 @@ export default function Scripter() {
     ctx.textAlign = "center";
     ctx.fillText(fmtMs(currentTime), centerX, 26);
 
-  }, [points, vtPreviewPoints, selectedIds, currentTime, tlZoomLevel]);
+  }, [points, vtPreviewPoints, selectedIds, currentTime, tlZoomLevel, divisions]);
 
   useEffect(() => {
     drawTimeline();
@@ -1338,14 +1359,25 @@ export default function Scripter() {
       const dragDist = Math.hypot(box.x2 - box.x1, box.y2 - box.y1);
 
       if (dragDist < 5) {
-        // Treated as a click on empty space — create a new point
         if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
           const { xToTime } = tlCoordsForCanvas(canvas);
-          const time = Math.max(0, xToTime(box.x1));
-          const pos = Math.max(0, Math.min(100, Math.round(100 - (box.y1 / canvas.height) * 100)));
-          const newPoint: Point = { id: crypto.randomUUID(), time, pos };
-          setPoints(prev => [...prev, newPoint]);
-          setSelectedIds(new Set([newPoint.id]));
+          const clickTime = Math.max(0, xToTime(box.x1));
+          const currentDivisions = divisionsRef.current;
+          if (currentDivisions.length > 0 && !e.altKey) {
+            // Zone click: select all points in the zone that contains the click time.
+            // Alt+click still creates a point even when divisions are present.
+            const sorted = [...currentDivisions].sort((a, b) => a.time - b.time);
+            const zoneStart = [...sorted].reverse().find(d => d.time <= clickTime)?.time ?? 0;
+            const zoneEnd = sorted.find(d => d.time > clickTime)?.time ?? Infinity;
+            const inZone = pointsRef.current.filter(p => p.time >= zoneStart && p.time < zoneEnd);
+            setSelectedIds(new Set(inZone.map(p => p.id)));
+          } else {
+            // Treated as a click on empty space — create a new point
+            const pos = Math.max(0, Math.min(100, Math.round(100 - (box.y1 / canvas.height) * 100)));
+            const newPoint: Point = { id: crypto.randomUUID(), time: clickTime, pos };
+            setPoints(prev => [...prev, newPoint]);
+            setSelectedIds(new Set([newPoint.id]));
+          }
         }
       } else {
         // Rubber-band: select all points whose canvas coords fall inside the box
@@ -1647,6 +1679,7 @@ export default function Scripter() {
         ) {
           setPoints(imported);
           setSelectedIds(new Set());
+          setDivisions([]);
           markClean(imported);
         }
       } catch {
@@ -2642,6 +2675,7 @@ export default function Scripter() {
                 setPoints(empty);
                 setSelectedIds(new Set());
                 setActiveDraftSlot(null);
+                setDivisions([]);
                 try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
                 markClean(empty);
               }
@@ -2790,6 +2824,7 @@ export default function Scripter() {
             containerRef={videoBlockRef}
             isEditor
             markers={[...points].sort((a, b) => a.time - b.time).map(p => p.time)}
+            divisions={divisions.map(d => d.time)}
           />
         </div>
         </div>{/* end Video + controls */}
@@ -3192,10 +3227,74 @@ export default function Scripter() {
               </span>
             )}
 
-            {/* Click-outside closer */}
+            {/* Click-outside closer for Tools */}
             {showToolsMenu && (
               <div className="fixed inset-0 z-40" onClick={() => setShowToolsMenu(false)} />
             )}
+
+            {/* ── Divisions menu ── */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1.5 border-border/50"
+                onClick={() => setShowDivisionsMenu(m => !m)}
+              >
+                <span className="h-3 w-3 flex items-center justify-center text-violet-400 font-bold text-[10px]">╫</span>
+                Divisions
+                {divisions.length > 0 && (
+                  <span className="ml-0.5 rounded-full bg-violet-500/20 text-violet-400 text-[9px] px-1 font-mono">{divisions.length}</span>
+                )}
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </Button>
+
+              {showDivisionsMenu && (
+                <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] rounded-md border border-border bg-popover shadow-xl py-1 text-sm">
+                  <button
+                    className="w-full text-left px-3 py-1.5 hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-2"
+                    onClick={() => {
+                      const time = currentTimeRef.current;
+                      setDivisions(prev => {
+                        const next = [...prev, { id: crypto.randomUUID(), time }];
+                        next.sort((a, b) => a.time - b.time);
+                        return next;
+                      });
+                    }}
+                  >
+                    <span className="text-violet-400 font-mono text-[10px] w-4">+</span>
+                    New Division
+                    <span className="ml-auto text-[10px] text-muted-foreground font-mono">{fmtMs(currentTimeRef.current)}</span>
+                  </button>
+                  {divisions.length > 0 && (
+                    <>
+                      <div className="my-1 border-t border-border/50" />
+                      {divisions.map(div => (
+                        <div key={div.id} className="flex items-center gap-2 px-3 py-1 text-[11px] text-muted-foreground">
+                          <span className="w-2 h-2 rounded-full bg-violet-500/70 flex-shrink-0" />
+                          <span className="font-mono flex-1">{fmtMs(div.time)}</span>
+                          <button
+                            className="text-muted-foreground/50 hover:text-destructive transition-colors flex-shrink-0"
+                            onClick={() => setDivisions(prev => prev.filter(d => d.id !== div.id))}
+                            title="Remove division"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                      <div className="my-1 border-t border-border/50" />
+                      <p className="px-3 py-1 text-[9px] text-muted-foreground/50 leading-snug">
+                        Click zone to select · <span className="font-mono">Alt+click</span> to place a point
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Click-outside closer for Divisions */}
+              {showDivisionsMenu && (
+                <div className="fixed inset-0 z-40" onClick={() => setShowDivisionsMenu(false)} />
+              )}
+            </div>
           </div>
 
           {/* ── Preset Patterns Popup ── */}
@@ -3463,7 +3562,10 @@ export default function Scripter() {
             )}
             {points.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-muted-foreground/50 text-xs text-center px-4 select-none">
-                Click to place · drag to select area · <span className="font-mono">Shift+click</span> multi-select · <span className="font-mono">Ctrl+C/X/V</span> copy/cut/paste
+                {divisions.length > 0
+                  ? <>Click zone to select all · <span className="font-mono">Alt+click</span> to place · drag to rubber-band · <span className="font-mono">Shift+click</span> multi-select</>
+                  : <>Click to place · drag to select area · <span className="font-mono">Shift+click</span> multi-select · <span className="font-mono">Ctrl+C/X/V</span> copy/cut/paste</>
+                }
               </div>
             )}
           </Card>
