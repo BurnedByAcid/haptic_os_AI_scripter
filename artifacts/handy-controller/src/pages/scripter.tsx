@@ -3668,9 +3668,10 @@ export default function Scripter() {
                             : "8× — faster scan but may miss rapid beats above ~120 BPM."}
                           {videoUrl && vtVideoDuration != null && (() => {
                             const playbackRate = vtScanSpeed === "fast" ? 8 : 4;
+                            const gpuMultiplier = gpuMode === "webgpu" ? 4 : gpuMode === "webgl" ? 2 : 1;
                             const effectiveEnd = vtEndTime > 0 ? Math.min(vtEndTime, vtVideoDuration) : vtVideoDuration;
                             const rangeSeconds = Math.max(0, effectiveEnd - vtStartTime);
-                            const estimatedSeconds = rangeSeconds / playbackRate;
+                            const estimatedSeconds = rangeSeconds / (playbackRate * gpuMultiplier);
                             const rangeMinutes = Math.round(rangeSeconds / 60);
                             const estimatedMinutes = Math.round(estimatedSeconds / 60);
                             const rangeLabel = rangeMinutes < 1 ? `${Math.round(rangeSeconds)}s` : `${rangeMinutes}-min`;
