@@ -426,11 +426,13 @@ export default function Scripter() {
   const [vtChosenRange, setVtChosenRange] = useState<[number, number]>([0, 100]);
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
   const vtCancelRef = useRef(false);
+  const vtCurrentRunSpeedRef = useRef<"fast" | "accurate">("fast");
   const [vtProgress, setVtProgress] = useState(0);
   const [vtMarkerCount, setVtMarkerCount] = useState(0);
   const vtMarkerCountRef = useRef(0);
   const [vtLastScanCount, setVtLastScanCount] = useState<number | null>(null);
   const [vtLastScanCancelled, setVtLastScanCancelled] = useState(false);
+  const [vtLastScanSpeed, setVtLastScanSpeed] = useState<"fast" | "accurate">("fast");
   const [vtStartTime, setVtStartTime] = useState(0);
   const [vtEndTime, setVtEndTime] = useState(0);
   const [vtVideoDuration, setVtVideoDuration] = useState<number | null>(null);
@@ -2074,6 +2076,7 @@ export default function Scripter() {
     if (!video || !vtZone || !vtSampledPatch) return;
 
     vtCancelRef.current = false;
+    vtCurrentRunSpeedRef.current = vtScanSpeed;
     setVtAnalyzing(true);
     setVtProgress(0);
     setVtMarkerCount(0);
@@ -2090,6 +2093,7 @@ export default function Scripter() {
       const wasCancelled = vtCancelRef.current;
       setVtLastScanCancelled(wasCancelled);
       setVtLastScanCount(vtMarkerCountRef.current);
+      setVtLastScanSpeed(vtCurrentRunSpeedRef.current);
       setVtAnalyzing(false);
       if (wasCancelled) {
         toast({ title: "Scan cancelled" });
@@ -2548,6 +2552,7 @@ export default function Scripter() {
     // Snapshot the final GPU/CPU mode so the post-scan badge reflects what was
     // actually used for the majority of the scan (not the live analyzeMode,
     // which could be reset by a subsequent scan's 'ready' message).
+    // vtLastScanSpeed is set in the finally block (covers cancel path too).
     setFinalAnalyzeMode(analyzeModeRef.current);
 
     // Commit all detections at the neutral midpoint — one pos value per trigger.
@@ -3489,9 +3494,19 @@ export default function Scripter() {
               <p className="text-sm text-muted-foreground">
                 {`${vtMarkerCount} marker${vtMarkerCount === 1 ? "" : "s"} found`}
               </p>
-              {analyzeMode !== "cpu" && (
-                <p className="text-[10px] text-muted-foreground">{analyzeMode === "webgpu" ? "WebGPU compute shader — fastest path" : "WebGL shader"} + fast playback — up to 16× faster than seek-based CPU</p>
-              )}
+              {(() => {
+                const runSpeed = vtCurrentRunSpeedRef.current;
+                const playbackRate = runSpeed === "fast" ? 8 : 4;
+                const gpuMult = analyzeMode === "webgpu" ? 4 : analyzeMode === "webgl" ? 2 : 1;
+                const effective = playbackRate * gpuMult;
+                const modeLabel = analyzeMode === "webgpu" ? "WebGPU" : analyzeMode === "webgl" ? "WebGL" : "CPU";
+                const speedLabel = runSpeed === "fast" ? "Fast" : "Accurate";
+                return (
+                  <p className={`text-[11px] font-semibold ${analyzeMode !== "cpu" ? "text-primary" : "text-muted-foreground"}`}>
+                    ⚡ Scanning at ~{effective}× effective ({modeLabel} + {speedLabel})
+                  </p>
+                );
+              })()}
               <Button
                 variant="outline"
                 size="sm"
@@ -3509,7 +3524,7 @@ export default function Scripter() {
             <div className="flex-1 flex flex-col gap-2 min-h-0 justify-start">
               {vtLastScanCount !== null && (
                 <div className={`rounded-lg border px-3 py-2 flex flex-col gap-1 ${vtLastScanCancelled ? "border-muted-foreground/30 bg-muted/30" : vtLastScanCount === 0 ? "border-amber-500/30 bg-amber-500/5" : "border-primary/30 bg-primary/5"}`}>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className={`text-xs font-medium ${vtLastScanCancelled ? "text-muted-foreground" : vtLastScanCount === 0 ? "text-amber-500" : "text-primary"}`}>
                       {vtLastScanCancelled ? "Scan cancelled" : "Scan complete"}
                     </span>
@@ -3517,6 +3532,18 @@ export default function Scripter() {
                     <span className={`text-xs font-mono font-semibold ${vtLastScanCancelled ? "text-muted-foreground" : vtLastScanCount === 0 ? "text-amber-500" : "text-primary"}`}>
                       {vtLastScanCount} marker{vtLastScanCount === 1 ? "" : "s"} {vtLastScanCancelled ? "found so far" : "found"}
                     </span>
+                    {(() => {
+                      const playbackRate = vtLastScanSpeed === "fast" ? 8 : 4;
+                      const gpuMult = finalAnalyzeMode === "webgpu" ? 4 : finalAnalyzeMode === "webgl" ? 2 : 1;
+                      const effective = playbackRate * gpuMult;
+                      const modeLabel = finalAnalyzeMode === "webgpu" ? "WebGPU" : finalAnalyzeMode === "webgl" ? "WebGL" : "CPU";
+                      const speedLabel = vtLastScanSpeed === "fast" ? "Fast" : "Accurate";
+                      return (
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${finalAnalyzeMode !== "cpu" ? "border-primary/50 text-primary bg-primary/10" : "border-muted-foreground/30 text-muted-foreground"}`}>
+                          ⚡ {effective}× ({modeLabel} + {speedLabel})
+                        </span>
+                      );
+                    })()}
                   </div>
                   {!vtLastScanCancelled && vtLastScanCount === 0 && (
                     <p className="text-xs text-amber-500/80">
