@@ -2485,6 +2485,14 @@ export default function Scripter() {
         // The worker receives each seeked frame and handles analysis.
         // Seeking is the bottleneck here so pipelining is minimal, but we
         // still go through acquireSlot/sendFrame to share the same tracking.
+        //
+        // NOTE ON SCAN-SPEED SETTING: The vtScanSpeed toggle ("Accurate 4×" /
+        // "Fast 8×") controls the video playbackRate used by the rVFC fast path
+        // above.  The seek-based path does NOT use playbackRate at all — it
+        // steps by a fixed stepMs regardless of that setting, so every frame at
+        // the configured resolution is examined precisely.  BPM accuracy here
+        // is therefore fully independent of the speed toggle; the toggle has
+        // no effect in browsers that lack requestVideoFrameCallback.
         let t = startMs;
         while (t <= endMs && !vtCancelRef.current) {
           video.currentTime = t / 1000;
@@ -3629,25 +3637,33 @@ export default function Scripter() {
 
                   <div>
                     <p className="text-xs font-medium mb-1 text-muted-foreground uppercase tracking-wider">Scan Speed</p>
-                    <div className="flex rounded-md overflow-hidden border border-border/60 text-xs">
-                      {(["accurate", "fast"] as const).map(speed => (
-                        <button
-                          key={speed}
-                          onClick={() => {
-                            setVtScanSpeed(speed);
-                            try { localStorage.setItem("vt_scan_speed", speed); } catch {}
-                          }}
-                          className={`flex-1 py-1.5 font-medium transition-colors ${vtScanSpeed === speed ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground"}`}
-                        >
-                          {speed === "accurate" ? "Accurate (4×)" : "Fast (8×)"}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      {vtScanSpeed === "accurate"
-                        ? "4× — catches beats at 120–160 BPM. A 30-min video takes ~8 min."
-                        : "8× — faster scan but may miss rapid beats above ~120 BPM."}
-                    </p>
+                    {!("requestVideoFrameCallback" in HTMLVideoElement.prototype) ? (
+                      <p className="text-[10px] text-muted-foreground bg-muted/40 rounded px-2 py-1.5 border border-border/40">
+                        Not available — your browser uses the seek-based fallback, which steps frame-by-frame and is fully BPM-accurate regardless of this setting.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="flex rounded-md overflow-hidden border border-border/60 text-xs">
+                          {(["accurate", "fast"] as const).map(speed => (
+                            <button
+                              key={speed}
+                              onClick={() => {
+                                setVtScanSpeed(speed);
+                                try { localStorage.setItem("vt_scan_speed", speed); } catch {}
+                              }}
+                              className={`flex-1 py-1.5 font-medium transition-colors ${vtScanSpeed === speed ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground"}`}
+                            >
+                              {speed === "accurate" ? "Accurate (4×)" : "Fast (8×)"}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {vtScanSpeed === "accurate"
+                            ? "4× — catches beats at 120–160 BPM. A 30-min video takes ~8 min."
+                            : "8× — faster scan but may miss rapid beats above ~120 BPM."}
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   <div>
