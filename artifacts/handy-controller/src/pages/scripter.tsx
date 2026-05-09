@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2, BookmarkPlus, Link2, Activity } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2, BookmarkPlus, Link2, Activity, Brain, PersonStanding, Cpu } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -223,15 +223,15 @@ export default function Scripter() {
   const [realtimeTest, setRealtimeTest] = useState(false);
 
   // ─── Layout state ───
-  function getTabFromSearch(): "beat" | "timeline" | "visual" {
+  function getTabFromSearch(): "beat" | "timeline" | "visual" | "ai" {
     const param = new URLSearchParams(window.location.search).get("tab");
-    if (param === "timeline" || param === "visual") return param;
+    if (param === "timeline" || param === "visual" || param === "ai") return param;
     return "beat";
   }
 
   const initialTab = getTabFromSearch();
-  const [tabsOpen, setTabsOpen] = useState(initialTab === "timeline" || initialTab === "visual");
-  const [activeTab, setActiveTab] = useState<"beat" | "timeline" | "visual">(initialTab);
+  const [tabsOpen, setTabsOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<"beat" | "timeline" | "visual" | "ai">(initialTab);
 
   // ─── Timeline Editor state ───
   const [tlZoomLevel, setTlZoomLevel] = useState(3); // 0 = max zoom (2 s), 9 = min (60 s)
@@ -369,7 +369,6 @@ export default function Scripter() {
     const onPopState = () => {
       const tab = getTabFromSearch();
       setActiveTab(tab);
-      setTabsOpen(tab !== "beat");
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -441,6 +440,18 @@ export default function Scripter() {
     } catch { return "accurate"; }
   });
   const [vtPreviewPoints, setVtPreviewPoints] = useState<Point[]>([]);
+
+  // ─── AI Pose Detection (MoveNet Lightning) state ───
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiProgress, setAiProgress] = useState(0);
+  const [aiModelLoaded, setAiModelLoaded] = useState(false);
+  const [aiModelLoading, setAiModelLoading] = useState(false);
+  const [aiJointTarget, setAiJointTarget] = useState<"hips" | "wrists" | "shoulders">("hips");
+  const [aiFrameStep, setAiFrameStep] = useState(15);
+  const [aiLastCount, setAiLastCount] = useState<number | null>(null);
+  const aiCancelRef = useRef(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const aiDetectorRef = useRef<any>(null);
 
   // ─── GPU patch matcher ───
   // Holds whichever matcher was successfully initialised: WebGPU > WebGL > none.
@@ -2082,6 +2093,123 @@ export default function Scripter() {
     }
   };
 
+  // ─── AI Pose Analysis (MoveNet Lightning) ────────────────────────────────────
+  const runAiAnalysis = useCallback(async () => {
+    if (!videoRef.current || aiAnalyzing) return;
+    const video = videoRef.current;
+    if (!video.src && !video.currentSrc) {
+      toast({ variant: "destructive", title: "No video", description: "Load a video before running AI analysis." });
+      return;
+    }
+
+    setAiAnalyzing(true);
+    setAiProgress(0);
+    setAiLastCount(null);
+    aiCancelRef.current = false;
+
+    try {
+      // Lazy-load TF.js + MoveNet the first time
+      if (!aiDetectorRef.current) {
+        setAiModelLoading(true);
+        const [poseDetection, tfjsCore] = await Promise.all([
+          import("@tensorflow-models/pose-detection"),
+          import("@tensorflow/tfjs-core"),
+        ]);
+        await import("@tensorflow/tfjs-backend-webgl");
+        await tfjsCore.setBackend("webgl");
+        await tfjsCore.ready();
+        const detector = await poseDetection.createDetector(
+          poseDetection.SupportedModels.MoveNet,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          { modelType: (poseDetection as any).movenet.modelType.SINGLEPOSE_LIGHTNING }
+        );
+        aiDetectorRef.current = detector;
+        setAiModelLoaded(true);
+        setAiModelLoading(false);
+      }
+
+      const detector = aiDetectorRef.current;
+      const duration = video.duration;
+      if (!duration || !isFinite(duration)) {
+        toast({ variant: "destructive", title: "Video not ready", description: "Wait for the video metadata to load." });
+        setAiAnalyzing(false);
+        return;
+      }
+
+      // fps=30 assumed; aiFrameStep=15 → sample every 0.5 s
+      const frameInterval = (1 / 30) * aiFrameStep;
+      const rawPoints: { time: number; y: number; score: number }[] = [];
+
+      let t = 0;
+      while (t < duration && !aiCancelRef.current) {
+        video.currentTime = t;
+        await new Promise<void>(resolve => {
+          const onSeeked = () => { video.removeEventListener("seeked", onSeeked); resolve(); };
+          video.addEventListener("seeked", onSeeked);
+        });
+        if (aiCancelRef.current) break;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const poses = await detector.estimatePoses(video) as any[];
+        if (poses[0]) {
+          const kp = poses[0].keypoints as { x: number; y: number; score?: number }[];
+          // COCO keypoint indices: 11=left_hip, 12=right_hip, 9=left_wrist, 10=right_wrist, 5=left_shoulder, 6=right_shoulder
+          let y = 0;
+          let score = 0;
+          if (aiJointTarget === "hips") {
+            const lh = kp[11], rh = kp[12];
+            y = ((lh?.y ?? 0) + (rh?.y ?? 0)) / 2;
+            score = ((lh?.score ?? 0) + (rh?.score ?? 0)) / 2;
+          } else if (aiJointTarget === "wrists") {
+            const lw = kp[9], rw = kp[10];
+            y = ((lw?.y ?? 0) + (rw?.y ?? 0)) / 2;
+            score = ((lw?.score ?? 0) + (rw?.score ?? 0)) / 2;
+          } else {
+            const ls = kp[5], rs = kp[6];
+            y = ((ls?.y ?? 0) + (rs?.y ?? 0)) / 2;
+            score = ((ls?.score ?? 0) + (rs?.score ?? 0)) / 2;
+          }
+          if (score > 0.3) rawPoints.push({ time: Math.round(t * 1000), y, score });
+        }
+        t += frameInterval;
+        setAiProgress(Math.min(99, Math.round((t / duration) * 100)));
+      }
+
+      if (aiCancelRef.current) {
+        toast({ title: "AI analysis cancelled" });
+        setAiAnalyzing(false);
+        return;
+      }
+
+      if (rawPoints.length === 0) {
+        toast({ variant: "destructive", title: "No poses detected", description: "Try a different joint target or check the video has a visible person." });
+        setAiAnalyzing(false);
+        return;
+      }
+
+      // Normalize Y to haptic range 0–100; invert because screen Y is top-down
+      const ys = rawPoints.map(p => p.y);
+      const minY = Math.min(...ys), maxY = Math.max(...ys);
+      const range = maxY - minY || 1;
+      const newPoints: Point[] = rawPoints.map(p => ({
+        id: crypto.randomUUID(),
+        time: p.time,
+        pos: Math.round(100 - ((p.y - minY) / range) * 100),
+      }));
+
+      setPoints(prev => [...prev, ...newPoints]);
+      setAiLastCount(newPoints.length);
+      setAiProgress(100);
+      toast({ title: "AI analysis complete", description: `Added ${newPoints.length} points from ${aiJointTarget} movement.` });
+    } catch (err) {
+      console.error("[AI Pose]", err);
+      toast({ variant: "destructive", title: "AI analysis failed", description: String(err) });
+    } finally {
+      setAiAnalyzing(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiAnalyzing, aiJointTarget, aiFrameStep]);
+
   const runAnalysisInner = async (video: HTMLVideoElement) => {
     const { x, y, w, h } = vtZone!;
     const VW = video.videoWidth || 640;
@@ -2522,7 +2650,23 @@ export default function Scripter() {
         ) : null;
       })()}
 
-      {/* ── Split container: video + handle + tabs ── */}
+      {/* ── Tab nav + video + content ── */}
+      <Tabs
+        value={activeTab}
+        onValueChange={v => {
+          const tab = v as "beat" | "timeline" | "visual" | "ai";
+          setActiveTab(tab);
+          setLocation(tab === "beat" ? "/scripter" : `/scripter?tab=${tab}`);
+        }}
+        className="flex flex-col flex-1 min-h-0"
+      >
+      {/* ── Tab nav — 4 equally-spaced labels above the player ── */}
+      <TabsList className="bg-card/50 w-full flex-shrink-0 grid grid-cols-4 h-9 rounded-none border-b border-border/40 p-0 gap-0">
+        <TabsTrigger value="beat" className="text-xs h-full rounded-none data-[state=active]:bg-background/60">Audio</TabsTrigger>
+        <TabsTrigger value="visual" className="text-xs h-full rounded-none data-[state=active]:bg-background/60">Video</TabsTrigger>
+        <TabsTrigger value="ai" className="text-xs h-full rounded-none gap-1 data-[state=active]:bg-background/60"><Brain className="h-3 w-3" />AI</TabsTrigger>
+        <TabsTrigger value="timeline" className="text-xs h-full rounded-none data-[state=active]:bg-background/60">Editor</TabsTrigger>
+      </TabsList>
       <div ref={splitContainerRef} className="flex flex-col flex-1 min-h-0">
 
       {/* ── Shared video player ── */}
@@ -2667,44 +2811,9 @@ export default function Scripter() {
         </div>
       )}
 
-      {/* ── Tabs — collapsible tool panel ── */}
-      <Tabs
-        value={activeTab}
-        onValueChange={v => {
-          const tab = v as "beat" | "timeline" | "visual";
-          setActiveTab(tab);
-          setTabsOpen(true);
-          setLocation(tab === "beat" ? "/scripter" : `/scripter?tab=${tab}`);
-        }}
-        className="flex flex-col min-h-0"
-        style={tabsOpen ? { flex: 1, minHeight: MIN_TABS_H } : { flexShrink: 0 }}
-      >
-        <TabsList className="bg-card/50 w-full flex-shrink-0 flex justify-between items-center h-9 px-1">
-          <div className="flex">
-            <TabsTrigger value="beat" className="text-xs h-7">Beat Detector</TabsTrigger>
-            <TabsTrigger value="timeline" className="text-xs h-7">Timeline Editor</TabsTrigger>
-            <TabsTrigger value="visual" className="text-xs h-7">Visual Trigger</TabsTrigger>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 ml-auto text-muted-foreground hover:text-foreground"
-            onClick={() => {
-              const next = !tabsOpen;
-              setTabsOpen(next);
-              if (!next) {
-                setLocation("/scripter");
-              } else if (activeTab !== "beat") {
-                setLocation(`/scripter?tab=${activeTab}`);
-              }
-            }}
-            title={tabsOpen ? "Collapse tools" : "Expand tools"}
-          >
-            {tabsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-          </Button>
-        </TabsList>
-
-        {tabsOpen && <>
+      {/* ── Tab content panel ── */}
+      <div className="flex flex-col min-h-0" style={{ flex: 1, minHeight: MIN_TABS_H }}>
+        <>
         {/* Beat Detector Tab */}
         <TabsContent value="beat" className="flex-1 flex gap-3 mt-3 min-h-0 overflow-hidden">
           {/* Spectrum canvas + band toggles */}
@@ -3609,10 +3718,128 @@ export default function Scripter() {
               </Card>
             </div>}
         </TabsContent>
-        </>}
-      </Tabs>
+        {/* ── AI Pose Detection Tab (MoveNet Lightning) ── */}
+        <TabsContent value="ai" className="flex-1 flex gap-3 mt-3 min-h-0 overflow-auto">
+          <div className="flex-1 flex flex-col gap-3">
+            {/* Header */}
+            <Card className="border-border/40 bg-card/60 flex-shrink-0">
+              <CardContent className="p-3 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-primary flex-shrink-0" />
+                  <span className="text-sm font-semibold">MoveNet Lightning — Pose-to-Haptic</span>
+                  {aiModelLoaded && (
+                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-green-500/15 border border-green-500/30 text-green-400 flex items-center gap-1">
+                      <Cpu className="h-2.5 w-2.5" /> Model ready
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Analyzes body pose in the loaded video frame-by-frame using Google's MoveNet Lightning model. Tracks joint position over time and converts movement into a haptic script.
+                </p>
+
+                {/* Joint selector */}
+                <div>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Track joint</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([
+                      { id: "hips" as const, label: "Hips", desc: "Vertical hip movement" },
+                      { id: "wrists" as const, label: "Wrists", desc: "Hand/wrist position" },
+                      { id: "shoulders" as const, label: "Shoulders", desc: "Upper body movement" },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setAiJointTarget(opt.id)}
+                        disabled={aiAnalyzing}
+                        className={`flex flex-col items-center gap-0.5 p-2 rounded-lg border text-center transition-all ${
+                          aiJointTarget === opt.id
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border/40 text-muted-foreground hover:border-border"
+                        }`}
+                      >
+                        <PersonStanding className="h-4 w-4" />
+                        <span className="text-[11px] font-semibold">{opt.label}</span>
+                        <span className="text-[9px] opacity-70 leading-tight">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Frame step */}
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] text-muted-foreground uppercase tracking-wide w-24 flex-shrink-0">Sample rate</span>
+                  <Slider
+                    min={5}
+                    max={60}
+                    step={5}
+                    value={[aiFrameStep]}
+                    onValueChange={([v]) => setAiFrameStep(v)}
+                    disabled={aiAnalyzing}
+                    className="flex-1"
+                  />
+                  <span className="text-xs text-muted-foreground w-20 text-right flex-shrink-0">
+                    every {aiFrameStep} frames (~{(aiFrameStep / 30).toFixed(2)}s)
+                  </span>
+                </div>
+
+                {/* Analyze / Cancel button */}
+                {!aiAnalyzing ? (
+                  <Button
+                    className="w-full gap-2"
+                    onClick={() => void runAiAnalysis()}
+                    disabled={!videoRef.current?.src && !videoRef.current?.currentSrc}
+                  >
+                    {aiModelLoading ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Loading MoveNet Lightning…</>
+                    ) : (
+                      <><Brain className="h-4 w-4" /> Analyze with AI</>
+                    )}
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <Progress value={aiProgress} className="h-2" />
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Analyzing… {aiProgress}%</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs text-destructive hover:text-destructive"
+                        onClick={() => { aiCancelRef.current = true; }}
+                      >
+                        <Square className="h-3 w-3 mr-1" /> Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {aiLastCount !== null && !aiAnalyzing && (
+                  <p className="text-xs text-primary text-center">
+                    Added {aiLastCount} points from {aiJointTarget} analysis — see Timeline Editor to edit.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* How it works note */}
+            <Card className="border-border/30 bg-card/40 flex-shrink-0">
+              <CardContent className="p-3 space-y-1.5">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">How it works</p>
+                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Loads the video and seeks frame-by-frame at the chosen sample rate</li>
+                  <li>MoveNet Lightning detects 17 body keypoints per frame (~5ms/frame on GPU)</li>
+                  <li>The selected joint's vertical position is mapped to haptic intensity 0–100</li>
+                  <li>Generated points are added to your script and visible in the Editor tab</li>
+                  <li>First run downloads the model (~6 MB) — subsequent runs are instant</li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        </>
+      </div>{/* end tab content panel */}
 
       </div>{/* end split container */}
+      </Tabs>
 
       {/* ── Paste Video URL Dialog ── */}
       <Dialog open={urlDialogOpen} onOpenChange={(open) => { if (urlResolving) return; setUrlDialogOpen(open); if (!open) { setUrlInput(""); setUrlError(null); } }}>

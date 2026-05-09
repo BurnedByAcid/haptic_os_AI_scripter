@@ -77,7 +77,14 @@ export default defineConfig({
       : []),
   ],
   optimizeDeps: {
-    exclude: ["@ffmpeg/ffmpeg", "@ffmpeg/util"],
+    exclude: [
+      "@ffmpeg/ffmpeg",
+      "@ffmpeg/util",
+      "@tensorflow/tfjs-core",
+      "@tensorflow/tfjs-backend-webgl",
+      "@tensorflow/tfjs-converter",
+      "@tensorflow-models/pose-detection",
+    ],
   },
   resolve: {
     alias: {
