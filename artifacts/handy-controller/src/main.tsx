@@ -21,6 +21,15 @@ const updateSW = registerSW({
   },
 });
 
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (toastId !== undefined) {
+      toast.dismiss(toastId);
+      toastId = undefined;
+    }
+  });
+}
+
 // In dev mode, Vite's runtime-error overlay listens for window "error" events
 // in the bubble phase. Media element errors (video/audio source failures) are
 // handled gracefully by each component's onError handler and must not reach
