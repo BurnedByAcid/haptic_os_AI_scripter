@@ -411,6 +411,9 @@ export default function Scripter() {
   const [customPatternText, setCustomPatternText] = useState("");
   const toolsMenuRef = useRef<HTMLDivElement>(null);
 
+  // ─── Post-analysis pattern prompt ───
+  const [pendingPatternPrompt, setPendingPatternPrompt] = useState(false);
+
   // ─── Divisions state (in-memory only, cleared on new script) ───
   const [divisions, setDivisions] = useState<{ id: string; time: number }[]>([]);
   const [showDivisionsMenu, setShowDivisionsMenu] = useState(false);
@@ -560,8 +563,15 @@ export default function Scripter() {
   const [bdPointsAdded, setBdPointsAdded] = useState(0);
   /** Beat timestamps (ms) accumulated during the current recording session. */
   const bdSessionTimestampsRef = useRef<number[]>([]);
+  /** Point IDs generated during the current beat-detector recording session. */
+  const bdSessionIdsRef = useRef<string[]>([]);
   /** Tracks the previous bdIsRecording value to detect stop transitions. */
   const bdPrevIsRecordingRef = useRef(false);
+
+  // ─── IDs of points produced by the most recent automated analysis run ───
+  // Used by the post-analysis pattern prompt so only generated points are
+  // selected when the user opens Preset Patterns, not pre-existing ones.
+  const lastGeneratedPointIdsRef = useRef<Set<string>>(new Set());
 
   const [bdBandEnabled, setBdBandEnabled] = useState<boolean[]>(() => Array(11).fill(true));
   const bdBandEnabledRef = useRef<boolean[]>(Array(11).fill(true));
@@ -590,6 +600,9 @@ export default function Scripter() {
     if (wasRecording && !bdIsRecording && bdSessionTimestampsRef.current.length > 0 && mountedRef.current) {
       downloadRawFunscript(bdSessionTimestampsRef.current, "beat-detect", scriptOutputFiletype);
       bdSessionTimestampsRef.current = [];
+      lastGeneratedPointIdsRef.current = new Set(bdSessionIdsRef.current);
+      bdSessionIdsRef.current = [];
+      setPendingPatternPrompt(true);
     }
   }, [bdIsRecording]);
   useEffect(() => { bdBandEnabledRef.current = bdBandEnabled; }, [bdBandEnabled]);
@@ -709,9 +722,11 @@ export default function Scripter() {
           : Math.round(now - bdRecordStartRef.current);
         const pos = bdBeatPosRef.current;
         bdBeatPosRef.current = pos === 0 ? 100 : 0;
-        setPoints(prev => [...prev, { id: crypto.randomUUID(), time: beatMs, pos }]);
+        const beatId = crypto.randomUUID();
+        setPoints(prev => [...prev, { id: beatId, time: beatMs, pos }]);
         setBdPointsAdded(c => c + 1);
         bdSessionTimestampsRef.current.push(beatMs);
+        bdSessionIdsRef.current.push(beatId);
       }
     }
 
@@ -2238,10 +2253,12 @@ export default function Scripter() {
         pos: Math.round(100 - ((p.y - minY) / range) * 100),
       }));
 
+      lastGeneratedPointIdsRef.current = new Set(newPoints.map(p => p.id));
       setPoints(prev => [...prev, ...newPoints]);
       setAiLastCount(newPoints.length);
       setAiProgress(100);
       toast({ title: "AI analysis complete", description: `Added ${newPoints.length} points from ${aiJointTarget} movement.` });
+      setPendingPatternPrompt(true);
     } catch (err) {
       console.error("[AI Pose]", err);
       toast({ variant: "destructive", title: "AI analysis failed", description: String(err) });
@@ -2622,6 +2639,10 @@ export default function Scripter() {
   };
 
   const commitPreviewPoints = () => {
+    if (vtPreviewPoints.length > 0) {
+      lastGeneratedPointIdsRef.current = new Set(vtPreviewPoints.map(p => p.id));
+      setPendingPatternPrompt(true);
+    }
     setPoints(prev => [...prev, ...vtPreviewPoints]);
     setVtPreviewPoints([]);
   };
@@ -4073,6 +4094,34 @@ export default function Scripter() {
           onDeleted={() => setResumeDrafts((prev) => prev.slice(1))}
         />
       )}
+
+      {/* ── Post-analysis pattern prompt ── */}
+      <Dialog open={pendingPatternPrompt} onOpenChange={open => { if (!open) { setPendingPatternPrompt(false); lastGeneratedPointIdsRef.current = new Set(); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Apply a preset pattern?</DialogTitle>
+            <DialogDescription>
+              Your generated script is ready. Would you like to shape the positions with a preset pattern before exporting?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => {
+              setPendingPatternPrompt(false);
+              lastGeneratedPointIdsRef.current = new Set();
+            }}>
+              Skip
+            </Button>
+            <Button onClick={() => {
+              setPendingPatternPrompt(false);
+              setSelectedIds(new Set(lastGeneratedPointIdsRef.current));
+              lastGeneratedPointIdsRef.current = new Set();
+              setShowPresetsPopup(true);
+            }}>
+              Apply Pattern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Exit warning dialog ── */}
       <ExitWarningDialog
