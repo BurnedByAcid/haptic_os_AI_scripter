@@ -212,6 +212,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const handleDeviceChange = (id: string) => {
     setDeviceId(id as DeviceId);
     localStorage.setItem("hc_device_id", id);
+    setKeyError(null);
   };
 
   // ─── Privacy handle ───────────────────────────────────────────────────────
@@ -292,26 +293,42 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const trimmed = inputKey.trim();
     if (trimmed !== inputKey) setInputKey(trimmed);
     setKeyError(null);
+    const isIntiface = device.mode === "intiface";
     updateKey(trimmed, (reason) => {
       if (reason === "network_error") {
-        setKeyError("Network error — check your internet connection and try again.");
+        const msg = isIntiface
+          ? "Network error — ensure Intiface Central is running and reachable at that address."
+          : "Network error — check your internet connection and try again.";
+        setKeyError(msg);
         toast({
           title: "Network error",
-          description: "Check your internet connection and try again.",
+          description: isIntiface
+            ? "Couldn't reach Intiface Central — check that it's running and the URL is correct."
+            : "Check your internet connection and try again.",
           variant: "destructive",
         });
       } else if (reason === "invalid_key") {
-        setKeyError("Invalid key — double-check it at handyfeeling.com/my-handy.");
+        const msg = isIntiface
+          ? "Invalid URL — ensure Intiface Central is running at that address."
+          : "Invalid key — double-check it at handyfeeling.com/my-handy.";
+        setKeyError(msg);
         toast({
-          title: "Invalid connection key",
-          description: "That key wasn't accepted — double-check it at handyfeeling.com/my-handy.",
+          title: isIntiface ? "Invalid Intiface URL" : "Invalid connection key",
+          description: isIntiface
+            ? "That URL wasn't accepted — make sure Intiface Central is running and the address is correct."
+            : "That key wasn't accepted — double-check it at handyfeeling.com/my-handy.",
           variant: "destructive",
         });
       } else {
-        setKeyError("Device didn't respond — make sure it's powered on and in range.");
+        const msg = isIntiface
+          ? "Device didn't respond — ensure Intiface Central is running and your device is connected."
+          : "Device didn't respond — make sure it's powered on and in range.";
+        setKeyError(msg);
         toast({
           title: "Device not connected",
-          description: "The key is valid but the device didn't respond — make sure it's powered on and in range.",
+          description: isIntiface
+            ? "Intiface Central is reachable but no device responded — check that your device is paired in Intiface Central."
+            : "The key is valid but the device didn't respond — make sure it's powered on and in range.",
           variant: "destructive",
         });
       }
