@@ -5,11 +5,11 @@ import { useHandy } from "@/hooks/use-handy";
 import { enqueueRetry } from "@/hooks/use-retry-queue";
 import { useSubscription } from "@/hooks/use-subscription";
 import { syncEngine, hsspEngine, Funscript, HSSPStatus } from "@/lib/scriptSync";
-import { setHDSP, stopDevice } from "@/lib/handyApi";
+import { stopDevice } from "@/lib/handyApi";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Upload, Zap, Link2, Video, Loader2, CheckCircle2, WifiOff } from "lucide-react";
+import { Upload, Link2, Video, Loader2, CheckCircle2, WifiOff } from "lucide-react";
 import { VideoControlBar } from "@/components/video-control-bar";
 import { useToast } from "@/hooks/use-toast";
 import { validateAndParseFunscriptFile } from "@/lib/validation";
@@ -125,11 +125,9 @@ export default function Player() {
   const [scripts, setScripts] = useState<(Funscript | null)[]>([null, null, null, null]);
   const [activeScriptIdx, setActiveScriptIdx] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [finishMode, setFinishMode] = useState(false);
   const [hsspStatus, setHsspStatus] = useState<HSSPStatus>("idle");
   /** True once hsspStatus has reached "error"; cleared after the recovery toast fires. */
   const hadHsspErrorRef = useRef(false);
-  const finishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   // Cleanup fn returned by attachHlsSource — called when video URL changes or on unmount.
   const hlsCleanupRef = useRef<(() => void) | null>(null);
@@ -653,20 +651,6 @@ export default function Player() {
     }
   }, [isPlaying, hsspStatus]);
 
-  const triggerFinishMode = useCallback(() => {
-    if (!connected || !key) return;
-    setFinishMode(true);
-    let count = 0;
-    const burst = () => {
-      if (count >= 10) { stopDevice(key); setFinishMode(false); return; }
-      setHDSP(key, count % 2 === 0 ? 100 : 0, 87);
-      count++;
-      finishTimerRef.current = setTimeout(burst, 80);
-    };
-    burst();
-  }, [connected, key]);
-
-  useEffect(() => () => { if (finishTimerRef.current) clearTimeout(finishTimerRef.current); }, []);
 
   const hasVideo = videoUrl || embedUrl;
 
@@ -791,26 +775,6 @@ export default function Player() {
                     controls={false}
                   />
 
-                  {/* Tap-anywhere Finish Mode zone */}
-                  {isPlaying && connected && !finishMode && (
-                    <div
-                      className="absolute inset-0 flex items-end justify-center pb-6 cursor-pointer select-none"
-                      onClick={e => { e.stopPropagation(); triggerFinishMode(); }}
-                      title="Tap anywhere to trigger Finish Mode"
-                    >
-                      <div className="opacity-0 hover:opacity-100 transition-opacity duration-200 bg-black/60 backdrop-blur text-white text-sm font-bold px-6 py-3 rounded-full border border-white/30 flex items-center gap-2 pointer-events-none">
-                        <Zap className="h-4 w-4 text-primary" /> Tap anywhere → Finish Mode
-                      </div>
-                    </div>
-                  )}
-
-                  {finishMode && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="bg-primary/20 border border-primary rounded-full px-8 py-4 text-primary font-bold text-xl animate-pulse">
-                        <Zap className="inline mr-2 h-6 w-6" /> FINISHING...
-                      </div>
-                    </div>
-                  )}
                 </div>
               ) : embedUrl ? (
                 <div className="flex-1 min-h-0 relative">
@@ -851,24 +815,6 @@ export default function Player() {
             />
           )}
 
-          <Card className="border-primary/20 bg-card/50">
-            <CardHeader>
-              <CardTitle>Finish Mode</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button
-                variant={finishMode ? "destructive" : "default"}
-                className="w-full h-14 text-base font-bold"
-                onClick={triggerFinishMode}
-                disabled={!connected || finishMode}
-                data-testid="button-finish-mode"
-              >
-                <Zap className="mr-2 h-5 w-5" />
-                {finishMode ? "Burst Active..." : "Trigger Finish"}
-              </Button>
-              {!connected && <p className="text-xs text-muted-foreground mt-2">Connect device to use Finish Mode</p>}
-            </CardContent>
-          </Card>
         </div>
       </div>
 
