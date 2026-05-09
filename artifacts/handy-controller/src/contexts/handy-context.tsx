@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { getStatus, type HandyFailureReason } from "@/lib/handyApi";
 import { BASE } from "@/lib/handyApi";
+import { enqueueRetry } from "@/hooks/use-retry-queue";
 
 // Back-off constants for SSE reconnection
 const SSE_RETRY_MIN_MS = 5_000;
@@ -98,9 +99,17 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
         if (res.deviceModel) setDeviceModel(res.deviceModel);
         if (res.firmwareVersion) setFirmwareVersion(res.firmwareVersion);
       }
+      // If the check succeeded with a network error while offline, queue a retry.
+      if (res.failureReason === "network_error" && !navigator.onLine) {
+        enqueueRetry("device-sync", () => checkOnce(k).then(() => {}));
+      }
       return { connected: res.connected, failureReason: res.failureReason };
     } catch {
       if (mountedRef.current) setConnected(false);
+      // Network fetch threw entirely — queue a retry if we're offline.
+      if (!navigator.onLine) {
+        enqueueRetry("device-sync", () => checkOnce(k).then(() => {}));
+      }
       return { connected: false, failureReason: "network_error" };
     } finally {
       if (mountedRef.current) setChecking(false);

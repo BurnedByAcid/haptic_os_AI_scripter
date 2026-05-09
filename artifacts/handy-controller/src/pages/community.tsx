@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useFeatureTracking } from "@/hooks/use-analytics";
+import { enqueueRetry } from "@/hooks/use-retry-queue";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth, useUser } from "@clerk/react";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -417,6 +418,14 @@ export default function Community() {
   }
 
   async function handleUseInPlayer(s: CommunityScript) {
+    if (!navigator.onLine) {
+      enqueueRetry(`use-in-player-${s.id}`, () => handleUseInPlayer(s));
+      toast({
+        title: "You're offline",
+        description: `"${s.title}" will open in the player when you reconnect.`,
+      });
+      return;
+    }
     try {
       const headers = await authHeaders();
       const res = await fetch(`${API}/api/community/${s.id}`, { headers });
@@ -432,6 +441,14 @@ export default function Community() {
   }
 
   async function handleDownload(s: CommunityScript) {
+    if (!navigator.onLine) {
+      enqueueRetry(`download-script-${s.id}`, () => handleDownload(s));
+      toast({
+        title: "You're offline",
+        description: `"${s.title}" will download when you reconnect.`,
+      });
+      return;
+    }
     try {
       const headers = await authHeaders();
       const res = await fetch(`${API}/api/community/${s.id}`, { headers });

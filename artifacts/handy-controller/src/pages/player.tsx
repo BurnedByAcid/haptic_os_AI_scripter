@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@clerk/react";
 import { useFeatureTracking } from "@/hooks/use-analytics";
 import { useHandy } from "@/hooks/use-handy";
+import { enqueueRetry } from "@/hooks/use-retry-queue";
 import { useSubscription } from "@/hooks/use-subscription";
 import { syncEngine, hsspEngine, Funscript, HSSPStatus } from "@/lib/scriptSync";
 import { setHDSP, stopDevice } from "@/lib/handyApi";
@@ -455,7 +456,13 @@ export default function Player() {
     // fire the recovery toast to close the UX loop.
     if (activeScript && key) {
       recordAppModeChange(2);
-      hsspEngine.prepare(activeScript);
+      if (!navigator.onLine) {
+        enqueueRetry("hssp-prepare", () =>
+          hsspEngine.prepare(activeScript).then(() => {})
+        );
+      } else {
+        hsspEngine.prepare(activeScript);
+      }
     }
   }, [activeScript, key, recordAppModeChange]);
 
