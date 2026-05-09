@@ -352,7 +352,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className={`border-b border-border flex-shrink-0 ${collapsed ? "p-2" : "p-4"}`}>
           {collapsed ? (
             <div className="flex flex-col items-center gap-3">
-              <EmblemGlow />
+              <button
+                title="Send feedback or report an issue"
+                onClick={() => { setFeedbackText(""); setFeedbackCategory("other"); setFeedbackOpen(true); }}
+                className="hover:opacity-80 transition-opacity"
+              >
+                <EmblemGlow />
+              </button>
               {/* Connection dot */}
               <div
                 className={`h-3 w-3 rounded-full flex-shrink-0 ${
@@ -410,12 +416,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
+                <button
+                  className="flex items-center gap-2.5 group"
+                  title="Send feedback or report an issue"
+                  onClick={() => { setFeedbackText(""); setFeedbackCategory("other"); setFeedbackOpen(true); }}
+                >
                   <EmblemGlow />
-                  <h1 className="text-xl font-bold tracking-tight whitespace-nowrap">
+                  <h1 className="text-xl font-bold tracking-tight whitespace-nowrap group-hover:opacity-80 transition-opacity">
                     <span className="text-[#E05252]">Haptic</span><span className="text-foreground">OS</span>
                   </h1>
-                </div>
+                </button>
                 <div className="flex items-center gap-2">
                   {battery !== undefined && connected && (
                     <span className="text-xs font-mono text-muted-foreground">
@@ -806,20 +816,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </select>
             </div>
 
-            {/* Feedback */}
-            <div className="border-t border-border pt-4">
-              <button
-                onClick={() => {
-                  setSettingsOpen(false);
-                  setFeedbackText("");
-                  setFeedbackOpen(true);
-                }}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <MessageSquare size={15} className="flex-shrink-0" />
-                Send feedback / report an issue
-              </button>
-            </div>
           </div>
 
           <DialogFooter>
