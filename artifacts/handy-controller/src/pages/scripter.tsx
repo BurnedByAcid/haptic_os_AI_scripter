@@ -434,6 +434,12 @@ export default function Scripter() {
   const [vtLastScanCancelled, setVtLastScanCancelled] = useState(false);
   const [vtStartTime, setVtStartTime] = useState(0);
   const [vtEndTime, setVtEndTime] = useState(0);
+  const [vtScanSpeed, setVtScanSpeed] = useState<"fast" | "accurate">(() => {
+    try {
+      const stored = localStorage.getItem("vt_scan_speed");
+      return stored === "fast" || stored === "accurate" ? stored : "accurate";
+    } catch { return "accurate"; }
+  });
   const [vtPreviewPoints, setVtPreviewPoints] = useState<Point[]>([]);
 
   // ─── GPU patch matcher ───
@@ -2273,7 +2279,7 @@ export default function Scripter() {
         });
 
         video.muted = true;
-        video.playbackRate = 16;
+        video.playbackRate = vtScanSpeed === "fast" ? 8 : 4;
 
         await new Promise<void>((resolve, reject) => {
           let done = false;
@@ -3509,6 +3515,29 @@ export default function Scripter() {
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1">
                       Alternates hi↔lo. Collapses automatically to keep movement ≤ 400 units/sec.
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-medium mb-1 text-muted-foreground uppercase tracking-wider">Scan Speed</p>
+                    <div className="flex rounded-md overflow-hidden border border-border/60 text-xs">
+                      {(["accurate", "fast"] as const).map(speed => (
+                        <button
+                          key={speed}
+                          onClick={() => {
+                            setVtScanSpeed(speed);
+                            try { localStorage.setItem("vt_scan_speed", speed); } catch {}
+                          }}
+                          className={`flex-1 py-1.5 font-medium transition-colors ${vtScanSpeed === speed ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:text-foreground"}`}
+                        >
+                          {speed === "accurate" ? "Accurate (4×)" : "Fast (8×)"}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {vtScanSpeed === "accurate"
+                        ? "4× — catches beats at 120–160 BPM. A 30-min video takes ~8 min."
+                        : "8× — faster scan but may miss rapid beats above ~120 BPM."}
                     </p>
                   </div>
 
