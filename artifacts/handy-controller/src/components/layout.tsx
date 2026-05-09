@@ -103,6 +103,11 @@ const MODE_HAMP = 0;
 const MODE_HSSP = 2;
 
 const MODE_LABELS: Record<number, string> = { 0: "HAMP", 1: "HDSP", 2: "HSSP" };
+const MODE_DESCRIPTIONS: Record<number, string> = {
+  0: "Oscillating stroke",
+  1: "Direct position",
+  2: "Script sync",
+};
 
 /** Pages that are "wrong" when the device is in HAMP mode. */
 const HAMP_MISMATCH_PAGES = new Set(["/scripter", "/player"]);
@@ -406,16 +411,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       {modeChanging ? "…" : (MODE_LABELS[mode] ?? mode)}
                     </button>
                   </PopoverTrigger>
-                  <PopoverContent side="right" align="start" className="w-36 p-1">
+                  <PopoverContent side="right" align="start" className="w-44 p-1">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-2 py-1">Switch mode</p>
                     {([0, 1, 2] as const).map(m => (
                       <button
                         key={m}
                         onClick={() => handleModeSelect(m)}
-                        className="flex items-center justify-between w-full px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+                        className="flex items-start justify-between w-full px-2 py-1.5 rounded hover:bg-muted transition-colors"
                       >
-                        <span className="font-mono font-bold text-xs">{MODE_LABELS[m]}</span>
-                        {mode === m && <Check size={12} className="text-primary" />}
+                        <span className="flex flex-col items-start gap-0.5">
+                          <span className="font-mono font-bold text-xs">{MODE_LABELS[m]}</span>
+                          <span className="text-[10px] text-muted-foreground leading-tight">{MODE_DESCRIPTIONS[m]}</span>
+                        </span>
+                        {mode === m && <Check size={12} className="text-primary mt-0.5 flex-shrink-0" />}
                       </button>
                     ))}
                   </PopoverContent>
@@ -469,16 +477,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
                           {modeChanging ? "…" : (MODE_LABELS[mode] ?? mode)}
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent side="bottom" align="end" className="w-36 p-1">
+                      <PopoverContent side="bottom" align="end" className="w-44 p-1">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-2 py-1">Switch mode</p>
                         {([0, 1, 2] as const).map(m => (
                           <button
                             key={m}
                             onClick={() => handleModeSelect(m)}
-                            className="flex items-center justify-between w-full px-2 py-1.5 rounded text-sm hover:bg-muted transition-colors"
+                            className="flex items-start justify-between w-full px-2 py-1.5 rounded hover:bg-muted transition-colors"
                           >
-                            <span className="font-mono font-bold text-xs">{MODE_LABELS[m]}</span>
-                            {mode === m && <Check size={12} className="text-primary" />}
+                            <span className="flex flex-col items-start gap-0.5">
+                              <span className="font-mono font-bold text-xs">{MODE_LABELS[m]}</span>
+                              <span className="text-[10px] text-muted-foreground leading-tight">{MODE_DESCRIPTIONS[m]}</span>
+                            </span>
+                            {mode === m && <Check size={12} className="text-primary mt-0.5 flex-shrink-0" />}
                           </button>
                         ))}
                       </PopoverContent>
