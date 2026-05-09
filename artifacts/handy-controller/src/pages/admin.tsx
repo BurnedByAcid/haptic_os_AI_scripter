@@ -471,7 +471,11 @@ export default function Admin() {
             <CardTitle className="flex items-center gap-2 text-base">
               <MessageSquare className="h-4 w-4 text-primary" />
               User Feedback
-              <span className="text-xs font-normal text-muted-foreground ml-1">({feedbackTotal})</span>
+              <span className="text-xs font-normal text-muted-foreground ml-1">
+                {feedbackFilter === "all"
+                  ? `(${feedbackTotal})`
+                  : `(${feedbackList.length} of ${feedbackTotal})`}
+              </span>
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={refreshFeedback} disabled={feedbackLoading} className="h-7 w-7 p-0">
               <RefreshCw className={`h-3.5 w-3.5 ${feedbackLoading ? "animate-spin" : ""}`} />
