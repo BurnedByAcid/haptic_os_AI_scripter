@@ -2855,7 +2855,7 @@ export default function Scripter() {
                 {bdEverActive ? (
                   <span className="text-white/80 text-sm">Audio stopped — select a source to resume</span>
                 ) : (
-                  <span className="text-muted-foreground text-sm">Select an input source to begin</span>
+                  <span className="text-muted-foreground text-sm animate-fade-in">Select an input source to begin</span>
                 )}
               </div>
               {bdIsRecording && (
