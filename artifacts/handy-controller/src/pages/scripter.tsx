@@ -212,6 +212,16 @@ export default function Scripter() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoFileName, setVideoFileName] = useState<string | null>(null);
   const [importedScriptName, setImportedScriptName] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.title = importedScriptName
+      ? `Scripter — ${importedScriptName} | HapticOS`
+      : "HapticOS";
+    return () => {
+      document.title = "HapticOS";
+    };
+  }, [importedScriptName]);
+
   const [urlDialogOpen, setUrlDialogOpen] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
