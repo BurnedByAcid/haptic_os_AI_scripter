@@ -60,27 +60,21 @@ function ConnectionDot({ status }: { status: "connecting" | "connected" | "unrea
   );
 }
 
-const HAPTICAI_REPO = "HapticAI/HapticAI-Powered-Funscript-Generator";
-const HAPTICAI_RELEASES_PAGE = `https://github.com/${HAPTICAI_REPO}/releases/latest`;
-
-interface ReleaseAsset {
-  url: string;
-  sizeBytes: number;
-}
-
 interface HapticAIRelease {
-  tag: string;
-  windows: ReleaseAsset | null;
-  mac: ReleaseAsset | null;
+  available: boolean;
+  version?: string;
+  windows?: { sizeBytes: number } | null;
+  mac?: { sizeBytes: number } | null;
 }
+
+type ReleaseState = "loading" | "unavailable" | "available" | "error";
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const HAPTICAI_CACHE_KEY = "hapticai_release_cache";
-const HAPTICAI_CACHE_KEY_LEGACY = "hapticai_fungen_release_cache";
+const HAPTICAI_CACHE_KEY = "hapticai_release_v2_cache";
 const HAPTICAI_CACHE_TTL_MS = 60 * 60 * 1000;
 
 interface HapticAIReleaseCache {
@@ -90,7 +84,7 @@ interface HapticAIReleaseCache {
 
 function readReleaseCache(): HapticAIRelease | null {
   try {
-    const raw = localStorage.getItem(HAPTICAI_CACHE_KEY) ?? localStorage.getItem(HAPTICAI_CACHE_KEY_LEGACY);
+    const raw = localStorage.getItem(HAPTICAI_CACHE_KEY);
     if (!raw) return null;
     const parsed: HapticAIReleaseCache = JSON.parse(raw);
     if (Date.now() - parsed.fetchedAt > HAPTICAI_CACHE_TTL_MS) return null;
@@ -102,49 +96,158 @@ function readReleaseCache(): HapticAIRelease | null {
 
 function writeReleaseCache(release: HapticAIRelease): void {
   try {
-    const entry: HapticAIReleaseCache = { release, fetchedAt: Date.now() };
-    localStorage.setItem(HAPTICAI_CACHE_KEY, JSON.stringify(entry));
+    localStorage.setItem(HAPTICAI_CACHE_KEY, JSON.stringify({ release, fetchedAt: Date.now() }));
   } catch {
   }
 }
 
-function useHapticAIRelease(): HapticAIRelease | null {
+function useHapticAIRelease(): { release: HapticAIRelease | null; state: ReleaseState } {
   const [release, setRelease] = useState<HapticAIRelease | null>(() => readReleaseCache());
+  const [state, setState] = useState<ReleaseState>(() => {
+    const cached = readReleaseCache();
+    if (!cached) return "loading";
+    return cached.available ? "available" : "unavailable";
+  });
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`https://api.github.com/repos/${HAPTICAI_REPO}/releases/latest`, {
-      headers: { Accept: "application/vnd.github.v3+json" },
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled || !data?.assets) return;
-        const assets: Array<{ name: string; browser_download_url: string; size: number }> =
-          data.assets ?? [];
-        const winAsset = assets.find((a) => a.name.toLowerCase().endsWith(".exe"));
-        const macAsset = assets.find(
-          (a) =>
-            a.name.toLowerCase().endsWith(".app.zip") ||
-            (a.name.toLowerCase().includes("mac") && a.name.toLowerCase().endsWith(".zip")) ||
-            a.name.toLowerCase().endsWith(".dmg"),
-        );
-        const fresh: HapticAIRelease = {
-          tag: data.tag_name ?? "",
-          windows: winAsset
-            ? { url: winAsset.browser_download_url, sizeBytes: winAsset.size }
-            : null,
-          mac: macAsset
-            ? { url: macAsset.browser_download_url, sizeBytes: macAsset.size }
-            : null,
-        };
-        writeReleaseCache(fresh);
-        setRelease(fresh);
+    fetch(`${API}/api/hapticai/release`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data: HapticAIRelease) => {
+        if (cancelled) return;
+        writeReleaseCache(data);
+        setRelease(data);
+        setState(data.available ? "available" : "unavailable");
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setState((prev) => (prev === "loading" ? "error" : prev));
+      });
     return () => { cancelled = true; };
   }, []);
 
-  return release;
+  return { release, state };
+}
+
+function UnavailableMessage({ label }: { label: string }) {
+  return (
+    <div className="space-y-1">
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Download className="h-3 w-3" />
+        {label}
+        <span className="text-[10px]">(not yet available)</span>
+      </span>
+      <p className="text-[11px] text-muted-foreground">
+        The download isn&apos;t ready yet.{" "}
+        <a
+          href="mailto:support@hapticos.app"
+          className="underline underline-offset-2 hover:text-foreground transition-colors"
+        >
+          Contact support
+        </a>{" "}
+        if you need access.
+      </p>
+    </div>
+  );
+}
+
+function DownloadLink({ os, release, state }: {
+  os: "windows" | "mac" | "other";
+  release: HapticAIRelease | null;
+  state: ReleaseState;
+}) {
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  if (os === "other") {
+    return (
+      <p className="text-xs text-muted-foreground">
+        HapticAI is available for Windows and macOS. Check back soon for Linux support.
+      </p>
+    );
+  }
+
+  const platformRelease = os === "windows" ? release?.windows : release?.mac;
+  const downloadUrl = `${API}/api/hapticai/download/${os}`;
+  const filename = os === "windows"
+    ? `HapticAI-Setup-${release?.version ?? "latest"}.exe`
+    : `HapticAI-${release?.version ?? "latest"}.dmg`;
+  const label = os === "windows" ? "Download HapticAI for Windows (.exe)" : "Download HapticAI for macOS";
+
+  if (state === "loading") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        {label}
+      </span>
+    );
+  }
+
+  if (state !== "available" || !platformRelease) {
+    return <UnavailableMessage label={label} />;
+  }
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (downloading) return;
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const res = await fetch(downloadUrl);
+      if (!res.ok) {
+        let msg = "Download failed — the file may not be available yet.";
+        try {
+          const data = await res.json() as { message?: string; error?: string };
+          if (data.message) msg = data.message;
+          else if (data.error) msg = data.error;
+        } catch { /* ignore parse failure */ }
+        setDownloadError(msg);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setDownloadError("Download failed. Please check your connection or contact support.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <button
+        onClick={handleDownload}
+        disabled={downloading}
+        className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {downloading
+          ? <Loader2 className="h-3 w-3 animate-spin" />
+          : <Download className="h-3 w-3" />
+        }
+        {downloading ? "Downloading…" : label}
+        {!downloading && (
+          <span className="text-muted-foreground text-[10px]">
+            {release?.version} · {formatBytes(platformRelease.sizeBytes)}
+          </span>
+        )}
+      </button>
+      {downloadError && (
+        <p className="text-[11px] text-destructive">
+          {downloadError}{" "}
+          <a
+            href="mailto:support@hapticos.app"
+            className="underline underline-offset-2 hover:text-destructive/80 transition-colors"
+          >
+            Contact support
+          </a>
+        </p>
+      )}
+    </div>
+  );
 }
 
 function SetupPanel({ os, serverUrl, onUrlChange }: {
@@ -154,7 +257,7 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
 }) {
   const [urlInput, setUrlInput] = useState(serverUrl);
   const [expanded, setExpanded] = useState(true);
-  const release = useHapticAIRelease();
+  const { release, state } = useHapticAIRelease();
 
   const handleSaveUrl = () => {
     const trimmed = urlInput.trim().replace(/\/$/, "");
@@ -194,65 +297,7 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
               <p className="text-xs text-muted-foreground">
                 Download the HapticAI executable for your operating system. It is self-contained — no installation required.
               </p>
-              {os === "windows" && (
-                release?.windows ? (
-                  <a
-                    href={release.windows.url}
-                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Download className="h-3 w-3" />
-                    Download HapticAI for Windows (.exe)
-                    <span className="text-muted-foreground text-[10px]">
-                      {release.tag} · {formatBytes(release.windows.sizeBytes)}
-                    </span>
-                  </a>
-                ) : (
-                  <a
-                    href={HAPTICAI_RELEASES_PAGE}
-                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Download className="h-3 w-3" />
-                    Download HapticAI for Windows (.exe)
-                    <span className="text-[10px]">(coming soon)</span>
-                  </a>
-                )
-              )}
-              {os === "mac" && (
-                release?.mac ? (
-                  <a
-                    href={release.mac.url}
-                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Download className="h-3 w-3" />
-                    Download HapticAI for macOS
-                    <span className="text-muted-foreground text-[10px]">
-                      {release.tag} · {formatBytes(release.mac.sizeBytes)}
-                    </span>
-                  </a>
-                ) : (
-                  <a
-                    href={HAPTICAI_RELEASES_PAGE}
-                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Download className="h-3 w-3" />
-                    Download HapticAI for macOS (.app)
-                    <span className="text-[10px]">(coming soon)</span>
-                  </a>
-                )
-              )}
-              {os === "other" && (
-                <p className="text-xs text-muted-foreground">
-                  HapticAI is available for Windows and macOS. Check back soon for Linux support.
-                </p>
-              )}
+              <DownloadLink os={os} release={release} state={state} />
             </div>
           </li>
 

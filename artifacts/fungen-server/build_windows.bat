@@ -13,6 +13,15 @@ if errorlevel 1 (
     pause & exit /b 1
 )
 
+:: Require version argument
+set VERSION=%1
+if "%VERSION%"=="" (
+    echo.
+    echo Usage: build_windows.bat ^<version^>   e.g.  build_windows.bat v1.0.0
+    echo.
+    pause & exit /b 1
+)
+
 :: Create and activate venv
 echo [1/5] Creating virtual environment...
 if exist build_venv rmdir /s /q build_venv
@@ -43,10 +52,14 @@ echo [4/5] Running PyInstaller...
 pyinstaller fungen_windows.spec --clean --noconfirm
 
 :: Check result
-if not exist dist\FunGen.exe (
-    echo ERROR: Build failed. Check output above.
-    call build_venv\Scripts\deactivate.bat
-    pause & exit /b 1
+if not exist dist\HapticAI-Setup.exe (
+    if not exist dist\FunGen.exe (
+        echo ERROR: Build failed. Check output above.
+        call build_venv\Scripts\deactivate.bat
+        pause & exit /b 1
+    )
+    :: Rename legacy output
+    rename dist\FunGen.exe HapticAI-Setup.exe
 )
 
 :: Deactivate
@@ -54,10 +67,25 @@ call build_venv\Scripts\deactivate.bat
 
 echo [5/5] Done!
 echo.
-echo Output: dist\FunGen.exe
-echo Size:
-for %%F in (dist\FunGen.exe) do echo   %%~zF bytes
+echo Output: dist\HapticAI-Setup.exe
 echo.
-echo To test: dist\FunGen.exe
-echo HapticAI reads the port from hapticai_port.txt (created at startup).
+for %%F in (dist\HapticAI-Setup.exe) do echo Size: %%~zF bytes
+echo.
+echo ============================================================
+echo  Upload to HapticOS
+echo ============================================================
+echo.
+echo  Set your admin token first:
+echo    set HAPTICAI_ADMIN_TOKEN=^<token from HAPTICAI_ADMIN_TOKEN env var^>
+echo.
+echo  Then run:
+echo    curl -X POST https://hapticos.replit.app/api/hapticai/upload ^
+echo         -H "Authorization: Bearer %HAPTICAI_ADMIN_TOKEN%" ^
+echo         -F "platform=windows" ^
+echo         -F "version=%VERSION%" ^
+echo         -F "file=@dist\HapticAI-Setup.exe"
+echo.
+echo  The download will be live at:
+echo    https://hapticos.replit.app/api/hapticai/download/windows
+echo ============================================================
 pause

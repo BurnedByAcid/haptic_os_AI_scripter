@@ -13,6 +13,8 @@
   "dependencies": {
     "@clerk/express": "^2.1.9",
     "@clerk/shared": "^4.8.5",
+    "@google-cloud/storage": "^7.19.0",
+    "@types/multer": "^2.1.0",
     "@types/pg": "^8.18.0",
     "@types/sanitize-html": "^2.16.1",
     "@workspace/api-zod": "workspace:*",
@@ -24,6 +26,7 @@
     "express": "^5",
     "express-rate-limit": "^8.4.1",
     "http-proxy-middleware": "^3.0.5",
+    "multer": "^2.1.1",
     "pg": "^8.20.0",
     "pino": "^9",
     "pino-http": "^10",
