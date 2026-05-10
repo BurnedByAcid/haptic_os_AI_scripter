@@ -406,6 +406,17 @@ function GenerationUI({ serverUrl, options }: { serverUrl: string; options: FunG
     });
   };
 
+  const hasCustomValues = options.some(
+    (opt) => optionValues[opt.key] !== undefined && optionValues[opt.key] !== opt.default,
+  );
+
+  const handleResetOptions = () => {
+    const defaults: Record<string, unknown> = {};
+    for (const opt of options) defaults[opt.key] = opt.default;
+    try { localStorage.removeItem("fungen_option_values"); } catch { /* ignore */ }
+    setOptionValues(defaults);
+  };
+
   const handleGenerate = async () => {
     if (!prompt.trim() || generating) return;
     setGenerating(true);
@@ -518,7 +529,18 @@ function GenerationUI({ serverUrl, options }: { serverUrl: string; options: FunG
 
       {options.length > 0 && (
         <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Generation Options</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Generation Options</p>
+            {hasCustomValues && (
+              <button
+                type="button"
+                onClick={handleResetOptions}
+                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+              >
+                Reset to defaults
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {options.map((opt) => (
               <OptionControl
