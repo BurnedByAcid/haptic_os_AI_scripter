@@ -47,12 +47,11 @@ export function HapticAIConsentDialog({
 
           <div className="text-sm text-muted-foreground space-y-3 leading-relaxed">
             <p>
-              Before you can use HapticAI, a separate local application called{" "}
-              <strong className="text-foreground">FunGen</strong> must be
+              Before you can use HapticAI, a separate local application must be
               downloaded and installed into a custom sandbox on your computer.
             </p>
             <p>
-              FunGen runs entirely on your machine — no data leaves your computer
+              HapticAI runs entirely on your machine — no data leaves your computer
               during generation. It is a self-contained executable and requires no
               command-line knowledge to set up.
             </p>

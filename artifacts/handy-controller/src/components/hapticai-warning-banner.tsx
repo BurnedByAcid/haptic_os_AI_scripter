@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 
-export function FunGenWarningBanner() {
+export function HapticAIWarningBanner() {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -32,10 +32,10 @@ export function FunGenWarningBanner() {
           </p>
           <p>
             <strong className="text-foreground">No liability.</strong> The developer is not responsible for any
-            outputs, discomfort, or device effects resulting from use of HapticAI or FunGen.
+            outputs, discomfort, or device effects resulting from use of HapticAI.
           </p>
           <p>
-            <strong className="text-foreground">Local processing.</strong> Prompts are sent only to the FunGen
+            <strong className="text-foreground">Local processing.</strong> Prompts are sent only to the HapticAI
             app running on your computer. Nothing is transmitted to external servers.
           </p>
         </div>

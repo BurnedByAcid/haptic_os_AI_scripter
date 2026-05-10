@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth, useUser } from "@clerk/react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { PremiumGate } from "@/components/premium-gate";
-import { FunGenEuaModal } from "@/components/fungen-eua-modal";
-import { FunGenWarningBanner } from "@/components/fungen-warning-banner";
+import { HapticAIEuaModal } from "@/components/hapticai-eua-modal";
+import { HapticAIWarningBanner } from "@/components/hapticai-warning-banner";
 import { HapticAIConsentDialog } from "@/components/haptic-ai-consent-dialog";
-import { useFunGenConnection } from "@/hooks/use-fungen-connection";
-import type { FunGenOption } from "@/hooks/use-fungen-connection";
+import { useHapticAIConnection } from "@/hooks/use-hapticai-connection";
+import type { HapticAIOption } from "@/hooks/use-hapticai-connection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,20 +55,20 @@ function ConnectionDot({ status }: { status: "connecting" | "connected" | "unrea
   return (
     <span className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
       <Circle className="h-3.5 w-3.5 text-red-500 fill-red-500" />
-      Not running — is FunGen open?
+      Not running — is HapticAI open?
     </span>
   );
 }
 
-const FUNGEN_REPO = "HapticAI/HapticAI-Powered-Funscript-Generator";
-const FUNGEN_RELEASES_PAGE = `https://github.com/${FUNGEN_REPO}/releases/latest`;
+const HAPTICAI_REPO = "HapticAI/HapticAI-Powered-Funscript-Generator";
+const HAPTICAI_RELEASES_PAGE = `https://github.com/${HAPTICAI_REPO}/releases/latest`;
 
 interface ReleaseAsset {
   url: string;
   sizeBytes: number;
 }
 
-interface FunGenRelease {
+interface HapticAIRelease {
   tag: string;
   windows: ReleaseAsset | null;
   mac: ReleaseAsset | null;
@@ -79,40 +79,41 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-const FUNGEN_CACHE_KEY = "hapticai_fungen_release_cache";
-const FUNGEN_CACHE_TTL_MS = 60 * 60 * 1000;
+const HAPTICAI_CACHE_KEY = "hapticai_release_cache";
+const HAPTICAI_CACHE_KEY_LEGACY = "hapticai_fungen_release_cache";
+const HAPTICAI_CACHE_TTL_MS = 60 * 60 * 1000;
 
-interface FunGenReleaseCache {
-  release: FunGenRelease;
+interface HapticAIReleaseCache {
+  release: HapticAIRelease;
   fetchedAt: number;
 }
 
-function readReleaseCache(): FunGenRelease | null {
+function readReleaseCache(): HapticAIRelease | null {
   try {
-    const raw = localStorage.getItem(FUNGEN_CACHE_KEY);
+    const raw = localStorage.getItem(HAPTICAI_CACHE_KEY) ?? localStorage.getItem(HAPTICAI_CACHE_KEY_LEGACY);
     if (!raw) return null;
-    const parsed: FunGenReleaseCache = JSON.parse(raw);
-    if (Date.now() - parsed.fetchedAt > FUNGEN_CACHE_TTL_MS) return null;
+    const parsed: HapticAIReleaseCache = JSON.parse(raw);
+    if (Date.now() - parsed.fetchedAt > HAPTICAI_CACHE_TTL_MS) return null;
     return parsed.release;
   } catch {
     return null;
   }
 }
 
-function writeReleaseCache(release: FunGenRelease): void {
+function writeReleaseCache(release: HapticAIRelease): void {
   try {
-    const entry: FunGenReleaseCache = { release, fetchedAt: Date.now() };
-    localStorage.setItem(FUNGEN_CACHE_KEY, JSON.stringify(entry));
+    const entry: HapticAIReleaseCache = { release, fetchedAt: Date.now() };
+    localStorage.setItem(HAPTICAI_CACHE_KEY, JSON.stringify(entry));
   } catch {
   }
 }
 
-function useFunGenRelease(): FunGenRelease | null {
-  const [release, setRelease] = useState<FunGenRelease | null>(() => readReleaseCache());
+function useHapticAIRelease(): HapticAIRelease | null {
+  const [release, setRelease] = useState<HapticAIRelease | null>(() => readReleaseCache());
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`https://api.github.com/repos/${FUNGEN_REPO}/releases/latest`, {
+    fetch(`https://api.github.com/repos/${HAPTICAI_REPO}/releases/latest`, {
       headers: { Accept: "application/vnd.github.v3+json" },
     })
       .then((r) => (r.ok ? r.json() : null))
@@ -127,7 +128,7 @@ function useFunGenRelease(): FunGenRelease | null {
             (a.name.toLowerCase().includes("mac") && a.name.toLowerCase().endsWith(".zip")) ||
             a.name.toLowerCase().endsWith(".dmg"),
         );
-        const fresh: FunGenRelease = {
+        const fresh: HapticAIRelease = {
           tag: data.tag_name ?? "",
           windows: winAsset
             ? { url: winAsset.browser_download_url, sizeBytes: winAsset.size }
@@ -153,7 +154,7 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
 }) {
   const [urlInput, setUrlInput] = useState(serverUrl);
   const [expanded, setExpanded] = useState(true);
-  const release = useFunGenRelease();
+  const release = useHapticAIRelease();
 
   const handleSaveUrl = () => {
     const trimmed = urlInput.trim().replace(/\/$/, "");
@@ -170,7 +171,7 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
           aria-expanded={expanded}
         >
           <AlertTriangle className="h-4 w-4 text-yellow-500 flex-shrink-0" />
-          <h3 className="font-semibold text-sm text-foreground flex-1">FunGen is not running</h3>
+          <h3 className="font-semibold text-sm text-foreground flex-1">HapticAI is not running</h3>
           {expanded
             ? <ChevronUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             : <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -180,7 +181,7 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
         {expanded && (
         <div className="px-5 pb-5 space-y-5 border-t border-border">
         <p className="text-sm text-muted-foreground pt-4">
-          HapticAI requires the FunGen app to be running on your computer. Follow the steps below to get started.
+          HapticAI requires a local app to be running on your computer. Follow the steps below to get started.
         </p>
 
         <ol className="space-y-4">
@@ -189,9 +190,9 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
               1
             </span>
             <div className="space-y-1.5">
-              <p className="text-sm text-foreground font-medium">Download FunGen</p>
+              <p className="text-sm text-foreground font-medium">Download HapticAI</p>
               <p className="text-xs text-muted-foreground">
-                Download the FunGen executable for your operating system. It is self-contained — no installation required.
+                Download the HapticAI executable for your operating system. It is self-contained — no installation required.
               </p>
               {os === "windows" && (
                 release?.windows ? (
@@ -202,20 +203,20 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
                     rel="noopener noreferrer"
                   >
                     <Download className="h-3 w-3" />
-                    Download FunGen for Windows (.exe)
+                    Download HapticAI for Windows (.exe)
                     <span className="text-muted-foreground text-[10px]">
                       {release.tag} · {formatBytes(release.windows.sizeBytes)}
                     </span>
                   </a>
                 ) : (
                   <a
-                    href={FUNGEN_RELEASES_PAGE}
+                    href={HAPTICAI_RELEASES_PAGE}
                     className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
                     <Download className="h-3 w-3" />
-                    Download FunGen for Windows (.exe)
+                    Download HapticAI for Windows (.exe)
                     <span className="text-[10px]">(coming soon)</span>
                   </a>
                 )
@@ -229,27 +230,27 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
                     rel="noopener noreferrer"
                   >
                     <Download className="h-3 w-3" />
-                    Download FunGen for macOS
+                    Download HapticAI for macOS
                     <span className="text-muted-foreground text-[10px]">
                       {release.tag} · {formatBytes(release.mac.sizeBytes)}
                     </span>
                   </a>
                 ) : (
                   <a
-                    href={FUNGEN_RELEASES_PAGE}
+                    href={HAPTICAI_RELEASES_PAGE}
                     className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
                     <Download className="h-3 w-3" />
-                    Download FunGen for macOS (.app)
+                    Download HapticAI for macOS (.app)
                     <span className="text-[10px]">(coming soon)</span>
                   </a>
                 )
               )}
               {os === "other" && (
                 <p className="text-xs text-muted-foreground">
-                  FunGen is available for Windows and macOS. Check back soon for Linux support.
+                  HapticAI is available for Windows and macOS. Check back soon for Linux support.
                 </p>
               )}
             </div>
@@ -260,7 +261,7 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
               2
             </span>
             <div className="space-y-1">
-              <p className="text-sm text-foreground font-medium">Launch FunGen</p>
+              <p className="text-sm text-foreground font-medium">Launch HapticAI</p>
               <p className="text-xs text-muted-foreground">
                 {os === "windows"
                   ? "Double-click the downloaded .exe file. Windows may show a security prompt — click \"More info\" then \"Run anyway\"."
@@ -269,7 +270,7 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
                   : "Open the downloaded executable. Your OS may require you to grant permission to run it."}
               </p>
               <p className="text-xs text-muted-foreground">
-                FunGen will start a local server automatically. You'll see a small status window confirming it's running.
+                HapticAI will start a local server automatically. You'll see a small status window confirming it's running.
               </p>
             </div>
           </li>
@@ -281,7 +282,7 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
             <div className="space-y-1">
               <p className="text-sm text-foreground font-medium">Wait for the status indicator to turn green</p>
               <p className="text-xs text-muted-foreground">
-                HapticOS polls FunGen every few seconds. Once it connects, the generation interface will unlock automatically.
+                HapticOS polls HapticAI every few seconds. Once it connects, the generation interface will unlock automatically.
               </p>
             </div>
           </li>
@@ -290,7 +291,7 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
         <div className="pt-1 border-t border-border space-y-2">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Server URL</p>
           <p className="text-xs text-muted-foreground">
-            By default FunGen runs at <code className="bg-muted px-1 py-0.5 rounded text-[11px]">http://localhost:8000</code>.
+            By default HapticAI runs at <code className="bg-muted px-1 py-0.5 rounded text-[11px]">http://localhost:8000</code>.
             Change this only if you configured a different port.
           </p>
           <div className="flex gap-2">
@@ -318,7 +319,7 @@ function OptionControl({
   value,
   onChange,
 }: {
-  option: FunGenOption;
+  option: HapticAIOption;
   value: unknown;
   onChange: (key: string, val: unknown) => void;
 }) {
@@ -370,10 +371,10 @@ function OptionControl({
   );
 }
 
-function initOptionValues(options: FunGenOption[]): Record<string, unknown> {
+function initOptionValues(options: HapticAIOption[]): Record<string, unknown> {
   const stored = (() => {
     try {
-      const raw = localStorage.getItem("fungen_option_values");
+      const raw = localStorage.getItem("hapticai_option_values");
       return raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
     } catch { return {}; }
   })();
@@ -384,7 +385,7 @@ function initOptionValues(options: FunGenOption[]): Record<string, unknown> {
   return result;
 }
 
-function GenerationUI({ serverUrl, sessionToken, options }: { serverUrl: string; sessionToken: string; options: FunGenOption[] }) {
+function GenerationUI({ serverUrl, sessionToken, options }: { serverUrl: string; sessionToken: string; options: HapticAIOption[] }) {
   const [prompt, setPrompt] = useState("");
   const [optionValues, setOptionValues] = useState<Record<string, unknown>>(() => initOptionValues(options));
   const [generating, setGenerating] = useState(false);
@@ -401,7 +402,7 @@ function GenerationUI({ serverUrl, sessionToken, options }: { serverUrl: string;
   const handleOptionChange = (key: string, val: unknown) => {
     setOptionValues((prev) => {
       const next = { ...prev, [key]: val };
-      try { localStorage.setItem("fungen_option_values", JSON.stringify(next)); } catch { /* ignore */ }
+      try { localStorage.setItem("hapticai_option_values", JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
   };
@@ -413,7 +414,7 @@ function GenerationUI({ serverUrl, sessionToken, options }: { serverUrl: string;
   const handleResetOptions = () => {
     const defaults: Record<string, unknown> = {};
     for (const opt of options) defaults[opt.key] = opt.default;
-    try { localStorage.removeItem("fungen_option_values"); } catch { /* ignore */ }
+    try { localStorage.removeItem("hapticai_option_values"); } catch { /* ignore */ }
     setOptionValues(defaults);
   };
 
@@ -428,7 +429,7 @@ function GenerationUI({ serverUrl, sessionToken, options }: { serverUrl: string;
       const body: Record<string, unknown> = { prompt: prompt.trim() };
       if (options.length > 0) body.options = optionValues;
       const genHeaders: Record<string, string> = { "Content-Type": "application/json" };
-      if (sessionToken) genHeaders["X-FunGen-Token"] = sessionToken;
+      if (sessionToken) genHeaders["X-HapticAI-Token"] = sessionToken;
       const res = await fetch(`${serverUrl}/generate`, {
         method: "POST",
         headers: genHeaders,
@@ -449,7 +450,7 @@ function GenerationUI({ serverUrl, sessionToken, options }: { serverUrl: string;
       setResult({ funscript: funscriptStr, name });
     } catch (err) {
       const msg = err instanceof Error
-        ? (err.name === "AbortError" ? "Generation timed out — FunGen took too long to respond." : err.message)
+        ? (err.name === "AbortError" ? "Generation timed out — HapticAI took too long to respond." : err.message)
         : "Generation failed.";
       setGenError(msg);
     } finally {
@@ -576,7 +577,7 @@ function GenerationUI({ serverUrl, sessionToken, options }: { serverUrl: string;
 
       {generating && (
         <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground text-center">
-          FunGen is processing your request. This may take a moment…
+          HapticAI is processing your request. This may take a moment…
         </div>
       )}
 
@@ -618,14 +619,15 @@ function HapticAIContent() {
   const { user } = useUser();
   const [agreementState, setAgreementState] = useState<AgreementState>("loading");
   const checkedRef = useRef(false);
-  const { status, capabilities, serverUrl, sessionToken, setServerUrl } = useFunGenConnection();
+  const { status, capabilities, serverUrl, sessionToken, setServerUrl } = useHapticAIConnection();
   const os = detectOS();
 
   useEffect(() => {
     if (checkedRef.current) return;
     checkedRef.current = true;
 
-    const localAgreed = (user?.publicMetadata as Record<string, unknown>)?.fungenAgreed === true;
+    const meta = user?.publicMetadata as Record<string, unknown>;
+    const localAgreed = meta?.hapticaiAgreed === true || meta?.fungenAgreed === true;
     if (localAgreed) {
       setAgreementState("accepted");
       return;
@@ -636,7 +638,7 @@ function HapticAIContent() {
         const token = await getToken();
         const headers: Record<string, string> = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
-        const res = await fetch(`${API}/api/user/fungen-status`, { headers });
+        const res = await fetch(`${API}/api/user/hapticai-status`, { headers });
         if (!res.ok) {
           setAgreementState("needed");
           return;
@@ -667,10 +669,10 @@ function HapticAIContent() {
   return (
     <div className="flex flex-col h-full">
       {agreementState === "needed" && (
-        <FunGenEuaModal onAccepted={handleAccepted} />
+        <HapticAIEuaModal onAccepted={handleAccepted} />
       )}
 
-      <FunGenWarningBanner />
+      <HapticAIWarningBanner />
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
@@ -683,14 +685,14 @@ function HapticAIContent() {
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              Generate haptic scripts from natural language using the FunGen local AI engine.
+              Generate haptic scripts from natural language using the HapticAI local engine.
             </p>
           </div>
 
           {/* Connection status bar */}
           <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-2.5">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">FunGen status:</span>
+              <span className="text-xs text-muted-foreground">HapticAI status:</span>
               <ConnectionDot status={status} />
             </div>
             <div className="flex items-center gap-2">
@@ -721,7 +723,7 @@ function HapticAIContent() {
           {status === "connecting" && (
             <div className="rounded-lg border border-border bg-muted/20 px-4 py-8 text-center space-y-2">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mx-auto" />
-              <p className="text-sm text-muted-foreground">Connecting to FunGen…</p>
+              <p className="text-sm text-muted-foreground">Connecting to HapticAI…</p>
             </div>
           )}
         </div>

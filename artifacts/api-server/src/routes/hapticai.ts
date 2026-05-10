@@ -5,10 +5,10 @@ import { pool } from "../lib/db";
 const router = Router();
 
 /**
- * GET /api/user/fungen-status
- * Returns whether the current user has accepted the FunGen EUA.
+ * GET /api/user/hapticai-status
+ * Returns whether the current user has accepted the HapticAI EUA.
  */
-router.get("/user/fungen-status", async (req: Request, res: Response) => {
+router.get("/user/hapticai-status", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) {
     res.status(401).json({ error: "Not authenticated." });
@@ -16,7 +16,8 @@ router.get("/user/fungen-status", async (req: Request, res: Response) => {
   }
   try {
     const user = await clerkClient.users.getUser(auth.userId);
-    const agreed = (user.publicMetadata as Record<string, unknown>)?.fungenAgreed === true;
+    const meta = user.publicMetadata as Record<string, unknown>;
+    const agreed = meta?.hapticaiAgreed === true || meta?.fungenAgreed === true;
     res.json({ agreed });
   } catch {
     res.status(500).json({ error: "Failed to fetch user status." });
@@ -24,11 +25,11 @@ router.get("/user/fungen-status", async (req: Request, res: Response) => {
 });
 
 /**
- * POST /api/user/fungen-agree
- * Records that the current user has accepted the FunGen EUA.
+ * POST /api/user/hapticai-agree
+ * Records that the current user has accepted the HapticAI EUA.
  * Idempotent — calling it again when already agreed is a no-op.
  */
-router.post("/user/fungen-agree", async (req: Request, res: Response) => {
+router.post("/user/hapticai-agree", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) {
     res.status(401).json({ error: "Not authenticated." });
@@ -36,7 +37,7 @@ router.post("/user/fungen-agree", async (req: Request, res: Response) => {
   }
   try {
     await clerkClient.users.updateUserMetadata(auth.userId, {
-      publicMetadata: { fungenAgreed: true },
+      publicMetadata: { hapticaiAgreed: true },
     });
     res.json({ ok: true });
   } catch {

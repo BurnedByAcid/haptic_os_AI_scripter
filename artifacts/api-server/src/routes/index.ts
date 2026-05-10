@@ -13,7 +13,7 @@ import scripterDraftsRouter from "./scripter-drafts";
 import scripterSessionsRouter from "./scripter-sessions";
 import analyticsRouter from "./analytics";
 import videoRouter from "./video";
-import fungenRouter from "./fungen";
+import hapticaiRouter from "./hapticai";
 
 const router: IRouter = Router();
 
@@ -31,6 +31,6 @@ router.use(scripterDraftsRouter);
 router.use(scripterSessionsRouter);
 router.use(analyticsRouter);
 router.use(videoRouter);
-router.use(fungenRouter);
+router.use(hapticaiRouter);
 
 export default router;

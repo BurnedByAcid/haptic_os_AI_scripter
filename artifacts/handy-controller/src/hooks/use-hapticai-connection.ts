@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-export type FunGenStatus = "connecting" | "connected" | "unreachable";
+export type HapticAIStatus = "connecting" | "connected" | "unreachable";
 
-export interface FunGenCapabilities {
+export interface HapticAICapabilities {
   version?: string;
-  options?: FunGenOption[];
+  options?: HapticAIOption[];
   session_token?: string;
 }
 
-export interface FunGenOption {
+export interface HapticAIOption {
   key: string;
   label: string;
   type: "number" | "boolean" | "select";
@@ -19,9 +19,9 @@ export interface FunGenOption {
   choices?: string[];
 }
 
-export interface FunGenConnection {
-  status: FunGenStatus;
-  capabilities: FunGenCapabilities;
+export interface HapticAIConnection {
+  status: HapticAIStatus;
+  capabilities: HapticAICapabilities;
   serverUrl: string;
   sessionToken: string;
   setServerUrl: (url: string) => void;
@@ -31,17 +31,17 @@ const DEFAULT_URL = "http://localhost:8000";
 const POLL_INTERVAL_MS = 3000;
 const TIMEOUT_MS = 2500;
 
-export function useFunGenConnection(): FunGenConnection {
+export function useHapticAIConnection(): HapticAIConnection {
   const [serverUrl, setServerUrl] = useState<string>(() => {
     try {
-      return localStorage.getItem("fungen_server_url") ?? DEFAULT_URL;
+      return localStorage.getItem("hapticai_server_url") ?? DEFAULT_URL;
     } catch {
       return DEFAULT_URL;
     }
   });
 
-  const [status, setStatus] = useState<FunGenStatus>("connecting");
-  const [capabilities, setCapabilities] = useState<FunGenCapabilities>({});
+  const [status, setStatus] = useState<HapticAIStatus>("connecting");
+  const [capabilities, setCapabilities] = useState<HapticAICapabilities>({});
   const [sessionToken, setSessionToken] = useState<string>("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
@@ -57,9 +57,9 @@ export function useFunGenConnection(): FunGenConnection {
       clearTimeout(timeoutId);
       if (!mountedRef.current) return;
       if (res.ok) {
-        let caps: FunGenCapabilities = {};
+        let caps: HapticAICapabilities = {};
         try {
-          caps = (await res.json()) as FunGenCapabilities;
+          caps = (await res.json()) as HapticAICapabilities;
         } catch { /* ignore */ }
         setCapabilities(caps);
         if (caps.session_token) {
@@ -89,7 +89,7 @@ export function useFunGenConnection(): FunGenConnection {
 
   const handleSetServerUrl = useCallback((url: string) => {
     try {
-      localStorage.setItem("fungen_server_url", url);
+      localStorage.setItem("hapticai_server_url", url);
     } catch { /* ignore */ }
     setServerUrl(url);
   }, []);
