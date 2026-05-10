@@ -967,6 +967,43 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </select>
             </div>
 
+            {/* HapticAI warning reset */}
+            {hapticAiWarnDismissed === true && (
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-foreground">HapticAI Setup Warning</p>
+                  <p className="text-xs text-muted-foreground">You've dismissed this — click to show it again next time</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-shrink-0"
+                  onClick={async () => {
+                    try {
+                      const token = await getToken();
+                      const headers: Record<string, string> = { "Content-Type": "application/json" };
+                      if (token) headers["Authorization"] = `Bearer ${token}`;
+                      const res = await fetch(`${API}/api/user/preferences`, {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify({ hapticAiWarnDismissed: false }),
+                      });
+                      if (res.ok) {
+                        setHapticAiWarnDismissed(false);
+                        toast({ title: "Warning restored", description: "The HapticAI setup warning will show on your next visit.", duration: 3000 });
+                      } else {
+                        toast({ variant: "destructive", title: "Couldn't reset preference", description: "Please try again." });
+                      }
+                    } catch {
+                      toast({ variant: "destructive", title: "Couldn't reset preference", description: "Please try again." });
+                    }
+                  }}
+                >
+                  Reset warning
+                </Button>
+              </div>
+            )}
+
           </div>
 
           <DialogFooter>

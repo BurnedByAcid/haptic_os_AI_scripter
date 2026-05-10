@@ -78,14 +78,14 @@ router.post("/user/preferences", async (req: Request, res: Response) => {
     return;
   }
   const { hapticAiWarnDismissed } = req.body as { hapticAiWarnDismissed?: unknown };
-  if (hapticAiWarnDismissed !== true) {
+  if (hapticAiWarnDismissed !== true && hapticAiWarnDismissed !== false) {
     res.status(400).json({ error: "No valid preference fields provided." });
     return;
   }
   try {
     await pool.query(
-      `UPDATE users SET haptic_ai_warn_dismissed = TRUE WHERE clerk_id = $1`,
-      [auth.userId],
+      `UPDATE users SET haptic_ai_warn_dismissed = $2 WHERE clerk_id = $1`,
+      [auth.userId, hapticAiWarnDismissed],
     );
     res.json({ ok: true });
   } catch {
