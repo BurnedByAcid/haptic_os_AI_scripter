@@ -273,10 +273,10 @@ export default function Scripter() {
   // both in the same call avoids the async-setState race where the parent
   // would otherwise call `markClean()` against the stale `pointsRef.current`
   // and the next commit would immediately re-mark dirty.
-  const applyFunscriptJson = useCallback((json: string, _draftName: string): Point[] => {
+  const applyFunscriptJson = useCallback((json: string, _draftName: string): Point[] | null => {
     try {
       const parsed = JSON.parse(json) as { actions?: { at: number; pos: number }[] };
-      if (!Array.isArray(parsed.actions)) return pointsRef.current;
+      if (!Array.isArray(parsed.actions)) return null;
       const imported: Point[] = parsed.actions
         .filter(a => a && typeof a.at === "number" && typeof a.pos === "number")
         .map(a => ({
@@ -292,7 +292,7 @@ export default function Scripter() {
       return imported;
     } catch {
       toast({ title: "Couldn't load draft (invalid funscript JSON)", variant: "destructive" });
-      return pointsRef.current;
+      return null;
     }
   }, [markClean]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -308,13 +308,34 @@ export default function Scripter() {
       if (!raw) return;
       sessionStorage.removeItem("hapticai_import");
       const parsed = JSON.parse(raw) as { funscript?: string; name?: string };
-      if (!parsed.funscript) return;
+      if (!parsed.funscript) {
+        toast({
+          title: "Couldn't load HapticAI script",
+          description: "The script data was missing or incomplete. Please try generating it again.",
+          variant: "destructive",
+        });
+        return;
+      }
       hapticAiImportedRef.current = true;
       const scriptName = parsed.name ?? "HapticAI";
-      applyFunscriptJson(parsed.funscript, scriptName);
+      const result = applyFunscriptJson(parsed.funscript, scriptName);
+      if (result === null) {
+        toast({
+          title: "Couldn't load HapticAI script",
+          description: "The script data was unreadable. Please try generating it again.",
+          variant: "destructive",
+        });
+        return;
+      }
       setImportedScriptName(scriptName);
       toast({ title: "HapticAI script loaded", description: "Your generated script is ready to edit." });
-    } catch { /* silent */ }
+    } catch {
+      toast({
+        title: "Couldn't load HapticAI script",
+        description: "The script data was unreadable. Please try generating it again.",
+        variant: "destructive",
+      });
+    }
   // Only run once on mount; applyFunscriptJson is a stable callback.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -362,7 +383,7 @@ export default function Scripter() {
       const d = await res.json() as DraftSummary & { funscript_json: string };
       const nextPoints = applyFunscriptJson(d.funscript_json, d.name);
       setActiveDraftSlot(slot);
-      markClean(nextPoints);
+      if (nextPoints !== null) markClean(nextPoints);
     } catch {
       toast({ title: "Network error loading draft", variant: "destructive" });
     }
