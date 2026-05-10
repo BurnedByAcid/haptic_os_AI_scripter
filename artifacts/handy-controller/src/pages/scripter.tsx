@@ -211,6 +211,7 @@ export default function Scripter() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoFileName, setVideoFileName] = useState<string | null>(null);
+  const [importedScriptName, setImportedScriptName] = useState<string | null>(null);
   const [urlDialogOpen, setUrlDialogOpen] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
@@ -276,6 +277,7 @@ export default function Scripter() {
       setPoints(imported);
       setSelectedIds(new Set());
       setDivisions([]);
+      setImportedScriptName(null);
       markClean(imported);
       return imported;
     } catch {
@@ -298,7 +300,9 @@ export default function Scripter() {
       const parsed = JSON.parse(raw) as { funscript?: string; name?: string };
       if (!parsed.funscript) return;
       hapticAiImportedRef.current = true;
-      applyFunscriptJson(parsed.funscript, parsed.name ?? "HapticAI");
+      const scriptName = parsed.name ?? "HapticAI";
+      applyFunscriptJson(parsed.funscript, scriptName);
+      setImportedScriptName(scriptName);
       toast({ title: "HapticAI script loaded", description: "Your generated script is ready to edit." });
     } catch { /* silent */ }
   // Only run once on mount; applyFunscriptJson is a stable callback.
@@ -1438,10 +1442,11 @@ export default function Scripter() {
       ? actionsToCSV(actions)
       : JSON.stringify({ actions }, null, 2);
 
-    // Derive base name from the loaded video (strip its extension)
+    // Derive base name from the loaded video (strip its extension),
+    // or fall back to the HapticAI imported script name.
     const baseName = videoFileName
       ? videoFileName.replace(/\.[^/.]+$/, "")
-      : "script";
+      : importedScriptName ?? "script";
 
     // Build versioned filename: first export = baseName.<ext>,
     // subsequent exports = baseName (01).<ext>, baseName (02).<ext> …
@@ -2579,7 +2584,9 @@ export default function Scripter() {
     <div className="p-2 px-3 h-full flex flex-col max-w-[1600px] mx-auto gap-2">
       {/* Header */}
       <div className="flex justify-between items-center flex-shrink-0">
-        <h1 className="text-lg font-bold tracking-tight">Scripter</h1>
+        <h1 className="text-lg font-bold tracking-tight">
+          Scripter{importedScriptName ? <span className="font-normal text-muted-foreground"> — {importedScriptName}</span> : null}
+        </h1>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -2591,6 +2598,7 @@ export default function Scripter() {
                 setSelectedIds(new Set());
                 setActiveDraftSlot(null);
                 setDivisions([]);
+                setImportedScriptName(null);
                 try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
                 markClean(empty);
               }
@@ -3914,7 +3922,9 @@ export default function Scripter() {
       {saveDialogOpen && (() => {
         const sorted = [...points].sort((a, b) => a.time - b.time);
         const scriptJson = JSON.stringify({ actions: sorted.map(p => ({ at: Math.round(p.time), pos: p.pos })) });
-        const baseName = videoFileName ? videoFileName.replace(/\.[^/.]+$/, "") : "script";
+        const baseName = videoFileName
+          ? videoFileName.replace(/\.[^/.]+$/, "")
+          : importedScriptName ?? "script";
         return (
           <SaveScriptDialog
             open={saveDialogOpen}
