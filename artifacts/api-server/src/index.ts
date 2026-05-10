@@ -100,9 +100,27 @@ async function migrateCommunityUniqueConstraint(): Promise<void> {
   }
 }
 
+/**
+ * Idempotent migration: add haptic_ai_warn_dismissed boolean column to users.
+ * Safe to run on every boot — ALTER TABLE ADD COLUMN IF NOT EXISTS is a no-op
+ * when the column already exists.
+ */
+async function migrateHapticAiWarnDismissed(): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    await pool.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS haptic_ai_warn_dismissed BOOLEAN NOT NULL DEFAULT FALSE
+    `);
+  } catch (err) {
+    logger.warn({ err }, "Could not add haptic_ai_warn_dismissed column — continuing");
+  }
+}
+
 await initStripe();
 await migrateLegacyFunscripts();
 await migrateCommunityUniqueConstraint();
+await migrateHapticAiWarnDismissed();
 
 app.listen(port, (err) => {
   if (err) {

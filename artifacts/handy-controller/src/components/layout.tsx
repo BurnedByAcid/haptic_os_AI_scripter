@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useUser, useClerk, Show } from "@clerk/react";
+import { useUser, useClerk, useAuth, Show } from "@clerk/react";
+import { HapticAIConsentDialog } from "@/components/haptic-ai-consent-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PlanBadge } from "@/components/plan-badge";
@@ -87,13 +88,14 @@ interface NavItem {
   requiresPro: boolean;
   subscriberOnly?: boolean;
   badge?: string;
+  preNavWarning?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/",          label: "Dashboard",      icon: Home,      requiresPro: false },
   { href: "/player",    label: "Player",          icon: PlaySquare, requiresPro: false },
   { href: "/scripter",  label: "Scripter",        icon: Mic,       requiresPro: false },
-  { href: "/haptic-ai", label: "HapticAI",        icon: Sparkles,  requiresPro: true, subscriberOnly: true, badge: "Beta" },
+  { href: "/haptic-ai", label: "HapticAI",        icon: Sparkles,  requiresPro: true, subscriberOnly: true, badge: "Beta", preNavWarning: true },
   { href: "/library",   label: "My Library",      icon: BookMarked, requiresPro: false },
   { href: "/community", label: "Community",       icon: Users,     requiresPro: false },
   { href: "/control",   label: "Manual Controls", icon: Settings2, requiresPro: false },
@@ -131,6 +133,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [connected]);
   const { toast } = useToast();
   const { user } = useUser();
+  const { getToken } = useAuth();
   const { signOut, openSignIn } = useClerk();
   const [collapsed, setCollapsed] = useState(false);
   const { isAdmin, isPro, plan } = useSubscription();
@@ -142,6 +145,65 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
   const [modePopoverOpen, setModePopoverOpen] = useState(false);
   const [modeChanging, setModeChanging] = useState(false);
+
+  // ─── HapticAI consent dialog ──────────────────────────────────────────────
+  const [hapticAiConsentOpen, setHapticAiConsentOpen] = useState(false);
+  const [hapticAiWarnDismissed, setHapticAiWarnDismissed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getToken().then((token) => {
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      fetch(`${API}/api/user/preferences`, { headers })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (data && typeof data.hapticAiWarnDismissed === "boolean") {
+            setHapticAiWarnDismissed(data.hapticAiWarnDismissed);
+          } else {
+            setHapticAiWarnDismissed(false);
+          }
+        })
+        .catch(() => setHapticAiWarnDismissed(false));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  const handleHapticAiNavClick = useCallback(() => {
+    if (hapticAiWarnDismissed) {
+      navigate("/haptic-ai");
+    } else {
+      setHapticAiConsentOpen(true);
+    }
+  }, [hapticAiWarnDismissed, navigate]);
+
+  const handleHapticAiConsentConfirm = useCallback(async (dontShowAgain: boolean) => {
+    setHapticAiConsentOpen(false);
+    if (dontShowAgain) {
+      try {
+        const token = await getToken();
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(`${API}/api/user/preferences`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ hapticAiWarnDismissed: true }),
+        });
+        if (res.ok) {
+          setHapticAiWarnDismissed(true);
+        } else {
+          toast({ variant: "destructive", title: "Preference not saved", description: "Could not save \"Don't show again\" — the warning will reappear next time." });
+        }
+      } catch {
+        toast({ variant: "destructive", title: "Preference not saved", description: "Could not save \"Don't show again\" — the warning will reappear next time." });
+      }
+    }
+    navigate("/haptic-ai");
+  }, [getToken, navigate, toast]);
+
+  const handleHapticAiConsentCancel = useCallback(() => {
+    setHapticAiConsentOpen(false);
+  }, []);
 
   // ─── Mode selector ────────────────────────────────────────────────────────
   const handleModeSelect = useCallback(async (newMode: number) => {
@@ -614,6 +676,40 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 );
               }
 
+              if (item.preNavWarning) {
+                return (
+                  <button
+                    key={item.href}
+                    className={`w-full flex items-center gap-3 rounded-md cursor-pointer transition-colors ${
+                      collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5"
+                    } ${
+                      isActive
+                        ? "bg-gradient-to-r from-[#DC2626]/20 to-[#EF4444]/10 text-[#E05252] font-medium shadow-[inset_0_0_0_1px_rgba(220,38,38,0.2)]"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                    title={collapsed ? item.label : undefined}
+                    data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                    onClick={handleHapticAiNavClick}
+                  >
+                    <Icon size={18} className="flex-shrink-0" />
+                    {!collapsed && (
+                      <span className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <span className="text-sm">{item.label}</span>
+                        {item.badge && (
+                          <span className={`text-[8px] font-bold uppercase tracking-wider px-1 py-0.5 rounded border leading-none flex-shrink-0 ${
+                            isActive
+                              ? "bg-primary/20 text-primary border-primary/40"
+                              : "bg-primary/10 text-primary/70 border-primary/25"
+                          }`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </button>
+                );
+              }
+
               return (
                 <Link key={item.href} href={item.href}>
                   <div
@@ -1001,6 +1097,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* HapticAI consent dialog */}
+      <HapticAIConsentDialog
+        open={hapticAiConsentOpen}
+        onConfirm={handleHapticAiConsentConfirm}
+        onCancel={handleHapticAiConsentCancel}
+      />
     </div>
   );
 }
