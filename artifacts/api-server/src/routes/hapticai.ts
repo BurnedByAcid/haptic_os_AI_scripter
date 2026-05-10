@@ -236,12 +236,57 @@ router.get("/hapticai/download/:platform", async (req: Request, res: Response) =
         ? `HapticAI-Setup-${version}.exe`
         : `HapticAI-${version}.dmg`;
 
-    const { stream, contentType, sizeBytes } = await downloadReleaseFromGCS(storageKey);
+    // Parse the Range header (only "bytes=<start>-" and "bytes=<start>-<end>" are supported)
+    const rawRange = req.headers["range"];
+    const rangeHeader = Array.isArray(rawRange) ? rawRange[0] : rawRange;
+    let startOffset = 0;
+    let endOffset = -1;
+    let isRangeRequest = false;
+
+    if (rangeHeader && rangeHeader.startsWith("bytes=")) {
+      const rangeSpec = rangeHeader.slice(6);
+      const match = /^(\d+)-(\d*)$/.exec(rangeSpec);
+      if (match) {
+        startOffset = parseInt(match[1], 10);
+        endOffset = match[2] ? parseInt(match[2], 10) : -1;
+        isRangeRequest = true;
+      } else {
+        // Unrecognised range syntax — reject
+        res.status(416).setHeader("Content-Range", "bytes */*").end();
+        return;
+      }
+    }
+
+    const { stream, contentType, sizeBytes } = await downloadReleaseFromGCS(
+      storageKey,
+      startOffset,
+      endOffset,
+    );
+
+    // Validate range against known file size
+    if (isRangeRequest && sizeBytes > 0) {
+      const isInvalidStart = isNaN(startOffset) || startOffset < 0 || startOffset >= sizeBytes;
+      const isInvalidEnd = endOffset >= 0 && (isNaN(endOffset) || endOffset < startOffset);
+      if (isInvalidStart || isInvalidEnd) {
+        res.status(416).setHeader("Content-Range", `bytes */${sizeBytes}`).end();
+        return;
+      }
+    }
 
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Type", contentType);
-    if (sizeBytes > 0) res.setHeader("Content-Length", String(sizeBytes));
     res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Accept-Ranges", "bytes");
+
+    if (isRangeRequest && sizeBytes > 0) {
+      const rangeEnd = endOffset >= 0 ? Math.min(endOffset, sizeBytes - 1) : sizeBytes - 1;
+      const chunkSize = rangeEnd - startOffset + 1;
+      res.setHeader("Content-Range", `bytes ${startOffset}-${rangeEnd}/${sizeBytes}`);
+      res.setHeader("Content-Length", String(chunkSize));
+      res.status(206);
+    } else {
+      if (sizeBytes > 0) res.setHeader("Content-Length", String(sizeBytes));
+    }
 
     stream.pipe(res);
     stream.on("error", (err) => {

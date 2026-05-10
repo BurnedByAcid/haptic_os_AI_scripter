@@ -75,6 +75,8 @@ export async function uploadReleaseToGCS(
 
 export async function downloadReleaseFromGCS(
   storageKey: string,
+  startOffset = 0,
+  endOffset = -1,
 ): Promise<{ stream: NodeJS.ReadableStream; contentType: string; sizeBytes: number }> {
   const bucketName = getBucketName();
   const bucket = gcsClient.bucket(bucketName);
@@ -86,7 +88,13 @@ export async function downloadReleaseFromGCS(
   const [metadata] = await file.getMetadata();
   const contentType = (metadata.contentType as string) ?? "application/octet-stream";
   const sizeBytes = Number(metadata.size ?? 0);
-  const stream = file.createReadStream();
+
+  const streamOptions: { start?: number; end?: number } = {};
+  if (startOffset > 0) streamOptions.start = startOffset;
+  if (endOffset >= 0) streamOptions.end = endOffset;
+  const stream = file.createReadStream(
+    Object.keys(streamOptions).length > 0 ? streamOptions : {},
+  );
 
   return { stream, contentType, sizeBytes };
 }

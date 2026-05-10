@@ -190,6 +190,8 @@ function DownloadLink({ os, release, state }: {
     return <UnavailableMessage label={label} />;
   }
 
+  const MAX_RANGE_RETRIES = 3;
+
   const handleDownload = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (downloading) return;
@@ -198,50 +200,85 @@ function DownloadLink({ os, release, state }: {
     setUpgradeUrl(null);
     setProgress(null);
     setReceivedBytes(0);
+
+    const chunks: BlobPart[] = [];
+    let received = 0;
+    let totalBytes = 0;
+    let supportsRange = false;
+    let retries = 0;
+
     try {
-      const token = await getToken();
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch(downloadUrl, { headers });
-      if (!res.ok) {
-        let msg = "Download failed — the file may not be available yet.";
-        try {
-          const data = await res.json() as { message?: string; error?: string; upgradeUrl?: string };
-          if (data.message) msg = data.message;
-          else if (data.error) msg = data.error;
-          if (data.upgradeUrl) setUpgradeUrl(data.upgradeUrl);
-        } catch { /* ignore parse failure */ }
-        setDownloadError(msg);
-        return;
-      }
-
-      const contentLength = res.headers.get("content-length");
-      const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-      const reader = res.body?.getReader();
-      if (!reader) {
-        // Fallback: no streaming support
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(url);
-        return;
-      }
-
-      const chunks: BlobPart[] = [];
-      let received = 0;
-
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.length;
-        setReceivedBytes(received);
-        if (totalBytes > 0) {
-          setProgress(Math.min(100, Math.round((received / totalBytes) * 100)));
+        const token = await getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        if (received > 0 && supportsRange) {
+          headers["Range"] = `bytes=${received}-`;
         }
+
+        const res = await fetch(downloadUrl, { headers });
+
+        if (!res.ok && res.status !== 206) {
+          let msg = "Download failed — the file may not be available yet.";
+          try {
+            const data = await res.json() as { message?: string; error?: string; upgradeUrl?: string };
+            if (data.message) msg = data.message;
+            else if (data.error) msg = data.error;
+            if (data.upgradeUrl) setUpgradeUrl(data.upgradeUrl);
+          } catch { /* ignore parse failure */ }
+          setDownloadError(msg);
+          return;
+        }
+
+        if (res.status === 200) {
+          supportsRange = res.headers.get("accept-ranges") === "bytes";
+          const contentLength = res.headers.get("content-length");
+          totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+        } else if (res.status === 206) {
+          const contentRange = res.headers.get("content-range");
+          if (contentRange) {
+            const match = /\/(\d+)$/.exec(contentRange);
+            if (match) totalBytes = parseInt(match[1], 10);
+          }
+        }
+
+        const reader = res.body?.getReader();
+        if (!reader) {
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = filename;
+          a.click();
+          URL.revokeObjectURL(url);
+          return;
+        }
+
+        let streamError = false;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            received += value.length;
+            setReceivedBytes(received);
+            if (totalBytes > 0) {
+              setProgress(Math.min(100, Math.round((received / totalBytes) * 100)));
+            }
+          }
+        } catch {
+          streamError = true;
+        }
+
+        if (!streamError) break;
+
+        if (supportsRange && retries < MAX_RANGE_RETRIES) {
+          retries++;
+          continue;
+        }
+
+        setDownloadError("Download failed. Please check your connection or contact support.");
+        return;
       }
 
       const blob = new Blob(chunks);
