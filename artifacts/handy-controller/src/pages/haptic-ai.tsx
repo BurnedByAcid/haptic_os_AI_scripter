@@ -78,8 +78,36 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const FUNGEN_CACHE_KEY = "hapticai_fungen_release_cache";
+const FUNGEN_CACHE_TTL_MS = 60 * 60 * 1000;
+
+interface FunGenReleaseCache {
+  release: FunGenRelease;
+  fetchedAt: number;
+}
+
+function readReleaseCache(): FunGenRelease | null {
+  try {
+    const raw = localStorage.getItem(FUNGEN_CACHE_KEY);
+    if (!raw) return null;
+    const parsed: FunGenReleaseCache = JSON.parse(raw);
+    if (Date.now() - parsed.fetchedAt > FUNGEN_CACHE_TTL_MS) return null;
+    return parsed.release;
+  } catch {
+    return null;
+  }
+}
+
+function writeReleaseCache(release: FunGenRelease): void {
+  try {
+    const entry: FunGenReleaseCache = { release, fetchedAt: Date.now() };
+    localStorage.setItem(FUNGEN_CACHE_KEY, JSON.stringify(entry));
+  } catch {
+  }
+}
+
 function useFunGenRelease(): FunGenRelease | null {
-  const [release, setRelease] = useState<FunGenRelease | null>(null);
+  const [release, setRelease] = useState<FunGenRelease | null>(() => readReleaseCache());
 
   useEffect(() => {
     let cancelled = false;
@@ -98,7 +126,7 @@ function useFunGenRelease(): FunGenRelease | null {
             (a.name.toLowerCase().includes("mac") && a.name.toLowerCase().endsWith(".zip")) ||
             a.name.toLowerCase().endsWith(".dmg"),
         );
-        setRelease({
+        const fresh: FunGenRelease = {
           tag: data.tag_name ?? "",
           windows: winAsset
             ? { url: winAsset.browser_download_url, sizeBytes: winAsset.size }
@@ -106,7 +134,9 @@ function useFunGenRelease(): FunGenRelease | null {
           mac: macAsset
             ? { url: macAsset.browser_download_url, sizeBytes: macAsset.size }
             : null,
-        });
+        };
+        writeReleaseCache(fresh);
+        setRelease(fresh);
       })
       .catch(() => {});
     return () => { cancelled = true; };
