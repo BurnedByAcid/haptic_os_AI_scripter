@@ -13,13 +13,26 @@ type Plan = typeof VALID_PLANS[number];
  *
  * One-time endpoint: promotes the calling authenticated user to "admin" IF
  * no admin account exists yet in the system. Subsequent calls return 409.
- * Requires authentication. Safe because it only works once — once an admin
- * exists, the endpoint permanently returns 409.
+ * Requires authentication AND the ADMIN_BOOTSTRAP_SECRET environment variable
+ * to be provided in the request body as `bootstrapSecret`. This prevents any
+ * authenticated user from claiming admin rights on a fresh or restored deployment.
  */
 router.post("/admin/bootstrap", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) {
     res.status(401).json({ error: "Not authenticated" });
+    return;
+  }
+
+  // Require an out-of-band secret known only to the legitimate operator.
+  const requiredSecret = process.env.ADMIN_BOOTSTRAP_SECRET;
+  if (!requiredSecret) {
+    res.status(503).json({ error: "Admin bootstrap is not configured on this server." });
+    return;
+  }
+  const { bootstrapSecret } = req.body as { bootstrapSecret?: unknown };
+  if (typeof bootstrapSecret !== "string" || bootstrapSecret !== requiredSecret) {
+    res.status(403).json({ error: "Invalid bootstrap secret." });
     return;
   }
 
@@ -117,10 +130,46 @@ router.post("/admin/set-plan", async (req: Request, res: Response) => {
 
   const targetUser = users.data[0];
 
-  // Update plan in publicMetadata
-  await client.users.updateUserMetadata(targetUser.id, {
-    publicMetadata: { plan },
-  });
+  // Update plan in both Clerk publicMetadata and in the database so that all
+  // authorization checks (both Clerk-based and DB-based) reflect the change.
+  // Note: these two writes are not distributed-atomic. If one succeeds and the
+  // other fails, a partial-write state can occur temporarily. Failures are
+  // logged explicitly so operators can identify and correct any divergence.
+  const [clerkResult, dbResult] = await Promise.allSettled([
+    client.users.updateUserMetadata(targetUser.id, {
+      publicMetadata: { plan },
+    }),
+    pool.query(
+      "UPDATE users SET plan = $1 WHERE clerk_id = $2",
+      [plan, targetUser.id]
+    ),
+  ]);
+
+  const clerkFailed = clerkResult.status === "rejected";
+  const dbFailed = dbResult.status === "rejected";
+
+  if (clerkFailed || dbFailed) {
+    console.error("admin/set-plan partial write failure", {
+      email,
+      plan,
+      userId: targetUser.id,
+      clerkError: clerkFailed ? (clerkResult as PromiseRejectedResult).reason : undefined,
+      dbError: dbFailed ? (dbResult as PromiseRejectedResult).reason : undefined,
+    });
+
+    if (clerkFailed && dbFailed) {
+      res.status(500).json({ error: "Failed to update plan in both Clerk and the database. No change was applied." });
+      return;
+    }
+
+    // One store was updated; report partial failure so the operator can reconcile.
+    res.status(500).json({
+      error: "Partial update failure: plan was updated in one store but not the other. Manual reconciliation may be required.",
+      clerkUpdated: !clerkFailed,
+      databaseUpdated: !dbFailed,
+    });
+    return;
+  }
 
   res.json({
     message: `User ${email} has been updated to the '${plan as string}' plan.`,
