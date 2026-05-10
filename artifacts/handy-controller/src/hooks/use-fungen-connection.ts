@@ -5,6 +5,7 @@ export type FunGenStatus = "connecting" | "connected" | "unreachable";
 export interface FunGenCapabilities {
   version?: string;
   options?: FunGenOption[];
+  session_token?: string;
 }
 
 export interface FunGenOption {
@@ -22,6 +23,7 @@ export interface FunGenConnection {
   status: FunGenStatus;
   capabilities: FunGenCapabilities;
   serverUrl: string;
+  sessionToken: string;
   setServerUrl: (url: string) => void;
 }
 
@@ -40,6 +42,7 @@ export function useFunGenConnection(): FunGenConnection {
 
   const [status, setStatus] = useState<FunGenStatus>("connecting");
   const [capabilities, setCapabilities] = useState<FunGenCapabilities>({});
+  const [sessionToken, setSessionToken] = useState<string>("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
 
@@ -59,6 +62,9 @@ export function useFunGenConnection(): FunGenConnection {
           caps = (await res.json()) as FunGenCapabilities;
         } catch { /* ignore */ }
         setCapabilities(caps);
+        if (caps.session_token) {
+          setSessionToken(caps.session_token);
+        }
         setStatus("connected");
       } else {
         setStatus("unreachable");
@@ -88,5 +94,5 @@ export function useFunGenConnection(): FunGenConnection {
     setServerUrl(url);
   }, []);
 
-  return { status, capabilities, serverUrl, setServerUrl: handleSetServerUrl };
+  return { status, capabilities, serverUrl, sessionToken, setServerUrl: handleSetServerUrl };
 }

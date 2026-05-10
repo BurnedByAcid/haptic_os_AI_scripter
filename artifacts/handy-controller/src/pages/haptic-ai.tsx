@@ -384,7 +384,7 @@ function initOptionValues(options: FunGenOption[]): Record<string, unknown> {
   return result;
 }
 
-function GenerationUI({ serverUrl, options }: { serverUrl: string; options: FunGenOption[] }) {
+function GenerationUI({ serverUrl, sessionToken, options }: { serverUrl: string; sessionToken: string; options: FunGenOption[] }) {
   const [prompt, setPrompt] = useState("");
   const [optionValues, setOptionValues] = useState<Record<string, unknown>>(() => initOptionValues(options));
   const [generating, setGenerating] = useState(false);
@@ -427,9 +427,11 @@ function GenerationUI({ serverUrl, options }: { serverUrl: string; options: FunG
       const timeoutId = setTimeout(() => controller.abort(), 60000);
       const body: Record<string, unknown> = { prompt: prompt.trim() };
       if (options.length > 0) body.options = optionValues;
+      const genHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (sessionToken) genHeaders["X-FunGen-Token"] = sessionToken;
       const res = await fetch(`${serverUrl}/generate`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: genHeaders,
         body: JSON.stringify(body),
         signal: controller.signal,
         mode: "cors",
@@ -616,7 +618,7 @@ function HapticAIContent() {
   const { user } = useUser();
   const [agreementState, setAgreementState] = useState<AgreementState>("loading");
   const checkedRef = useRef(false);
-  const { status, capabilities, serverUrl, setServerUrl } = useFunGenConnection();
+  const { status, capabilities, serverUrl, sessionToken, setServerUrl } = useFunGenConnection();
   const os = detectOS();
 
   useEffect(() => {
@@ -710,7 +712,7 @@ function HapticAIContent() {
           {status === "connected" && (
             <Card className="border-border/60">
               <CardContent className="p-5">
-                <GenerationUI serverUrl={serverUrl} options={capabilities.options ?? []} />
+                <GenerationUI serverUrl={serverUrl} sessionToken={sessionToken} options={capabilities.options ?? []} />
               </CardContent>
             </Card>
           )}

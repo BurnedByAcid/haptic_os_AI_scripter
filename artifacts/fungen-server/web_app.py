@@ -3,8 +3,10 @@ import re as _re
 import sys
 import json
 import uuid
+import time
 import signal
 import socket
+import secrets
 import threading
 import logging
 from pathlib import Path
@@ -20,8 +22,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["SECRET_KEY"] = "fungen-web-secret"
+app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
+
+_SESSION_TOKEN: str = secrets.token_urlsafe(32)
+
+_UPLOAD_MAX_BYTES = 500 * 1024 * 1024
+_UPLOAD_MAX_AGE_SECONDS = 24 * 3600
 
 _LOCALHOST_RE = _re.compile(r"^http://localhost(:\d+)?$")
+_LOOPBACK_ORIGIN_RE = _re.compile(r"^https?://(?:localhost|127\.\d+\.\d+\.\d+|\[::1\])(:\d+)?$")
 
 def _build_allowed_origins():
     raw = os.environ.get("CORS_ALLOWED_ORIGINS", "")
@@ -49,14 +58,16 @@ def _origin_allowed(origin):
 socketio = SocketIO(app, cors_allowed_origins=_origin_allowed, async_mode="threading")
 
 if _has_flask_cors:
-    _CORS(app, origins=_allowed_origins)
+    _CORS(app, origins=_allowed_origins,
+          allow_headers=["Content-Type", "Authorization", "X-FunGen-Token"],
+          expose_headers=["Content-Disposition"])
 else:
     @app.after_request
     def _add_cors_headers(response):
         origin = request.headers.get("Origin", "")
         if _origin_allowed(origin):
             response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-FunGen-Token"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return response
 
@@ -68,12 +79,91 @@ else:
         r = Response()
         if _origin_allowed(origin):
             r.headers["Access-Control-Allow-Origin"] = origin
-        r.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        r.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-FunGen-Token"
         r.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return r
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _require_trusted_request():
+    """
+    Guard for state-changing endpoints.
+
+    Rules:
+    1. If the request carries an Origin header (i.e. it originates from a
+       browser page), that origin MUST be in the CORS allowlist.  This blocks
+       any cross-site request a hostile page tries to send in no-cors mode,
+       because the server rejects the request before any side effects occur.
+    2. For browser requests (Origin present) the caller MUST also supply the
+       per-session X-FunGen-Token header.  HapticOS reads this token from
+       GET /status (which is CORS-protected, so only allowed origins can read
+       its response) and attaches it to every mutating call.
+
+    Direct local callers (curl, desktop UI) that omit Origin are allowed
+    through without a token — they are not reachable from a remote web page.
+
+    Returns (None, None) when the request is trusted.
+    Returns (response, status_code) when it must be rejected.
+    """
+    origin = request.headers.get("Origin", "")
+
+    if not origin:
+        # Origin absent — derive a synthetic origin from the Referer header so
+        # that browsers which suppress Origin but still send Referer (e.g. some
+        # Chromium variants in certain redirect flows) are handled correctly.
+        referer = request.headers.get("Referer", "")
+        if referer:
+            try:
+                from urllib.parse import urlparse as _urlparse
+                _r = _urlparse(referer)
+                if _r.scheme and _r.netloc:
+                    origin = f"{_r.scheme}://{_r.netloc}"
+            except Exception:
+                pass
+
+    if not origin:
+        # No Origin and no usable Referer — direct local call (curl, native
+        # desktop UI). These callers are unreachable from a remote web page.
+        return None, None
+
+    # Requests whose Origin is a loopback address are the FunGen local web UI.
+    # A remote page cannot forge a loopback Origin, so the network topology
+    # itself provides the trust boundary here — no token needed.
+    if _LOOPBACK_ORIGIN_RE.match(origin):
+        return None, None
+
+    # For any other origin (e.g. HapticOS at hapticos.replit.app) the origin
+    # must be in the CORS allowlist AND the caller must supply the per-session
+    # token.  Any future browser calls to /api/* mutating endpoints from
+    # HapticOS must include the "X-FunGen-Token" header obtained from GET /status.
+    if not _origin_allowed(origin):
+        logger.warning("Rejected mutating request from untrusted origin: %s", origin)
+        return jsonify({"error": "forbidden"}), 403
+    provided = request.headers.get("X-FunGen-Token", "")
+    if not secrets.compare_digest(provided, _SESSION_TOKEN):
+        logger.warning("Rejected mutating request with bad session token from origin: %s", origin)
+        return jsonify({"error": "forbidden"}), 403
+    return None, None
+
+
+def _cleanup_stale_uploads():
+    """Remove upload and output files older than _UPLOAD_MAX_AGE_SECONDS."""
+    cutoff = time.time() - _UPLOAD_MAX_AGE_SECONDS
+    for folder in (UPLOAD_FOLDER, OUTPUT_FOLDER):
+        for path in list(folder.iterdir()):
+            try:
+                if path.is_file() and path.stat().st_mtime < cutoff:
+                    path.unlink()
+                    logger.info("Removed stale file: %s", path)
+            except OSError:
+                pass
+    stale_jobs = [jid for jid, j in list(jobs.items())
+                  if j.get("status") in ("done", "error", "uploaded", "funscript_loaded")
+                  and time.time() - j.get("_created_at", time.time()) > _UPLOAD_MAX_AGE_SECONDS]
+    for jid in stale_jobs:
+        jobs.pop(jid, None)
 
 UPLOAD_FOLDER = Path("uploads")
 OUTPUT_FOLDER = Path("output")
@@ -232,7 +322,7 @@ def hapticos_status():
             "default": False,
         },
     ]
-    return jsonify({"version": "0.5.4", "options": options})
+    return jsonify({"version": "0.5.4", "options": options, "session_token": _SESSION_TOKEN})
 
 
 def _interpret_prompt(prompt: str, options: dict) -> dict:
@@ -696,6 +786,10 @@ def hapticos_generate():
       - mode          – influences processing quality (3-stage → higher amplification)
       - generate_roll – add a secondary roll axis to the output
     """
+    err, code = _require_trusted_request()
+    if err is not None:
+        return err, code
+
     data = request.get_json(silent=True) or {}
     prompt = str(data.get("prompt", "")).strip()
     if not prompt:
@@ -751,8 +845,11 @@ def api_shutdown():
     if not any(remote.startswith(p) for p in _LOOPBACK_PREFIXES):
         return jsonify({"error": "forbidden"}), 403
 
+    err, code = _require_trusted_request()
+    if err is not None:
+        return err, code
+
     def _shutdown():
-        import time
         time.sleep(0.3)
         if PORT_FILE.exists():
             PORT_FILE.unlink()
@@ -774,6 +871,13 @@ def api_plugins():
 
 @app.route("/api/upload", methods=["POST"])
 def upload_video():
+    err, code = _require_trusted_request()
+    if err is not None:
+        return err, code
+
+    if request.content_length and request.content_length > _UPLOAD_MAX_BYTES:
+        return jsonify({"error": "Upload exceeds the 500 MB limit"}), 413
+
     if "video" not in request.files:
         return jsonify({"error": "No file provided"}), 400
     file = request.files["video"]
@@ -785,9 +889,15 @@ def upload_video():
     if ext not in allowed:
         return jsonify({"error": f"Unsupported format. Allowed: {', '.join(allowed)}"}), 400
 
+    _cleanup_stale_uploads()
+
     job_id = str(uuid.uuid4())[:8]
     dest = UPLOAD_FOLDER / f"{job_id}{ext}"
     file.save(dest)
+
+    if dest.stat().st_size > _UPLOAD_MAX_BYTES:
+        dest.unlink()
+        return jsonify({"error": "Upload exceeds the 500 MB limit"}), 413
 
     jobs[job_id] = {
         "id": job_id,
@@ -798,6 +908,7 @@ def upload_video():
         "stage": 0,
         "log": [],
         "output_files": [],
+        "_created_at": time.time(),
     }
 
     return jsonify({"job_id": job_id, "filename": file.filename, "size": dest.stat().st_size})
@@ -805,15 +916,28 @@ def upload_video():
 
 @app.route("/api/upload_funscript", methods=["POST"])
 def upload_funscript():
+    err, code = _require_trusted_request()
+    if err is not None:
+        return err, code
+
+    if request.content_length and request.content_length > _UPLOAD_MAX_BYTES:
+        return jsonify({"error": "Upload exceeds the 500 MB limit"}), 413
+
     if "funscript" not in request.files:
         return jsonify({"error": "No file provided"}), 400
     file = request.files["funscript"]
     if not file.filename.endswith(".funscript"):
         return jsonify({"error": "File must be a .funscript file"}), 400
 
+    _cleanup_stale_uploads()
+
     job_id = str(uuid.uuid4())[:8]
     dest = UPLOAD_FOLDER / f"{job_id}.funscript"
     file.save(dest)
+
+    if dest.stat().st_size > _UPLOAD_MAX_BYTES:
+        dest.unlink()
+        return jsonify({"error": "Upload exceeds the 500 MB limit"}), 413
 
     content = json.loads(dest.read_text())
     actions = content.get("actions", [])
@@ -828,6 +952,7 @@ def upload_funscript():
         "log": [f"Loaded funscript: {file.filename} ({len(actions)} actions)"],
         "output_files": [str(dest)],
         "funscript_actions": actions,
+        "_created_at": time.time(),
     }
 
     return jsonify({"job_id": job_id, "filename": file.filename, "actions": actions[:50]})
@@ -835,6 +960,10 @@ def upload_funscript():
 
 @app.route("/api/process", methods=["POST"])
 def start_processing():
+    err, code = _require_trusted_request()
+    if err is not None:
+        return err, code
+
     data = request.json
     job_id = data.get("job_id")
     if not job_id or job_id not in jobs:
@@ -1065,6 +1194,10 @@ def _run_fungen_cli(job_id, filepath, mode, settings, output_dir):
 
 @app.route("/api/apply_filter", methods=["POST"])
 def apply_filter():
+    err, code = _require_trusted_request()
+    if err is not None:
+        return err, code
+
     data = request.json
     job_id = data.get("job_id")
     plugin_name = data.get("plugin")
