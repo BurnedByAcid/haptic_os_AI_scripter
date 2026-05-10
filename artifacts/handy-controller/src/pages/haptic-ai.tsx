@@ -159,6 +159,8 @@ function DownloadLink({ os, release, state }: {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [upgradeUrl, setUpgradeUrl] = useState<string | null>(null);
   const { getToken } = useAuth();
+  const [progress, setProgress] = useState<number | null>(null);
+  const [receivedBytes, setReceivedBytes] = useState(0);
 
   if (os === "other") {
     return (
@@ -194,6 +196,8 @@ function DownloadLink({ os, release, state }: {
     setDownloading(true);
     setDownloadError(null);
     setUpgradeUrl(null);
+    setProgress(null);
+    setReceivedBytes(0);
     try {
       const token = await getToken();
       const headers: Record<string, string> = {};
@@ -210,7 +214,37 @@ function DownloadLink({ os, release, state }: {
         setDownloadError(msg);
         return;
       }
-      const blob = await res.blob();
+
+      const contentLength = res.headers.get("content-length");
+      const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+      const reader = res.body?.getReader();
+      if (!reader) {
+        // Fallback: no streaming support
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      const chunks: BlobPart[] = [];
+      let received = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        setReceivedBytes(received);
+        if (totalBytes > 0) {
+          setProgress(Math.min(100, Math.round((received / totalBytes) * 100)));
+        }
+      }
+
+      const blob = new Blob(chunks);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -221,11 +255,15 @@ function DownloadLink({ os, release, state }: {
       setDownloadError("Download failed. Please check your connection or contact support.");
     } finally {
       setDownloading(false);
+      setProgress(null);
+      setReceivedBytes(0);
     }
   };
 
+  const totalBytes = platformRelease.sizeBytes;
+
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <button
         onClick={handleDownload}
         disabled={downloading}
@@ -237,11 +275,28 @@ function DownloadLink({ os, release, state }: {
         }
         {downloading ? "Downloading…" : label}
         {!downloading && (
-          <span className="text-muted-foreground text-[10px]">
-            {release?.version} · {formatBytes(platformRelease.sizeBytes)}
+          <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
+            {formatBytes(platformRelease.sizeBytes)}
           </span>
         )}
       </button>
+
+      {downloading && (
+        <div className="space-y-1 pt-0.5">
+          <div className="h-1.5 w-full max-w-[220px] rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-150"
+              style={{ width: progress !== null ? `${progress}%` : "0%" }}
+            />
+          </div>
+          <p className="text-[10px] text-muted-foreground tabular-nums">
+            {progress !== null
+              ? `${formatBytes(receivedBytes)} of ${formatBytes(totalBytes)} — ${progress}%`
+              : `${formatBytes(receivedBytes)} received…`}
+          </p>
+        </div>
+      )}
+
       {downloadError && (
         <p className="text-[11px] text-destructive">
           {downloadError}{" "}
