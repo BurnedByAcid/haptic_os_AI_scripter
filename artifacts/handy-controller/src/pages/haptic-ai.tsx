@@ -59,6 +59,62 @@ function ConnectionDot({ status }: { status: "connecting" | "connected" | "unrea
   );
 }
 
+const FUNGEN_REPO = "HapticAI/HapticAI-Powered-Funscript-Generator";
+const FUNGEN_RELEASES_PAGE = `https://github.com/${FUNGEN_REPO}/releases/latest`;
+
+interface ReleaseAsset {
+  url: string;
+  sizeBytes: number;
+}
+
+interface FunGenRelease {
+  tag: string;
+  windows: ReleaseAsset | null;
+  mac: ReleaseAsset | null;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function useFunGenRelease(): FunGenRelease | null {
+  const [release, setRelease] = useState<FunGenRelease | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`https://api.github.com/repos/${FUNGEN_REPO}/releases/latest`, {
+      headers: { Accept: "application/vnd.github.v3+json" },
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.assets) return;
+        const assets: Array<{ name: string; browser_download_url: string; size: number }> =
+          data.assets ?? [];
+        const winAsset = assets.find((a) => a.name.toLowerCase().endsWith(".exe"));
+        const macAsset = assets.find(
+          (a) =>
+            a.name.toLowerCase().endsWith(".app.zip") ||
+            (a.name.toLowerCase().includes("mac") && a.name.toLowerCase().endsWith(".zip")) ||
+            a.name.toLowerCase().endsWith(".dmg"),
+        );
+        setRelease({
+          tag: data.tag_name ?? "",
+          windows: winAsset
+            ? { url: winAsset.browser_download_url, sizeBytes: winAsset.size }
+            : null,
+          mac: macAsset
+            ? { url: macAsset.browser_download_url, sizeBytes: macAsset.size }
+            : null,
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  return release;
+}
+
 function SetupPanel({ os, serverUrl, onUrlChange }: {
   os: "windows" | "mac" | "other";
   serverUrl: string;
@@ -66,6 +122,7 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
 }) {
   const [urlInput, setUrlInput] = useState(serverUrl);
   const [expanded, setExpanded] = useState(true);
+  const release = useFunGenRelease();
 
   const handleSaveUrl = () => {
     const trimmed = urlInput.trim().replace(/\/$/, "");
@@ -106,26 +163,58 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
                 Download the FunGen executable for your operating system. It is self-contained — no installation required.
               </p>
               {os === "windows" && (
-                <a
-                  href="#"
-                  className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  <Download className="h-3 w-3" />
-                  Download FunGen for Windows (.exe)
-                  <span className="text-muted-foreground text-[10px]">(coming soon)</span>
-                </a>
+                release?.windows ? (
+                  <a
+                    href={release.windows.url}
+                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Download className="h-3 w-3" />
+                    Download FunGen for Windows (.exe)
+                    <span className="text-muted-foreground text-[10px]">
+                      {release.tag} · {formatBytes(release.windows.sizeBytes)}
+                    </span>
+                  </a>
+                ) : (
+                  <a
+                    href={FUNGEN_RELEASES_PAGE}
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Download className="h-3 w-3" />
+                    Download FunGen for Windows (.exe)
+                    <span className="text-[10px]">(coming soon)</span>
+                  </a>
+                )
               )}
               {os === "mac" && (
-                <a
-                  href="#"
-                  className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
-                  onClick={(e) => e.preventDefault()}
-                >
-                  <Download className="h-3 w-3" />
-                  Download FunGen for macOS (.app)
-                  <span className="text-muted-foreground text-[10px]">(coming soon)</span>
-                </a>
+                release?.mac ? (
+                  <a
+                    href={release.mac.url}
+                    className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Download className="h-3 w-3" />
+                    Download FunGen for macOS
+                    <span className="text-muted-foreground text-[10px]">
+                      {release.tag} · {formatBytes(release.mac.sizeBytes)}
+                    </span>
+                  </a>
+                ) : (
+                  <a
+                    href={FUNGEN_RELEASES_PAGE}
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Download className="h-3 w-3" />
+                    Download FunGen for macOS (.app)
+                    <span className="text-[10px]">(coming soon)</span>
+                  </a>
+                )
               )}
               {os === "other" && (
                 <p className="text-xs text-muted-foreground">
