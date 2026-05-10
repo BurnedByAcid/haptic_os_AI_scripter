@@ -173,12 +173,39 @@ router.get("/hapticai/release", async (_req: Request, res: Response) => {
   }
 });
 
+const SUBSCRIBER_PLANS = new Set(["subscriber", "pro", "admin"]);
+
+async function getPlan(userId: string): Promise<string> {
+  const { rows } = await pool.query<{ plan: string }>(
+    `SELECT plan FROM users WHERE clerk_id = $1`,
+    [userId],
+  );
+  return rows[0]?.plan ?? "free";
+}
+
 /**
  * GET /api/hapticai/download/:platform
- * Public. Streams the latest release binary for the given platform directly
- * from object storage so the file downloads from the HapticOS domain.
+ * Subscriber-only. Streams the latest release binary for the given platform
+ * directly from object storage. Requires a valid Clerk JWT and an active
+ * subscription (subscriber / pro / admin plan).
  */
 router.get("/hapticai/download/:platform", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    res.status(401).json({ error: "Not authenticated. Please sign in to download HapticAI." });
+    return;
+  }
+
+  const plan = (await getPlan(auth.userId)).toLowerCase();
+  if (!SUBSCRIBER_PLANS.has(plan)) {
+    res.status(403).json({
+      error: "Subscription required.",
+      message: "HapticAI is available to subscribers. Upgrade to access downloads.",
+      upgradeUrl: "/upgrade",
+    });
+    return;
+  }
+
   const { platform } = req.params;
   if (!["windows", "mac"].includes(platform)) {
     res.status(400).json({ error: "Unknown platform. Use 'windows' or 'mac'." });

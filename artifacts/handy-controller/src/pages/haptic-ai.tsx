@@ -157,6 +157,8 @@ function DownloadLink({ os, release, state }: {
 }) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [upgradeUrl, setUpgradeUrl] = useState<string | null>(null);
+  const { getToken } = useAuth();
 
   if (os === "other") {
     return (
@@ -191,14 +193,19 @@ function DownloadLink({ os, release, state }: {
     if (downloading) return;
     setDownloading(true);
     setDownloadError(null);
+    setUpgradeUrl(null);
     try {
-      const res = await fetch(downloadUrl);
+      const token = await getToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(downloadUrl, { headers });
       if (!res.ok) {
         let msg = "Download failed — the file may not be available yet.";
         try {
-          const data = await res.json() as { message?: string; error?: string };
+          const data = await res.json() as { message?: string; error?: string; upgradeUrl?: string };
           if (data.message) msg = data.message;
           else if (data.error) msg = data.error;
+          if (data.upgradeUrl) setUpgradeUrl(data.upgradeUrl);
         } catch { /* ignore parse failure */ }
         setDownloadError(msg);
         return;
@@ -238,12 +245,21 @@ function DownloadLink({ os, release, state }: {
       {downloadError && (
         <p className="text-[11px] text-destructive">
           {downloadError}{" "}
-          <a
-            href="mailto:support@hapticos.app"
-            className="underline underline-offset-2 hover:text-destructive/80 transition-colors"
-          >
-            Contact support
-          </a>
+          {upgradeUrl ? (
+            <a
+              href={upgradeUrl}
+              className="underline underline-offset-2 hover:text-destructive/80 transition-colors"
+            >
+              Upgrade now
+            </a>
+          ) : (
+            <a
+              href="mailto:support@hapticos.app"
+              className="underline underline-offset-2 hover:text-destructive/80 transition-colors"
+            >
+              Contact support
+            </a>
+          )}
         </p>
       )}
     </div>
