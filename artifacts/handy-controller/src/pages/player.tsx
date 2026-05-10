@@ -545,7 +545,10 @@ export default function Player() {
     const embedMatch = raw.match(/src=["']([^"']+)["']/i);
     if (embedMatch) {
       const src = embedMatch[1];
-      try { new URL(src); } catch { return; }
+      let parsed: URL;
+      try { parsed = new URL(src); } catch { return; }
+      const allowedSchemes = ["https:", "http:"];
+      if (!allowedSchemes.includes(parsed.protocol)) return;
       setEmbedUrl(src);
       setVideoUrl(null);
       setVideoMode("embed");
@@ -784,6 +787,7 @@ export default function Player() {
                     allowFullScreen
                     allow="autoplay; fullscreen; picture-in-picture"
                     title="Embedded video"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
                   />
                 </div>
               ) : (
