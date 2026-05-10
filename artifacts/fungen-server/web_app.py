@@ -339,6 +339,14 @@ def hapticos_status():
             "max": 100,
             "step": 1,
         },
+        {
+            "key": "creativity",
+            "label": "Creativity",
+            "type": "number",
+            "default": 50,
+            "min": 0,
+            "max": 100,
+        },
     ]
     return jsonify({"version": "0.5.4", "options": options, "session_token": _SESSION_TOKEN})
 
@@ -428,6 +436,15 @@ def _interpret_prompt(prompt: str, options: dict) -> dict:
         variation = 0.18
 
     autotune = bool(options.get("autotune", True))
+
+    # Allow explicit creativity override (0–100) from the caller.
+    # 0 → fully predictable (variation=0.0), 100 → chaotic (variation=0.60).
+    if "creativity" in options:
+        try:
+            creativity = max(0.0, min(100.0, float(options["creativity"])))
+            variation = (creativity / 100.0) * 0.60
+        except (TypeError, ValueError):
+            pass
 
     return {
         "duration_s": duration_s,
