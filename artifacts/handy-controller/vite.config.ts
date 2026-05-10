@@ -98,6 +98,9 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
     sourcemap: false,
+    esbuild: {
+      drop: ["console", "debugger"],
+    },
   },
   server: {
     port,
