@@ -12,6 +12,7 @@ import { Layout } from "@/components/layout";
 import { HandyProvider } from "@/contexts/handy-context";
 import { BlockedReportProvider } from "@/contexts/blocked-report-context";
 import { AppSettingsContext, useAppSettingsProvider } from "@/hooks/use-app-settings";
+import { useSubscription } from "@/hooks/use-subscription";
 
 import Home from "@/pages/home";
 import Player from "@/pages/player";
@@ -117,15 +118,17 @@ const clerkAppearance = {
  * Redirects authenticated but un-onboarded users to /onboarding.
  * Renders nothing while Clerk loads.
  */
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+function ProtectedRoute({ component: Component, subscriberOnly = false }: { component: React.ComponentType; subscriberOnly?: boolean }) {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user, isLoaded: isUserLoaded } = useUser();
+  const { isLoaded: isSubscriptionLoaded, isPro } = useSubscription();
 
-  if (!isAuthLoaded || !isUserLoaded) return null;
+  if (!isAuthLoaded || !isUserLoaded || !isSubscriptionLoaded) return null;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
 
   const onboarded = (user?.publicMetadata as Record<string, unknown>)?.onboarded === true;
   if (!onboarded) return <Redirect to="/onboarding" />;
+  if (subscriberOnly && !isPro) return <Redirect to="/upgrade" />;
 
   return <Component />;
 }
@@ -152,7 +155,7 @@ function Router() {
       <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
       <Route path="/audio-cleaner" component={() => <Redirect to="/beat?tab=cleaner" />} />
       <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
-      <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} />} />
+      <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} subscriberOnly />} />
       <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
       <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
       <Route path="/admin"        component={() => <ProtectedRoute component={Admin} />} />
