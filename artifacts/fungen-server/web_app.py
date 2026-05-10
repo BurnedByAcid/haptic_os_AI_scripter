@@ -235,6 +235,450 @@ def hapticos_status():
     return jsonify({"version": "0.5.4", "options": options})
 
 
+def _interpret_prompt(prompt: str, options: dict) -> dict:
+    """
+    Parse a natural-language haptic prompt and options into generation parameters.
+
+    Returns a dict with keys:
+        duration_s       – total script length in seconds
+        base_interval_ms – nominal ms between action points (controls tempo)
+        intensity        – 0.0–1.0 amplitude multiplier
+        pattern          – "buildup", "wave", "burst", "constant", "descend", "edge"
+        variation        – 0.0–1.0 randomness added on top of the base pattern
+        autotune         – whether to apply smoothing post-generation
+    """
+    import re
+    text = prompt.lower()
+
+    # --- Duration ---
+    duration_s = 120.0
+    m = re.search(r'(\d+(?:\.\d+)?)\s*minute', text)
+    if m:
+        duration_s = float(m.group(1)) * 60.0
+    else:
+        m = re.search(r'(\d+(?:\.\d+)?)\s*second', text)
+        if m:
+            duration_s = float(m.group(1))
+    duration_s = max(10.0, min(600.0, duration_s))
+
+    # --- Tempo / interval ---
+    if any(w in text for w in ("very slow", "extremely slow", "super slow", "glacial")):
+        base_interval_ms = 1400
+    elif any(w in text for w in ("slow", "gentle", "leisurely", "relaxed", "languid")):
+        base_interval_ms = 900
+    elif any(w in text for w in ("very fast", "extremely fast", "super fast", "frantic", "rapid", "quick")):
+        base_interval_ms = 180
+    elif any(w in text for w in ("fast", "speed", "intense pace", "urgent")):
+        base_interval_ms = 300
+    else:
+        base_interval_ms = 550
+
+    # --- Intensity ---
+    if any(w in text for w in ("very intense", "extremely intense", "maximum", "full", "overwhelming")):
+        intensity = 0.98
+    elif any(w in text for w in ("intense", "strong", "powerful", "hard", "deep")):
+        intensity = 0.82
+    elif any(w in text for w in ("light", "soft", "gentle", "mild", "subtle", "delicate")):
+        intensity = 0.40
+    elif any(w in text for w in ("moderate", "medium", "average")):
+        intensity = 0.62
+    else:
+        intensity = 0.70
+
+    # --- Pattern ---
+    if any(w in text for w in ("build", "buildup", "build up", "build-up", "ramp", "escalate", "rise", "crescendo", "increase")):
+        pattern = "buildup"
+    elif any(w in text for w in ("edg", "tease", "almost", "hold back", "denial")):
+        pattern = "edge"
+    elif any(w in text for w in ("burst", "pulse", "staccato", "stutter", "jolt", "snap", "spike")):
+        pattern = "burst"
+    elif any(w in text for w in ("descend", "wind down", "slow down", "fade", "taper", "decrease", "come down")):
+        pattern = "descend"
+    elif any(w in text for w in ("wave", "undulat", "rhythmic", "sway", "cycle", "ebb", "flow")):
+        pattern = "wave"
+    else:
+        pattern = "constant"
+
+    # --- Variation / randomness ---
+    if any(w in text for w in ("random", "unpredictable", "surprise", "chaotic", "irregular")):
+        variation = 0.45
+    elif any(w in text for w in ("steady", "consistent", "even", "regular", "uniform")):
+        variation = 0.05
+    else:
+        variation = 0.18
+
+    autotune = bool(options.get("autotune", True))
+
+    return {
+        "duration_s": duration_s,
+        "base_interval_ms": base_interval_ms,
+        "intensity": intensity,
+        "pattern": pattern,
+        "variation": variation,
+        "autotune": autotune,
+    }
+
+
+def _generate_actions(params: dict, seed: int = 0) -> list:
+    """
+    Synthesize a list of funscript actions from interpreted prompt parameters.
+    """
+    import math
+    import random
+
+    rng = random.Random(seed)
+
+    duration_ms = int(params["duration_s"] * 1000)
+    base_iv = params["base_interval_ms"]
+    intensity = params["intensity"]
+    pattern = params["pattern"]
+    variation = params["variation"]
+
+    actions = []
+    t = 0
+
+    low_base = max(5, int(50 - intensity * 45))
+    high_base = min(100, int(50 + intensity * 45))
+
+    going_up = True
+
+    while t <= duration_ms:
+        progress = t / duration_ms  # 0.0 → 1.0
+
+        # --- Envelope: shape amplitude over time based on pattern ---
+        if pattern == "buildup":
+            envelope = 0.25 + 0.75 * progress
+        elif pattern == "descend":
+            envelope = 1.0 - 0.75 * progress
+        elif pattern == "edge":
+            # Three plateaus with sudden drops; keeps near peak but never quite goes over
+            cycle = progress * 3.0
+            phase = cycle % 1.0
+            if phase < 0.85:
+                envelope = 0.80 + 0.18 * (phase / 0.85)
+            else:
+                envelope = 0.30 + (phase - 0.85) / 0.15 * 0.50
+        elif pattern == "wave":
+            envelope = 0.55 + 0.45 * math.sin(math.pi * progress * 4)
+        elif pattern == "burst":
+            cycle_len = 0.15
+            phase = (progress % cycle_len) / cycle_len
+            envelope = 1.0 if phase < 0.5 else 0.15
+        else:
+            envelope = 1.0
+
+        envelope = max(0.0, min(1.0, envelope))
+
+        # --- Compute position for this tick ---
+        lo = max(0, int(low_base + (1.0 - envelope) * (50 - low_base)))
+        hi = min(100, int(high_base - (1.0 - envelope) * (high_base - 50)))
+        lo = min(lo, hi - 5)
+
+        if going_up:
+            raw_pos = hi
+        else:
+            raw_pos = lo
+
+        # Add variation noise
+        noise = int(rng.gauss(0, variation * (hi - lo) * 0.3))
+        pos = max(0, min(100, raw_pos + noise))
+        actions.append({"at": t, "pos": pos})
+
+        going_up = not going_up
+
+        # Jitter the interval slightly for a human feel
+        jitter_factor = 1.0 + rng.uniform(-variation * 0.25, variation * 0.25)
+        interval = max(50, int(base_iv * jitter_factor))
+        t += interval
+
+    # Ensure the script ends with a neutral position
+    if actions and actions[-1]["at"] < duration_ms:
+        actions.append({"at": duration_ms, "pos": 0})
+
+    return actions
+
+
+def _fallback_smooth_actions(actions: list) -> list:
+    """
+    Pure-Python fallback smoother used when the HapticAI plugin system is
+    unavailable.  Applies a 3-point weighted average then clamps device speed.
+    """
+    if len(actions) < 3:
+        return actions
+
+    smoothed = [dict(actions[0])]
+    for i in range(1, len(actions) - 1):
+        avg_pos = (actions[i - 1]["pos"] + actions[i]["pos"] * 2 + actions[i + 1]["pos"]) // 4
+        smoothed.append({"at": actions[i]["at"], "pos": max(0, min(100, avg_pos))})
+    smoothed.append(dict(actions[-1]))
+
+    MAX_SPEED = 800
+    result = [smoothed[0]]
+    for i in range(1, len(smoothed)):
+        dt = smoothed[i]["at"] - smoothed[i - 1]["at"]
+        dp = abs(smoothed[i]["pos"] - smoothed[i - 1]["pos"])
+        if dt > 0 and dp / dt * 1000 > MAX_SPEED:
+            clamped_dp = int(MAX_SPEED * dt / 1000)
+            direction = 1 if smoothed[i]["pos"] > smoothed[i - 1]["pos"] else -1
+            new_pos = max(0, min(100, smoothed[i - 1]["pos"] + direction * clamped_dp))
+            result.append({"at": smoothed[i]["at"], "pos": new_pos})
+        else:
+            result.append(smoothed[i])
+
+    return result
+
+
+def _try_app_logic_pipeline(raw_actions: list, options: dict, output_dir: Path) -> list | None:
+    """
+    Primary processing path.
+
+    Saves *raw_actions* to a temporary funscript file, then invokes
+    ``ApplicationLogic.run_cli()`` in *funscript_mode* so the real HapticAI
+    processing pipeline (plugin system + internal file manager) transforms the
+    signal.  The filter applied is chosen from the *options* dict:
+        - autotune=True  → ``ultimate-autotune`` (8-stage pipeline)
+        - autotune=False → ``speed-limiter``       (device-speed clamping only)
+
+    The ``mode`` option is forwarded to ``run_cli`` so the processing quality
+    level is respected (e.g. ``"3-stage"`` uses higher-quality settings in the
+    autotune plugin).
+
+    Returns the processed action list on success, or ``None`` if the core is
+    unavailable (missing YOLO models / dependencies not installed) so the caller
+    can fall back to the plugin-only path.
+
+    The call runs inside a thread with a *50-second* timeout so the HTTP request
+    cannot block indefinitely if a heavy initialisation stalls.
+    """
+    import types as _types
+    import json as _json
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    temp_fs_path = output_dir / "hapticai_generate_input.funscript"
+    temp_fs_path.write_text(_json.dumps({
+        "version": "1.0",
+        "inverted": False,
+        "range": 100,
+        "actions": raw_actions,
+    }))
+
+    result_holder: list[list | None] = [None]
+    error_holder: list[str] = []
+
+    def _worker():
+        try:
+            from application.logic.app_logic import ApplicationLogic
+
+            autotune = bool(options.get("autotune", True))
+            filter_name = "ultimate-autotune" if autotune else "speed-limiter"
+            mode_val = str(options.get("mode", "3-stage"))
+
+            args = _types.SimpleNamespace(
+                input_path=str(temp_fs_path),
+                mode=mode_val,
+                od_mode="current",
+                overwrite=True,
+                autotune=autotune,
+                copy=False,
+                generate_roll=bool(options.get("generate_roll", False)),
+                recursive=False,
+                funscript_mode=True,
+                filter=filter_name,
+            )
+
+            os.environ["FUNGEN_OUTPUT_DIR"] = str(output_dir)
+            core_app = ApplicationLogic(is_cli=True)
+            core_app.run_cli(args)
+
+            if temp_fs_path.exists():
+                content = _json.loads(temp_fs_path.read_text())
+                processed = content.get("actions", [])
+                if processed:
+                    result_holder[0] = processed
+                    return
+
+            error_holder.append("run_cli produced no output")
+        except Exception as exc:
+            error_holder.append(str(exc))
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+    t.join(timeout=50)
+
+    if result_holder[0] is not None:
+        logger.info("ApplicationLogic.run_cli pipeline succeeded (%d actions)", len(result_holder[0]))
+        return result_holder[0]
+
+    reason = error_holder[0] if error_holder else "timeout or unknown error"
+    logger.warning("ApplicationLogic.run_cli unavailable — falling back to plugin system: %s", reason)
+    return None
+
+
+def _plugin_system_pipeline(raw_actions: list, options: dict) -> list | None:
+    """
+    Fallback processing path using the HapticAI plugin system directly
+    (``funscript.plugins`` + ``DualAxisFunscript``), bypassing the heavyweight
+    ``ApplicationLogic`` initialisation.
+
+    This mirrors the logic inside ``_run_funscript_cli_mode`` and the existing
+    ``/api/apply_filter`` endpoint.  Returns ``None`` if the plugin system
+    itself is unavailable.
+    """
+    try:
+        from funscript.plugins.plugin_loader import PluginLoader
+        from funscript.plugins.base_plugin import plugin_registry
+        from funscript.dual_axis_funscript import DualAxisFunscript
+
+        loader = PluginLoader()
+        loader.load_builtin_plugins()
+
+        fs = DualAxisFunscript()
+        for action in raw_actions:
+            fs.primary_actions.append(dict(action))
+        fs._invalidate_cache("primary")
+
+        autotune = bool(options.get("autotune", True))
+        mode = str(options.get("mode", "3-stage")).lower()
+        high_quality = "3-stage" in mode or "optical" in mode
+
+        speed_plugin = plugin_registry.get_plugin("Speed Limiter")
+        if speed_plugin:
+            speed_params = speed_plugin.validate_parameters({})
+            speed_plugin.transform(fs, axis="primary", **speed_params)
+            logger.debug("Speed Limiter applied via plugin system")
+
+        if autotune:
+            at_plugin = plugin_registry.get_plugin("Ultimate Autotune")
+            if at_plugin:
+                amplify_scale = 1.35 if high_quality else 1.25
+                at_params = at_plugin.validate_parameters({"amplify_scale": amplify_scale})
+                at_plugin.transform(fs, axis="primary", **at_params)
+                logger.debug("Ultimate Autotune applied (high_quality=%s)", high_quality)
+
+        result = list(fs.primary_actions)
+        logger.info("Plugin system pipeline succeeded (%d actions)", len(result))
+        return result
+
+    except Exception as exc:
+        logger.warning("Plugin system unavailable — falling back to built-in smoother: %s", exc)
+        return None
+
+
+def _build_roll_actions(primary_actions: list) -> list:
+    """
+    Derive a secondary (roll) axis from the primary signal by phase-shifting
+    and inverting, producing a complementary oscillation pattern.
+    """
+    import math
+    roll = []
+    for i, a in enumerate(primary_actions):
+        phase_offset = int(50 * math.sin(math.pi * i / max(1, len(primary_actions) - 1)))
+        pos = max(0, min(100, 50 + (a["pos"] - 50) * -0.6 + phase_offset))
+        roll.append({"at": a["at"], "pos": int(pos)})
+    return roll
+
+
+def _run_generate_job(job_id: str, prompt: str, options: dict) -> None:
+    """
+    Core generation logic executed synchronously for a /generate request.
+    Updates jobs[job_id] with status, progress, and the final funscript.
+
+    Processing pipeline (three tiers, first success wins):
+      1. ApplicationLogic.run_cli (funscript_mode) — the real HapticAI core
+      2. Plugin system directly (DualAxisFunscript + registry) — same plugins,
+         bypasses heavyweight YOLO/tracker initialisation
+      3. Pure-Python fallback smoother — no external deps required
+    """
+    import time as _time
+    import json as _json
+
+    job = jobs[job_id]
+
+    def _progress(pct: int, msg: str) -> None:
+        job["progress"] = pct
+        job["log"].append(msg)
+        logger.info("[job %s] %s", job_id, msg)
+
+    try:
+        _progress(5, "Interpreting prompt…")
+        params = _interpret_prompt(prompt, options)
+        _progress(15, f"Prompt interpreted: pattern={params['pattern']} "
+                      f"duration={params['duration_s']:.0f}s "
+                      f"interval={params['base_interval_ms']}ms "
+                      f"intensity={params['intensity']:.2f}")
+
+        seed = int(_time.time() * 1000) & 0xFFFFFF
+        _progress(25, "Generating raw haptic signal…")
+        raw_actions = _generate_actions(params, seed=seed)
+        _progress(40, f"Raw signal: {len(raw_actions)} action points generated")
+
+        output_dir = OUTPUT_FOLDER / f"gen_{job_id}"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        _progress(45, "Attempting HapticAI core pipeline (ApplicationLogic.run_cli)…")
+        processed_actions = _try_app_logic_pipeline(raw_actions, options, output_dir)
+        pipeline_used = "ApplicationLogic.run_cli"
+
+        if processed_actions is None:
+            _progress(55, "Core pipeline unavailable — trying plugin system…")
+            processed_actions = _plugin_system_pipeline(raw_actions, options)
+            pipeline_used = "plugin-system"
+
+        if processed_actions is None:
+            _progress(65, "Plugin system unavailable — using built-in smoother…")
+            autotune = bool(options.get("autotune", True))
+            processed_actions = (
+                _fallback_smooth_actions(raw_actions) if autotune else raw_actions
+            )
+            pipeline_used = "fallback-smoother"
+
+        _progress(80, f"Pipeline '{pipeline_used}' complete: "
+                      f"{len(processed_actions)} actions")
+
+        generate_roll = bool(options.get("generate_roll", False))
+        roll_actions: list = []
+        if generate_roll:
+            _progress(85, "Generating roll axis…")
+            roll_actions = _build_roll_actions(processed_actions)
+            _progress(88, f"Roll axis: {len(roll_actions)} points")
+
+        duration_s = params["duration_s"]
+        funscript: dict = {
+            "version": "1.0",
+            "inverted": False,
+            "range": 100,
+            "metadata": {
+                "creator": "HapticAI",
+                "description": prompt[:200],
+                "duration": duration_s,
+                "generated_by": "hapticos-prompt-engine",
+                "pattern": params["pattern"],
+                "pipeline": pipeline_used,
+            },
+            "actions": processed_actions,
+        }
+        if generate_roll and roll_actions:
+            funscript["roll_actions"] = roll_actions
+
+        funscript_str = _json.dumps(funscript)
+
+        out_file = output_dir / f"gen_{job_id}.funscript"
+        out_file.write_text(funscript_str)
+
+        job["funscript"] = funscript_str
+        job["funscript_actions"] = processed_actions
+        job["output_files"] = [str(out_file)]
+        job["status"] = "done"
+        job["progress"] = 100
+        _progress(100, "Generation complete")
+
+    except Exception as exc:
+        logger.exception("Generation job %s failed", job_id)
+        job["status"] = "error"
+        job["error"] = str(exc)
+        job["log"].append(f"Error: {exc}")
+
+
 @app.route("/generate", methods=["POST"])
 def hapticos_generate():
     """
@@ -242,44 +686,47 @@ def hapticos_generate():
     Body: { prompt: string, options?: { mode?: string, autotune?: bool, generate_roll?: bool } }
     Returns: { funscript: string }  (JSON-encoded funscript string)
 
-    Prompt-driven generation is not yet implemented in the FunGen core — this
-    endpoint queues a stub job that returns a minimal valid funscript so the
-    HapticOS frontend can complete the round-trip.  When the AI generation
-    back-end is wired up the stub below should be replaced with a real call.
+    Interprets the natural-language prompt to derive haptic parameters (tempo,
+    intensity, pattern shape, duration), synthesises a raw haptic signal, then
+    runs it through the real HapticAI plugin pipeline (Speed Limiter +
+    Ultimate Autotune) and returns the processed result.
+
+    Options from /status are honoured:
+      - autotune      – enable/disable HapticAI Ultimate Autotune pipeline
+      - mode          – influences processing quality (3-stage → higher amplification)
+      - generate_roll – add a secondary roll axis to the output
     """
     data = request.get_json(silent=True) or {}
     prompt = str(data.get("prompt", "")).strip()
     if not prompt:
         return jsonify({"error": "prompt is required"}), 400
 
-    import time
-    import json as _json
+    options = data.get("options") or {}
+    if not isinstance(options, dict):
+        options = {}
 
-    duration_ms = 120_000
-    interval_ms = 500
-    num_points = duration_ms // interval_ms
-
-    actions = []
-    import math
-    for i in range(num_points + 1):
-        t = i / num_points
-        pos = int(50 + 45 * math.sin(2 * math.pi * t * 4 + math.pi / 4))
-        pos = max(0, min(100, pos))
-        actions.append({"at": i * interval_ms, "pos": pos})
-
-    funscript = {
-        "version": "1.0",
-        "inverted": False,
-        "range": 100,
-        "metadata": {
-            "creator": "HapticAI (Beta)",
-            "description": prompt[:200],
-            "duration": duration_ms / 1000,
-        },
-        "actions": actions,
+    job_id = str(uuid.uuid4())[:8]
+    jobs[job_id] = {
+        "id": job_id,
+        "status": "processing",
+        "progress": 0,
+        "log": [],
+        "funscript": None,
+        "funscript_actions": [],
+        "error": None,
+        "source": "hapticos_generate",
     }
 
-    return jsonify({"funscript": _json.dumps(funscript), "actions": actions[:50]})
+    _run_generate_job(job_id, prompt, options)
+
+    job = jobs[job_id]
+    if job["status"] == "error":
+        return jsonify({"error": job.get("error", "Generation failed")}), 500
+
+    import json as _json
+    funscript_str = job["funscript"]
+    preview_actions = job["funscript_actions"][:50]
+    return jsonify({"funscript": funscript_str, "actions": preview_actions})
 
 
 # ---------------------------------------------------------------------------
