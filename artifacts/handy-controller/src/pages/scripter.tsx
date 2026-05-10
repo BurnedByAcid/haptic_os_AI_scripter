@@ -1718,6 +1718,7 @@ export default function Scripter() {
           setSelectedIds(new Set());
           setDivisions([]);
           markClean(imported);
+          setImportedScriptName(null);
         }
       } catch {
         alert("Could not parse the file. Make sure it is a valid .funscript or JSON file.");
