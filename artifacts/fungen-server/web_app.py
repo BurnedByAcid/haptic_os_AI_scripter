@@ -321,6 +321,24 @@ def hapticos_status():
             "type": "boolean",
             "default": False,
         },
+        {
+            "key": "duration_minutes",
+            "label": "Duration (minutes)",
+            "type": "number",
+            "default": None,
+            "min": 0.17,
+            "max": 10.0,
+            "step": 0.5,
+        },
+        {
+            "key": "intensity",
+            "label": "Intensity",
+            "type": "number",
+            "default": None,
+            "min": 0,
+            "max": 100,
+            "step": 1,
+        },
     ]
     return jsonify({"version": "0.5.4", "options": options, "session_token": _SESSION_TOKEN})
 
@@ -341,15 +359,22 @@ def _interpret_prompt(prompt: str, options: dict) -> dict:
     text = prompt.lower()
 
     # --- Duration ---
-    duration_s = 120.0
-    m = re.search(r'(\d+(?:\.\d+)?)\s*minute', text)
-    if m:
-        duration_s = float(m.group(1)) * 60.0
+    if options.get("duration_minutes") is not None:
+        try:
+            duration_s = float(options["duration_minutes"]) * 60.0
+        except (TypeError, ValueError):
+            duration_s = 120.0
+        duration_s = max(10.0, min(600.0, duration_s))
     else:
-        m = re.search(r'(\d+(?:\.\d+)?)\s*second', text)
+        duration_s = 120.0
+        m = re.search(r'(\d+(?:\.\d+)?)\s*minute', text)
         if m:
-            duration_s = float(m.group(1))
-    duration_s = max(10.0, min(600.0, duration_s))
+            duration_s = float(m.group(1)) * 60.0
+        else:
+            m = re.search(r'(\d+(?:\.\d+)?)\s*second', text)
+            if m:
+                duration_s = float(m.group(1))
+        duration_s = max(10.0, min(600.0, duration_s))
 
     # --- Tempo / interval ---
     if any(w in text for w in ("very slow", "extremely slow", "super slow", "glacial")):
@@ -364,7 +389,12 @@ def _interpret_prompt(prompt: str, options: dict) -> dict:
         base_interval_ms = 550
 
     # --- Intensity ---
-    if any(w in text for w in ("very intense", "extremely intense", "maximum", "full", "overwhelming")):
+    if options.get("intensity") is not None:
+        try:
+            intensity = max(0.0, min(1.0, float(options["intensity"]) / 100.0))
+        except (TypeError, ValueError):
+            intensity = 0.70
+    elif any(w in text for w in ("very intense", "extremely intense", "maximum", "full", "overwhelming")):
         intensity = 0.98
     elif any(w in text for w in ("intense", "strong", "powerful", "hard", "deep")):
         intensity = 0.82
@@ -773,7 +803,8 @@ def _run_generate_job(job_id: str, prompt: str, options: dict) -> None:
 def hapticos_generate():
     """
     POST /generate
-    Body: { prompt: string, options?: { mode?: string, autotune?: bool, generate_roll?: bool } }
+    Body: { prompt: string, options?: { mode?: string, autotune?: bool,
+            generate_roll?: bool, duration_minutes?: number, intensity?: number } }
     Returns: { funscript: string }  (JSON-encoded funscript string)
 
     Interprets the natural-language prompt to derive haptic parameters (tempo,
@@ -782,9 +813,12 @@ def hapticos_generate():
     Ultimate Autotune) and returns the processed result.
 
     Options from /status are honoured:
-      - autotune      – enable/disable HapticAI Ultimate Autotune pipeline
-      - mode          – influences processing quality (3-stage → higher amplification)
-      - generate_roll – add a secondary roll axis to the output
+      - autotune          – enable/disable HapticAI Ultimate Autotune pipeline
+      - mode              – influences processing quality (3-stage → higher amplification)
+      - generate_roll     – add a secondary roll axis to the output
+      - duration_minutes  – explicit script length in minutes (0.17–10); overrides
+                            duration inferred from the prompt text
+      - intensity         – explicit amplitude 0–100 %; overrides keyword inference
     """
     err, code = _require_trusted_request()
     if err is not None:
