@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-HapticOS is a pnpm monorepo with a React/Vite frontend (`artifacts/handy-controller`) and an Express 5 API (`artifacts/api-server`) backed by PostgreSQL. Users authenticate with Clerk, complete onboarding and Stripe Identity verification, manage a private script library, share community scripts, use subscriber-gated features, and interact with Stripe billing flows. Production security risk is concentrated in the API server and any frontend path that turns stored user content into DOM or navigation behavior.
+HapticOS is a pnpm monorepo with a React/Vite frontend (`artifacts/handy-controller`) and an Express 5 API (`artifacts/api-server`) backed by PostgreSQL. Users authenticate with Clerk, complete onboarding and Stripe Identity verification, manage a private script library, share community scripts, use subscriber-gated features, and interact with Stripe billing flows. The deployed product also reaches a desktop-local Flask/SocketIO companion (`artifacts/fungen-server`) from the production frontend for Haptic AI features. Production security risk is concentrated in the API server, the browser-exposed video/helper routes, the frontend paths that turn user content into DOM or navigation behavior, and the browser-to-loopback boundary for the local companion.
 
 ## Assets
 
@@ -13,6 +13,7 @@ HapticOS is a pnpm monorepo with a React/Vite frontend (`artifacts/handy-control
 - **Payment and verification state** — Stripe customer IDs, subscription state, portal/checkout sessions, Stripe Identity session IDs, and webhook processing. Tampering can grant paid access or break billing.
 - **Application secrets** — Stripe secret/webhook credentials, database connection string, Clerk secret key, and Replit connector credentials.
 - **Operational logs** — block reports, request logs, and analytics events. These can contain user-supplied text and limited PII.
+- **Browser-visible capability URLs and local companion state** — stream tokens, local companion ports, locally stored device keys, queued uploads, and local output files. Weak binding here can let attackers proxy internal resources or abuse the user's machine through loopback services.
 
 ## Trust Boundaries
 
@@ -22,12 +23,14 @@ HapticOS is a pnpm monorepo with a React/Vite frontend (`artifacts/handy-control
 - **API to PostgreSQL boundary** — the API has direct access to user data and authorization state. Query construction and row scoping determine whether one user can affect another.
 - **API to Clerk boundary** — the server can update Clerk metadata for plans, onboarding, and identity verification. Mistakes here can permanently alter account privileges.
 - **API to Stripe boundary** — checkout, portal, identity verification, and webhook processing rely on Stripe as an external authority.
+- **Frontend to local companion boundary** — the production site talks to a loopback FunGen service on the user's machine. Localhost is not a trust boundary by itself; the companion must authenticate unsafe actions and reject untrusted web origins.
 - **Internal/dev to production boundary** — `artifacts/mockup-sandbox` is assumed never deployed and is out of scope unless production reachability is demonstrated.
 
 ## Scan Anchors
 
-- **Production entry points:** `artifacts/api-server/src/index.ts`, `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/routes/*`, `artifacts/handy-controller/src/App.tsx`.
+- **Production entry points:** `artifacts/api-server/src/index.ts`, `artifacts/api-server/src/app.ts`, `artifacts/api-server/src/routes/*`, `artifacts/handy-controller/src/App.tsx`, `artifacts/fungen-server/web_app.py`.
 - **Highest-risk server areas:** `routes/admin.ts`, `routes/billing.ts`, `routes/scripts.ts`, `routes/community.ts`, `routes/library.ts`, `routes/media-funscripts.ts`.
+- **High-risk helper surfaces:** `artifacts/api-server/src/routes/video.ts`, `artifacts/handy-controller/src/pages/player.tsx`, `artifacts/handy-controller/src/pages/scripter.tsx`, `artifacts/fungen-server/web_app.py`.
 - **Surface split:** public/legacy = `/api/health`, `/api/users/check-username`, `/api/scripts*`; authenticated = library, community, onboarding, usage, drafts, billing; admin = `/api/admin/*`.
 - **Usually ignore unless proven reachable:** `artifacts/mockup-sandbox/**`, build outputs in `dist/**`.
 
