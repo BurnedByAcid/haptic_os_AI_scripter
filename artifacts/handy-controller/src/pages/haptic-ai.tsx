@@ -4,6 +4,7 @@ import { useSubscription } from "@/hooks/use-subscription";
 import { PremiumGate } from "@/components/premium-gate";
 import { FunGenEuaModal } from "@/components/fungen-eua-modal";
 import { FunGenWarningBanner } from "@/components/fungen-warning-banner";
+import { HapticAIConsentDialog } from "@/components/haptic-ai-consent-dialog";
 import { useFunGenConnection } from "@/hooks/use-fungen-connection";
 import type { FunGenOption } from "@/hooks/use-fungen-connection";
 import { Button } from "@/components/ui/button";
@@ -705,7 +706,85 @@ function HapticAIContent() {
   );
 }
 
+type ConsentState = "loading" | "needed" | "dismissed";
+
 export default function HapticAI() {
+  const { getToken } = useAuth();
+  const { user, isLoaded } = useUser();
+  const [, navigate] = useLocation();
+  const [consentState, setConsentState] = useState<ConsentState>("loading");
+  const fetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (!user?.id) {
+      setConsentState("dismissed");
+      return;
+    }
+    try {
+      if (sessionStorage.getItem("hapticAiConsentAcknowledged") === "1") {
+        setConsentState("dismissed");
+        return;
+      }
+    } catch { /* ignore */ }
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+
+    getToken()
+      .then((token) => {
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        return fetch(`${API}/api/user/preferences`, { headers });
+      })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { hapticAiWarnDismissed?: boolean } | null) => {
+        setConsentState(data?.hapticAiWarnDismissed === true ? "dismissed" : "needed");
+      })
+      .catch(() => setConsentState("needed"));
+  }, [isLoaded, user?.id, getToken]);
+
+  const handleConsentConfirm = useCallback(
+    async (dontShowAgain: boolean) => {
+      try { sessionStorage.setItem("hapticAiConsentAcknowledged", "1"); } catch { /* ignore */ }
+      if (dontShowAgain) {
+        try {
+          const token = await getToken();
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          await fetch(`${API}/api/user/preferences`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ hapticAiWarnDismissed: true }),
+          });
+        } catch { /* silent */ }
+      }
+      setConsentState("dismissed");
+    },
+    [getToken],
+  );
+
+  const handleConsentCancel = useCallback(() => {
+    navigate("/");
+  }, [navigate]);
+
+  if (consentState === "loading") {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (consentState === "needed") {
+    return (
+      <HapticAIConsentDialog
+        open={true}
+        onConfirm={handleConsentConfirm}
+        onCancel={handleConsentCancel}
+      />
+    );
+  }
+
   return (
     <PremiumGate feature="HapticAI">
       <HapticAIContent />

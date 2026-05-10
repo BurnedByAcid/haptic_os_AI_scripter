@@ -179,6 +179,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const handleHapticAiConsentConfirm = useCallback(async (dontShowAgain: boolean) => {
     setHapticAiConsentOpen(false);
+    try { sessionStorage.setItem("hapticAiConsentAcknowledged", "1"); } catch { /* ignore */ }
     if (dontShowAgain) {
       try {
         const token = await getToken();
