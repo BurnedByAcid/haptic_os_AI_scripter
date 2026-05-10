@@ -332,4 +332,46 @@ router.get("/admin/feedback", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/admin/hapticai/releases
+ *
+ * Returns every hapticai_releases row ordered by platform then upload date
+ * (newest first). Requires admin plan.
+ */
+router.get("/admin/hapticai/releases", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const caller = await clerkClient.users.getUser(auth.userId);
+  if ((caller.publicMetadata as Record<string, unknown>)?.plan !== "admin") {
+    res.status(403).json({ error: "Admin access required" }); return;
+  }
+
+  try {
+    const { rows } = await pool.query<{
+      id: number;
+      platform: string;
+      version: string;
+      size_bytes: string;
+      storage_key: string;
+      uploaded_at: string;
+    }>(
+      `SELECT id, platform, version, size_bytes, storage_key, uploaded_at
+       FROM hapticai_releases
+       ORDER BY platform ASC, uploaded_at DESC`,
+    );
+    res.json(rows.map((r) => ({
+      id: r.id,
+      platform: r.platform,
+      version: r.version,
+      sizeBytes: Number(r.size_bytes),
+      storageKey: r.storage_key,
+      uploadedAt: r.uploaded_at,
+    })));
+  } catch (err) {
+    logger.error({ err }, "Failed to load hapticai releases");
+    res.status(500).json({ error: "Failed to load releases." });
+  }
+});
+
 export default router;

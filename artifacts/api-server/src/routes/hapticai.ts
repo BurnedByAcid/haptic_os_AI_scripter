@@ -8,24 +8,46 @@ import { logger } from "../lib/logger";
 const router = Router();
 
 /**
- * Middleware: rejects the request immediately if the Authorization header
- * does not carry the correct admin bearer token.  Runs BEFORE any body
- * parser / multer so that unauthenticated callers never cause the server to
- * read or buffer the request body (preventing memory-exhaustion DoS).
+ * Middleware: allows the request only when the caller is authorised as an
+ * admin via ONE of two mechanisms (checked in order, runs BEFORE multer so
+ * unauthenticated callers never cause the server to buffer the request body):
+ *
+ * 1. Static bearer token — Authorization: Bearer $HAPTICAI_ADMIN_TOKEN
+ *    (preserves backward-compat with existing curl-based upload scripts)
+ *
+ * 2. Clerk JWT with admin plan — the browser admin panel sends its session
+ *    token; the HAPTICAI_ADMIN_TOKEN never leaves the server.
  */
-function adminTokenMiddleware(req: Request, res: Response, next: NextFunction): void {
+async function adminAuthMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
+  // --- Method 1: static HAPTICAI_ADMIN_TOKEN (curl / CI) ---
   const adminToken = process.env.HAPTICAI_ADMIN_TOKEN;
-  if (!adminToken) {
-    res.status(503).json({ error: "Admin uploads not configured on this server." });
-    return;
-  }
   const authHeader = req.headers.authorization ?? "";
   const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!provided || provided !== adminToken) {
-    res.status(403).json({ error: "Invalid admin token." });
+  if (adminToken && provided === adminToken) {
+    next();
     return;
   }
-  next();
+
+  // --- Method 2: Clerk JWT with admin plan (browser admin panel) ---
+  const auth = getAuth(req);
+  if (auth.userId) {
+    try {
+      const user = await clerkClient.users.getUser(auth.userId);
+      if ((user.publicMetadata as Record<string, unknown>)?.plan === "admin") {
+        next();
+        return;
+      }
+    } catch {
+      // fall through to rejection
+    }
+  }
+
+  // Neither method succeeded
+  if (!adminToken) {
+    res.status(503).json({ error: "Admin uploads not configured on this server." });
+  } else {
+    res.status(403).json({ error: "Invalid admin token or insufficient permissions." });
+  }
 }
 
 /**
@@ -50,7 +72,7 @@ const upload = multer({
  */
 router.post(
   "/hapticai/upload",
-  adminTokenMiddleware,
+  adminAuthMiddleware,
   upload.single("file"),
   async (req: Request, res: Response) => {
     const { platform, version } = req.body as { platform?: string; version?: string };

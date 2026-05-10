@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Shield, Search, Crown, Zap, ShieldCheck, AlertCircle,
   Users, TrendingUp, FileText, Star, Heart, Eye,
   Gamepad2, Music, Play, BookOpen, Sliders, PenLine,
   Ticket, RefreshCw, BarChart3, UserPlus, MessageSquare, Bug, Lightbulb, MessageCircle,
+  Upload, Monitor, Apple, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -168,17 +169,122 @@ function useAdminFeedback(isAdmin: boolean) {
   return { data: filtered, total: data.length, counts, loading, error, refresh: load, filter, setFilter };
 }
 
+interface HapticAIRelease {
+  id: number;
+  platform: string;
+  version: string;
+  sizeBytes: number;
+  storageKey: string;
+  uploadedAt: string;
+}
+
+function useHapticAIReleases(isAdmin: boolean) {
+  const { getToken } = useAuth();
+  const [data, setData] = useState<HapticAIRelease[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async () => {
+    if (!isAdmin) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/admin/hapticai/releases`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Failed to load releases");
+      setData(await res.json() as HapticAIRelease[]);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { data, loading, error, refresh: load };
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+}
+
 export default function Admin() {
   const { isAdmin, isLoaded } = useSubscription();
   const { getToken } = useAuth();
   const { toast } = useToast();
   const { data: analytics, loading: analyticsLoading, error: analyticsError, refresh } = useAdminAnalytics(isLoaded && isAdmin);
   const { data: feedbackList, total: feedbackTotal, counts: feedbackCounts, loading: feedbackLoading, error: feedbackError, refresh: refreshFeedback, filter: feedbackFilter, setFilter: setFeedbackFilter } = useAdminFeedback(isLoaded && isAdmin);
+  const { data: releases, loading: releasesLoading, error: releasesError, refresh: refreshReleases } = useHapticAIReleases(isLoaded && isAdmin);
 
   const [targetEmail, setTargetEmail] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<Plan>("pro");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const [uploadPlatform, setUploadPlatform] = useState<"windows" | "mac">("windows");
+  const [uploadVersion, setUploadVersion] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = async () => {
+    if (!uploadFile || !uploadVersion.trim()) return;
+    setUploadProgress(0);
+    setUploadError(null);
+    setUploadSuccess(false);
+
+    try {
+      const token = await getToken();
+      const formData = new FormData();
+      formData.append("platform", uploadPlatform);
+      formData.append("version", uploadVersion.trim());
+      formData.append("file", uploadFile);
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${API_BASE}/api/hapticai/upload`);
+        xhr.setRequestHeader("Authorization", `Bearer ${token ?? ""}`);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setUploadProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            let msg = "Upload failed.";
+            try { msg = (JSON.parse(xhr.responseText) as { error?: string }).error ?? msg; } catch {}
+            reject(new Error(msg));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("Network error during upload."));
+        xhr.send(formData);
+      });
+
+      setUploadSuccess(true);
+      setUploadProgress(100);
+      setUploadFile(null);
+      setUploadVersion("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      toast({ title: "Release uploaded", description: `${uploadPlatform} ${uploadVersion.trim()} is now live.` });
+      refreshReleases();
+    } catch (e) {
+      setUploadError(String(e instanceof Error ? e.message : e));
+      setUploadProgress(null);
+    }
+  };
 
   if (!isLoaded) return null;
 
@@ -460,6 +566,146 @@ export default function Admin() {
             className="w-full gap-2"
           >
             {loading ? "Updating..." : `Set plan to ${selectedPlan}`}
+          </Button>
+        </div>
+      </Card>
+
+      {/* HapticAI Releases */}
+      <Card className="border-border/40 bg-card/60">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Upload className="h-4 w-4 text-primary" />
+              HapticAI Releases
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={refreshReleases} disabled={releasesLoading} className="h-7 w-7 p-0">
+              <RefreshCw className={`h-3.5 w-3.5 ${releasesLoading ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+          <CardDescription>Current uploads per platform and upload history.</CardDescription>
+        </CardHeader>
+
+        <div className="px-6 pb-4">
+          {releasesError && (
+            <p className="text-sm text-red-400 py-2">{releasesError}</p>
+          )}
+          {!releasesError && releases.length === 0 && !releasesLoading && (
+            <p className="text-sm text-muted-foreground py-2 text-center">No releases uploaded yet.</p>
+          )}
+          {releases.length > 0 && (
+            <div className="rounded-lg border border-border/50 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/40 bg-muted/20">
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Platform</th>
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Version</th>
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Size</th>
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Uploaded</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {releases.map((r, i) => (
+                    <tr key={r.id} className={`border-b border-border/30 last:border-0 ${i === 0 || releases[i - 1]?.platform !== r.platform ? "bg-card/40" : ""}`}>
+                      <td className="px-3 py-2.5">
+                        <span className="flex items-center gap-1.5 font-medium">
+                          {r.platform === "windows"
+                            ? <Monitor className="h-3.5 w-3.5 text-blue-400" />
+                            : <Apple className="h-3.5 w-3.5 text-muted-foreground" />}
+                          <span className="capitalize text-xs">{r.platform}</span>
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 font-mono text-xs text-foreground/90">{r.version}</td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground tabular-nums">{formatBytes(r.sizeBytes)}</td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                        {new Date(r.uploadedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Upload form */}
+        <div className="px-6 pb-6 space-y-4 border-t border-border/30 pt-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Upload New Release</p>
+
+          {/* Platform toggle */}
+          <div className="flex gap-2">
+            {(["windows", "mac"] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => { setUploadPlatform(p); setUploadFile(null); setUploadError(null); setUploadSuccess(false); setUploadProgress(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
+                  uploadPlatform === p
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/40 text-muted-foreground hover:border-border"
+                }`}
+              >
+                {p === "windows" ? <Monitor className="h-3.5 w-3.5" /> : <Apple className="h-3.5 w-3.5" />}
+                {p === "windows" ? "Windows (.exe)" : "macOS (.dmg)"}
+              </button>
+            ))}
+          </div>
+
+          {/* Version + file */}
+          <div className="flex gap-2 items-start flex-wrap">
+            <div className="flex-1 min-w-36">
+              <Input
+                placeholder="e.g. v1.2.0"
+                value={uploadVersion}
+                onChange={(e) => setUploadVersion(e.target.value)}
+                className="h-9 text-sm font-mono"
+              />
+            </div>
+            <div className="flex-1 min-w-48">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={uploadPlatform === "windows" ? ".exe" : ".dmg"}
+                onChange={(e) => { setUploadFile(e.target.files?.[0] ?? null); setUploadError(null); setUploadSuccess(false); setUploadProgress(null); }}
+                className="block w-full text-xs text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-border/60 file:bg-muted/30 file:text-xs file:font-medium file:text-foreground hover:file:bg-muted/60 file:cursor-pointer cursor-pointer"
+              />
+              {uploadFile && (
+                <p className="text-[10px] text-muted-foreground mt-1">{uploadFile.name} · {formatBytes(uploadFile.size)}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          {uploadProgress !== null && (
+            <div className="space-y-1">
+              <div className="h-2 rounded-full bg-muted/40 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-200"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground text-right">{uploadProgress}%</p>
+            </div>
+          )}
+
+          {/* Status messages */}
+          {uploadError && (
+            <div className="text-sm px-3 py-2 rounded-md border bg-red-500/10 border-red-500/30 text-red-400">
+              {uploadError}
+            </div>
+          )}
+          {uploadSuccess && (
+            <div className="text-sm px-3 py-2 rounded-md border bg-green-500/10 border-green-500/30 text-green-400 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              Release uploaded successfully.
+            </div>
+          )}
+
+          <Button
+            onClick={handleUpload}
+            disabled={!uploadFile || !uploadVersion.trim() || uploadProgress !== null}
+            className="w-full gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            {uploadProgress !== null && uploadProgress < 100 ? `Uploading… ${uploadProgress}%` : "Upload Release"}
           </Button>
         </div>
       </Card>
