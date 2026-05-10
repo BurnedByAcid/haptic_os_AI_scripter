@@ -1654,14 +1654,18 @@ export default function Scripter() {
         `${API_BASE}/api/video/resolve?url=${encodeURIComponent(trimmed)}`,
         { headers }
       );
-      const data = await res.json() as { token?: string; title?: string; isHls?: boolean; error?: string };
+      const data = await res.json() as { token?: string; title?: string; isHls?: boolean; cdnUrl?: string; error?: string };
       if (!res.ok || !data.token) {
         setUrlError(data.error ?? "Could not resolve that URL. Try a direct .mp4 link, load a file, or paste the site's embed code.");
         return;
       }
+      // For HLS, route through our manifest proxy so segment requests stay
+      // CORS-clean for canvas frame-capture.  For non-HLS, use the resolved
+      // CDN URL directly — this avoids the unauthenticated stream-proxy route
+      // and matches the approach used in player.tsx.
       const proxyUrl = data.isHls
         ? `${API_BASE}/api/video/hls/${data.token}/manifest.m3u8`
-        : `${API_BASE}/api/video/stream/${data.token}`;
+        : data.cdnUrl ?? "";
       setVtVideoDuration(null);
       setVideoUrl(proxyUrl);
       setVideoFileName(data.title ?? "video");
@@ -1748,10 +1752,21 @@ export default function Scripter() {
       // Remove the src attribute so hls.js can control the element via MSE
       video.removeAttribute("src");
       video.load();
-      hlsCleanupRef.current = attachHlsSource(video, videoUrl);
+      // Fetch the Clerk JWT and pass it to hls.js so every manifest, sub-manifest
+      // and segment request includes an Authorization header.  This keeps the
+      // follow-on proxy routes bound to the authenticated user.
+      let cancelled = false;
+      getToken().then((tok) => {
+        if (cancelled || !videoRef.current) return;
+        hlsCleanupRef.current = attachHlsSource(videoRef.current, videoUrl, tok);
+      }).catch(() => {
+        if (cancelled || !videoRef.current) return;
+        hlsCleanupRef.current = attachHlsSource(videoRef.current, videoUrl);
+      });
+      return () => { cancelled = true; };
     }
     // Non-HLS: the <video src={videoUrl}> JSX attribute handles it
-  }, [videoUrl]);
+  }, [videoUrl, getToken]);
 
   // Clean up HLS on unmount
   useEffect(() => {

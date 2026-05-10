@@ -479,10 +479,21 @@ export default function Player() {
       // Remove the src attribute so hls.js can manage it via MSE
       video.removeAttribute("src");
       video.load();
-      hlsCleanupRef.current = attachHlsSource(video, videoUrl);
+      // Fetch the Clerk JWT and pass it to hls.js so every manifest, sub-manifest
+      // and segment request includes an Authorization header.  This keeps the
+      // follow-on proxy routes bound to the authenticated user.
+      let cancelled = false;
+      getToken().then((tok) => {
+        if (cancelled || !videoRef.current) return;
+        hlsCleanupRef.current = attachHlsSource(videoRef.current, videoUrl, tok);
+      }).catch(() => {
+        if (cancelled || !videoRef.current) return;
+        hlsCleanupRef.current = attachHlsSource(videoRef.current, videoUrl);
+      });
+      return () => { cancelled = true; };
     }
     // Non-HLS: the <video src={videoUrl}> attribute handles it
-  }, [videoUrl]);
+  }, [videoUrl, getToken]);
 
   useEffect(() => {
     // Clean up HLS on unmount

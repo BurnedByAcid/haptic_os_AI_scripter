@@ -21,12 +21,19 @@ export function detachHls(video: HTMLVideoElement): void {
  * - Safari: uses native HLS — just sets `src` directly.
  * - Chrome/Firefox/others: creates an hls.js instance and loads via MSE.
  *
+ * `authToken` is an optional Clerk JWT.  When provided, hls.js will attach it
+ * as an `Authorization: Bearer <token>` header on every XHR it makes
+ * (manifest, sub-manifest, segment).  This ensures the follow-on proxy routes
+ * stay bound to the authenticated user even though the video stack issues the
+ * requests rather than application code.
+ *
  * Returns a cleanup function that destroys the hls.js instance (call it when
  * the component unmounts or the source changes).
  */
 export function attachHlsSource(
   video: HTMLVideoElement,
   manifestUrl: string,
+  authToken?: string | null,
 ): () => void {
   // Tear down any prior hls.js instance on this element first.
   detachHls(video);
@@ -54,8 +61,13 @@ export function attachHlsSource(
     // element may be smaller than the desired playback resolution.
     capLevelToPlayerSize: false,
     // Keep cross-origin fetch so canvas capture stays untainted.
+    // When an auth token is present, attach it so the proxy routes can verify
+    // the requesting user on every manifest and segment request.
     xhrSetup: (xhr) => {
       xhr.withCredentials = false;
+      if (authToken) {
+        xhr.setRequestHeader("Authorization", `Bearer ${authToken}`);
+      }
     },
   });
 
