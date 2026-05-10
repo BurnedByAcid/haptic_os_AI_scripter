@@ -1,4 +1,5 @@
 import os
+import re as _re
 import sys
 import json
 import uuid
@@ -19,14 +20,42 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["SECRET_KEY"] = "fungen-web-secret"
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+
+_LOCALHOST_RE = _re.compile(r"^http://localhost(:\d+)?$")
+
+def _build_allowed_origins():
+    raw = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+    strings = [o.strip() for o in raw.split(",") if o.strip()] if raw.strip() else [
+        "https://hapticos.replit.app",
+        "http://localhost",
+    ]
+    non_local = [o for o in strings if "localhost" not in o]
+    has_local = any("localhost" in o for o in strings)
+    if has_local:
+        return non_local + [_LOCALHOST_RE]
+    return non_local
+
+_allowed_origins = _build_allowed_origins()
+
+def _origin_allowed(origin):
+    for entry in _allowed_origins:
+        if hasattr(entry, "match"):
+            if entry.match(origin):
+                return True
+        elif entry == origin:
+            return True
+    return False
+
+socketio = SocketIO(app, cors_allowed_origins=_origin_allowed, async_mode="threading")
 
 if _has_flask_cors:
-    _CORS(app, origins="*")
+    _CORS(app, origins=_allowed_origins)
 else:
     @app.after_request
     def _add_cors_headers(response):
-        response.headers["Access-Control-Allow-Origin"] = "*"
+        origin = request.headers.get("Origin", "")
+        if _origin_allowed(origin):
+            response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return response
@@ -35,8 +64,10 @@ else:
     @app.route("/generate", methods=["OPTIONS"])
     def _options_handler():
         from flask import Response
+        origin = request.headers.get("Origin", "")
         r = Response()
-        r.headers["Access-Control-Allow-Origin"] = "*"
+        if _origin_allowed(origin):
+            r.headers["Access-Control-Allow-Origin"] = origin
         r.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         r.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return r
