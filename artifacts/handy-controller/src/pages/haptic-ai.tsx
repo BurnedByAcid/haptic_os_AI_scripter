@@ -161,6 +161,7 @@ function DownloadLink({ os, release, state }: {
   const { getToken } = useAuth();
   const [progress, setProgress] = useState<number | null>(null);
   const [receivedBytes, setReceivedBytes] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   if (os === "other") {
     return (
@@ -192,9 +193,15 @@ function DownloadLink({ os, release, state }: {
 
   const MAX_RANGE_RETRIES = 3;
 
+  const handleCancel = () => {
+    abortRef.current?.abort();
+  };
+
   const handleDownload = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (downloading) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
     setDownloading(true);
     setDownloadError(null);
     setUpgradeUrl(null);
@@ -216,7 +223,7 @@ function DownloadLink({ os, release, state }: {
           headers["Range"] = `bytes=${received}-`;
         }
 
-        const res = await fetch(downloadUrl, { headers });
+        const res = await fetch(downloadUrl, { headers, signal: controller.signal });
 
         if (!res.ok && res.status !== 206) {
           let msg = "Download failed — the file may not be available yet.";
@@ -288,9 +295,14 @@ function DownloadLink({ os, release, state }: {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setDownloadError("Download failed. Please check your connection or contact support.");
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        // User cancelled — reset silently, no error message
+      } else {
+        setDownloadError("Download failed. Please check your connection or contact support.");
+      }
     } finally {
+      abortRef.current = null;
       setDownloading(false);
       setProgress(null);
       setReceivedBytes(0);
@@ -320,11 +332,20 @@ function DownloadLink({ os, release, state }: {
 
       {downloading && (
         <div className="space-y-1 pt-0.5">
-          <div className="h-1.5 w-full max-w-[220px] rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full rounded-full bg-primary transition-all duration-150"
-              style={{ width: progress !== null ? `${progress}%` : "0%" }}
-            />
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 w-full max-w-[220px] rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-150"
+                style={{ width: progress !== null ? `${progress}%` : "0%" }}
+              />
+            </div>
+            <button
+              onClick={handleCancel}
+              className="text-[10px] text-muted-foreground hover:text-destructive transition-colors leading-none flex-shrink-0"
+              aria-label="Cancel download"
+            >
+              Cancel
+            </button>
           </div>
           <p className="text-[10px] text-muted-foreground tabular-nums">
             {progress !== null
