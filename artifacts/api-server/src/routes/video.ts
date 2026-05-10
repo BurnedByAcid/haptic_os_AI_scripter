@@ -5,6 +5,7 @@ import { promisify } from "util";
 import http from "http";
 import https from "https";
 import { videoResolveLimiter } from "../middlewares/rateLimiters";
+import { logger } from "../lib/logger";
 
 const execFileAsync = promisify(execFile);
 const router = Router();
@@ -208,10 +209,13 @@ router.get("/video/resolve", videoResolveLimiter, async (req: Request, res: Resp
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("403") || msg.includes("Forbidden")) {
+      logger.warn({ url: pageUrl, msg }, "Video resolve blocked by site (403)");
       res.status(422).json({ error: "This site blocked the URL resolver. Download the video and load it as a file instead." });
     } else if (msg.includes("Unsupported URL") || msg.includes("No video formats found")) {
+      logger.warn({ url: pageUrl, msg }, "Video resolve: unsupported URL");
       res.status(422).json({ error: "This site isn't supported by the URL resolver." });
     } else {
+      logger.warn({ url: pageUrl, msg }, "Video resolve: could not extract playable URL");
       res.status(422).json({ error: "Could not extract a playable URL. Try a direct video file link or load a file instead." });
     }
   }
@@ -339,6 +343,7 @@ router.get("/video/hls/:token/manifest.m3u8", async (req: Request, res: Response
     res.send(rewritten);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    logger.warn({ token: req.params.token, msg }, "Failed to fetch HLS manifest");
     res.status(502).json({ error: "Failed to fetch HLS manifest: " + msg });
   }
 });
@@ -434,6 +439,7 @@ router.get("/video/hls/:token/sub-manifest", async (req: Request, res: Response)
     res.send(rewritten);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    logger.warn({ token: req.params.token, msg }, "Failed to fetch sub-manifest");
     res.status(502).json({ error: "Failed to fetch sub-manifest: " + msg });
   }
 });

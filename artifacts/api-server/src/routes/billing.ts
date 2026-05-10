@@ -3,6 +3,7 @@ import { getAuth, clerkClient } from "@clerk/express";
 import { pool } from "../lib/db";
 import { getUncachableStripeClient, getStripeWebhookSecret } from "../lib/stripeClient";
 import Stripe from "stripe";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -68,7 +69,7 @@ router.get("/billing/price", async (_req: Request, res: Response) => {
 
     res.json(data);
   } catch (err) {
-    console.error("billing/price error:", err);
+    logger.error({ err }, "Failed to fetch price from Stripe");
     res.status(500).json({ error: "Failed to fetch price from Stripe" });
   }
 });
@@ -106,7 +107,7 @@ router.post("/billing/start-verification", async (req: Request, res: Response) =
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("start-verification error:", err);
+    logger.error({ err }, "Failed to start identity verification");
     res.status(500).json({ error: "Failed to start identity verification. Ensure Stripe Identity is enabled in your Stripe dashboard." });
   }
 });
@@ -153,7 +154,7 @@ router.get("/billing/verification-status", async (req: Request, res: Response) =
 
     res.json({ status: session.status, verified });
   } catch (err) {
-    console.error("verification-status error:", err);
+    logger.error({ err }, "Failed to check verification status");
     res.status(500).json({ error: "Failed to check verification status" });
   }
 });
@@ -235,7 +236,7 @@ router.post("/billing/checkout", async (req: Request, res: Response) => {
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("Checkout error:", err);
+    logger.error({ err }, "Failed to create checkout session");
     res.status(500).json({ error: "Failed to create checkout session" });
   }
 });
@@ -273,7 +274,7 @@ router.post("/billing/portal", async (req: Request, res: Response) => {
 
     res.json({ url: portalSession.url });
   } catch (err) {
-    console.error("Portal error:", err);
+    logger.error({ err }, "Failed to create portal session");
     res.status(500).json({ error: "Failed to create portal session" });
   }
 });
@@ -307,7 +308,7 @@ export async function handleBillingWebhook(req: Request, res: Response): Promise
     const sigStr = Array.isArray(sig) ? sig[0] : sig;
     event = stripe.webhooks.constructEvent(payload, sigStr, webhookSecret);
   } catch (err) {
-    console.error("Webhook signature verification failed:", err);
+    logger.warn({ err }, "Webhook signature verification failed");
     res.status(400).json({ error: "Invalid signature" });
     return;
   }
@@ -330,11 +331,11 @@ export async function handleBillingWebhook(req: Request, res: Response): Promise
         await clerkClient.users.updateUserMetadata(clerkId, {
           privateMetadata: { identitySessionId: null, identityVerified: true },
         });
-        console.log(`Identity verified for user ${clerkId} via webhook`);
+        logger.info({ clerkId }, "Identity verified via webhook");
       }
     }
   } catch (err) {
-    console.error("Webhook processing error:", err);
+    logger.error({ err }, "Webhook processing error");
     res.status(500).json({ error: "Webhook processing failed" });
     return;
   }
@@ -348,14 +349,14 @@ async function setPlanByCustomerId(customerId: string, plan: "subscriber" | "fre
     [plan, customerId]
   );
   if (rows.length === 0) {
-    console.warn(`No user found for Stripe customer ${customerId}`);
+    logger.warn({ customerId }, "No user found for Stripe customer");
     return;
   }
   const clerkId = (rows[0] as { clerk_id: string }).clerk_id;
   await clerkClient.users.updateUserMetadata(clerkId, {
     publicMetadata: { plan },
   });
-  console.log(`Updated user ${clerkId} plan to ${plan}`);
+  logger.info({ clerkId, plan }, "Updated user plan");
 }
 
 export default router;

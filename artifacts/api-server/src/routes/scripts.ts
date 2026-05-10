@@ -8,6 +8,7 @@ import {
   validateFunscriptJson,
 } from "../lib/validation";
 import { scriptUploadLimiter, writeLimiter } from "../middlewares/rateLimiters";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -20,7 +21,8 @@ router.get("/scripts", async (_req: Request, res: Response) => {
        FROM shared_scripts ORDER BY created_at DESC LIMIT 100`
     );
     res.json(rows);
-  } catch {
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch scripts");
     res.status(500).json({ error: "Failed to fetch scripts" });
   }
 });
@@ -34,7 +36,8 @@ router.get("/scripts/:id", async (req: Request, res: Response) => {
     if (!rows.length) { res.status(404).json({ error: "Not found" }); return; }
     await pool.query(`UPDATE shared_scripts SET downloads = downloads + 1 WHERE id = $1`, [req.params.id]);
     res.json(rows[0]);
-  } catch {
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch script");
     res.status(500).json({ error: "Failed to fetch script" });
   }
 });
@@ -115,7 +118,8 @@ router.post("/scripts", writeLimiter, scriptUploadLimiter, async (req: Request, 
       [title, description, video_url, script_json_str, author_id, author_name, tags]
     );
     res.status(201).json(rows[0]);
-  } catch {
+  } catch (err) {
+    logger.error({ err }, "Failed to save script");
     res.status(500).json({ error: "Failed to save script" });
   }
 });
@@ -131,7 +135,8 @@ router.delete("/scripts/:id", writeLimiter, async (req: Request, res: Response) 
     );
     if (!rowCount) { res.status(404).json({ error: "Not found or not your script" }); return; }
     res.json({ ok: true });
-  } catch {
+  } catch (err) {
+    logger.error({ err }, "Failed to delete script");
     res.status(500).json({ error: "Failed to delete script" });
   }
 });

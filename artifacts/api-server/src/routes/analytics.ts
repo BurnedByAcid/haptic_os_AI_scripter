@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -35,7 +36,7 @@ router.post("/analytics/event", async (req: Request, res: Response) => {
     );
     res.json({ ok: true });
   } catch (err) {
-    console.error("analytics event error:", err);
+    logger.error({ err }, "Failed to record analytics event");
     res.status(500).json({ error: "Failed to record event" });
   }
 });

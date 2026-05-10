@@ -3,6 +3,7 @@ import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
 import sanitizeHtml from "sanitize-html";
 import { scriptUploadLimiter, writeLimiter } from "../middlewares/rateLimiters";
+import { logger } from "../lib/logger";
 import { validateTagsForWrite, parseTagsFilter } from "@workspace/validation";
 
 const router = Router();
@@ -105,7 +106,7 @@ router.get("/community", async (req: Request, res: Response) => {
     );
     res.json({ scripts: rows, total: (countRows[0] as { total: number }).total, limit, offset });
   } catch (err) {
-    console.error("GET /community error:", err);
+    logger.error({ err }, "Failed to fetch community scripts");
     res.status(500).json({ error: "Failed to fetch community scripts" });
   }
 });

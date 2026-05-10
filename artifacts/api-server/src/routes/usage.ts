@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -90,7 +91,7 @@ router.post("/usage/scripter/start", async (req: Request, res: Response) => {
     res.json({ allowed: true, count: newCount, limit: FREE_DAILY_LIMIT });
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("Usage start error:", err);
+    logger.error({ err }, "Failed to record usage");
     res.status(500).json({ error: "Failed to record usage" });
   } finally {
     client.release();

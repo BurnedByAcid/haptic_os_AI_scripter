@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
 import { pool } from "../lib/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -292,7 +293,7 @@ router.get("/admin/analytics", async (req: Request, res: Response) => {
       earlyBird,
     });
   } catch (err) {
-    console.error("admin/analytics error:", err);
+    logger.error({ err }, "Failed to load admin analytics");
     res.status(500).json({ error: "Failed to load analytics" });
   }
 });
@@ -326,7 +327,7 @@ router.get("/admin/feedback", async (req: Request, res: Response) => {
     );
     res.json(result.rows);
   } catch (err) {
-    console.error("admin/feedback error:", err);
+    logger.error({ err }, "Failed to load admin feedback");
     res.status(500).json({ error: "Failed to load feedback" });
   }
 });

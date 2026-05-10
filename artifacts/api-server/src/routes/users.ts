@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
 import { pool } from "../lib/db";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -33,7 +34,8 @@ router.get("/users/check-username", async (req: Request, res: Response) => {
       [username],
     );
     res.json({ available: rows.length === 0 });
-  } catch {
+  } catch (err) {
+    logger.error({ err }, "Failed to check username availability");
     res.status(500).json({ error: "Failed to check username availability." });
   }
 });
@@ -107,7 +109,8 @@ router.post("/users/onboard", async (req: Request, res: Response) => {
     });
 
     res.json({ message: "Onboarding complete.", username: usernameStr });
-  } catch {
+  } catch (err) {
+    logger.error({ err }, "Failed to complete onboarding");
     res.status(500).json({ error: "Failed to complete onboarding." });
   }
 });
