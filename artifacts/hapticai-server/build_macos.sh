@@ -50,11 +50,11 @@ fi
 
 # Build
 echo "[4/5] Running PyInstaller..."
-pyinstaller fungen_macos.spec --clean --noconfirm
+pyinstaller hapticai_macos.spec --clean --noconfirm
 
 # Check result
-BUNDLE="dist/FunGen.app"
-BINARY="dist/FunGen"
+BUNDLE="dist/HapticAI.app"
+BINARY="dist/HapticAI"
 
 if [ -d "$BUNDLE" ]; then
     echo "[5/5] Done! macOS app bundle:"

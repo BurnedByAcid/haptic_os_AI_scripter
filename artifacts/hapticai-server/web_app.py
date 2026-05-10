@@ -21,7 +21,7 @@ except ImportError:
 sys.path.insert(0, str(Path(__file__).parent))
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
-app.config["SECRET_KEY"] = "fungen-web-secret"
+app.config["SECRET_KEY"] = "hapticai-web-secret"
 app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
 
 _SESSION_TOKEN: str = secrets.token_urlsafe(32)
@@ -59,7 +59,7 @@ socketio = SocketIO(app, cors_allowed_origins=_origin_allowed, async_mode="threa
 
 if _has_flask_cors:
     _CORS(app, origins=_allowed_origins,
-          allow_headers=["Content-Type", "Authorization", "X-FunGen-Token"],
+          allow_headers=["Content-Type", "Authorization", "X-HapticAI-Token"],
           expose_headers=["Content-Disposition"])
 else:
     @app.after_request
@@ -67,7 +67,7 @@ else:
         origin = request.headers.get("Origin", "")
         if _origin_allowed(origin):
             response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-FunGen-Token"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-HapticAI-Token"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return response
 
@@ -79,7 +79,7 @@ else:
         r = Response()
         if _origin_allowed(origin):
             r.headers["Access-Control-Allow-Origin"] = origin
-        r.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-FunGen-Token"
+        r.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-HapticAI-Token"
         r.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
         return r
 
@@ -97,7 +97,7 @@ def _require_trusted_request():
        any cross-site request a hostile page tries to send in no-cors mode,
        because the server rejects the request before any side effects occur.
     2. For browser requests (Origin present) the caller MUST also supply the
-       per-session X-FunGen-Token header.  HapticOS reads this token from
+       per-session X-HapticAI-Token header.  HapticOS reads this token from
        GET /status (which is CORS-protected, so only allowed origins can read
        its response) and attaches it to every mutating call.
 
@@ -128,7 +128,7 @@ def _require_trusted_request():
         # desktop UI). These callers are unreachable from a remote web page.
         return None, None
 
-    # Requests whose Origin is a loopback address are the FunGen local web UI.
+    # Requests whose Origin is a loopback address are the HapticAI local web UI.
     # A remote page cannot forge a loopback Origin, so the network topology
     # itself provides the trust boundary here — no token needed.
     if _LOOPBACK_ORIGIN_RE.match(origin):
@@ -137,11 +137,11 @@ def _require_trusted_request():
     # For any other origin (e.g. HapticOS at hapticos.replit.app) the origin
     # must be in the CORS allowlist AND the caller must supply the per-session
     # token.  Any future browser calls to /api/* mutating endpoints from
-    # HapticOS must include the "X-FunGen-Token" header obtained from GET /status.
+    # HapticOS must include the "X-HapticAI-Token" header obtained from GET /status.
     if not _origin_allowed(origin):
         logger.warning("Rejected mutating request from untrusted origin: %s", origin)
         return jsonify({"error": "forbidden"}), 403
-    provided = request.headers.get("X-FunGen-Token", "")
+    provided = request.headers.get("X-HapticAI-Token", "")
     if not secrets.compare_digest(provided, _SESSION_TOKEN):
         logger.warning("Rejected mutating request with bad session token from origin: %s", origin)
         return jsonify({"error": "forbidden"}), 403
@@ -291,7 +291,7 @@ def index():
 
 
 # ---------------------------------------------------------------------------
-# HapticOS integration endpoints — used by use-fungen-connection.ts
+# HapticOS integration endpoints — used by use-hapticai-connection.ts
 # ---------------------------------------------------------------------------
 
 @app.route("/status")
@@ -299,7 +299,7 @@ def hapticos_status():
     """
     GET /status
     Returns server version and available generation options.
-    Shape: { version: string, options: FunGenOption[] }
+    Shape: { version: string, options: HapticAIOption[] }
     """
     options = [
         {
@@ -1073,7 +1073,7 @@ def run_processing(job_id):
 
         emit_progress(job_id, 1, 15, f"Processing mode: {mode}")
 
-        _run_fungen_cli(job_id, filepath, mode, settings, output_dir)
+        _run_hapticai_cli(job_id, filepath, mode, settings, output_dir)
 
     except Exception as e:
         logger.exception(f"Processing error for job {job_id}")
@@ -1125,7 +1125,7 @@ def _collect_funscript_results(job_id, video_path, output_dir):
         jobs[job_id]["status"] = "error"
 
 
-def _run_fungen_inprocess(job_id, filepath, mode, settings, output_dir):
+def _run_hapticai_inprocess(job_id, filepath, mode, settings, output_dir):
     """
     Run HapticAI processing in-process.
     Used when the app is packaged as a PyInstaller frozen bundle — in that
@@ -1153,7 +1153,7 @@ def _run_fungen_inprocess(job_id, filepath, mode, settings, output_dir):
         filter=None,
     )
 
-    os.environ["FUNGEN_OUTPUT_DIR"] = str(output_dir)
+    os.environ["HAPTICAI_OUTPUT_DIR"] = str(output_dir)
 
     emit_progress(job_id, 1, 25, "Initializing ApplicationLogic (in-process)...")
     core_app = ApplicationLogic(is_cli=True)
@@ -1164,7 +1164,7 @@ def _run_fungen_inprocess(job_id, filepath, mode, settings, output_dir):
     _collect_funscript_results(job_id, Path(filepath), output_dir)
 
 
-def _run_fungen_subprocess(job_id, filepath, mode, settings, output_dir):
+def _run_hapticai_subprocess(job_id, filepath, mode, settings, output_dir):
     """
     Run HapticAI processing via subprocess (dev/source mode).
     Spawns main.py with sys.executable (a real Python interpreter).
@@ -1233,14 +1233,14 @@ def _run_fungen_subprocess(job_id, filepath, mode, settings, output_dir):
     _collect_funscript_results(job_id, video_path, output_dir)
 
 
-def _run_fungen_cli(job_id, filepath, mode, settings, output_dir):
+def _run_hapticai_cli(job_id, filepath, mode, settings, output_dir):
     """
     Dispatch to in-process (frozen/packaged) or subprocess (dev) execution.
     """
     if getattr(sys, "frozen", False):
-        _run_fungen_inprocess(job_id, filepath, mode, settings, output_dir)
+        _run_hapticai_inprocess(job_id, filepath, mode, settings, output_dir)
     else:
-        _run_fungen_subprocess(job_id, filepath, mode, settings, output_dir)
+        _run_hapticai_subprocess(job_id, filepath, mode, settings, output_dir)
 
 
 @app.route("/api/apply_filter", methods=["POST"])

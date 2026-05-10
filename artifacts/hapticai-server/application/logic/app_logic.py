@@ -125,7 +125,7 @@ class ApplicationLogic:
             logging.INFO: 3.0, logging.WARNING: 6.0, logging.ERROR: 10.0, logging.CRITICAL: 15.0,
         }
         Path("logs").mkdir(exist_ok=True)
-        self.app_log_file_path = 'logs/fungen.log'  # Define app_log_file_path
+        self.app_log_file_path = 'logs/hapticai.log'  # Define app_log_file_path
 
         # --- Start of Log Purge ---
         try:
@@ -993,7 +993,7 @@ class ApplicationLogic:
                             metadata = funscript_data.get('metadata', {})
                             # Ensure metadata is a dict before calling .get() on it
                             version = metadata.get('version', '') if isinstance(metadata, dict) else ''
-                            if author.startswith("FunGen") and version == FUNSCRIPT_METADATA_VERSION:
+                            if author.startswith("HapticAI") and version == FUNSCRIPT_METADATA_VERSION:
                                 self.logger.info(
                                     f"Skipping '{video_basename}': Up-to-date funscript from this program version already exists. (Mode: All except own matching version)")
                                 continue

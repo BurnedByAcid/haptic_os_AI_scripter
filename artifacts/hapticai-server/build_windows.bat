@@ -49,7 +49,7 @@ pip install opencv-python-headless --upgrade flask-cors
 
 :: Build
 echo [4/5] Running PyInstaller...
-pyinstaller fungen_windows.spec --clean --noconfirm
+pyinstaller hapticai_windows.spec --clean --noconfirm
 
 :: Check result
 if not exist dist\HapticAI-Setup.exe (

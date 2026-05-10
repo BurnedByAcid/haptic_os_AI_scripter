@@ -89,7 +89,7 @@ class GitHubTokenManager:
         
         try:
             headers = {
-                'User-Agent': 'FunGen-Updater/1.0',
+                'User-Agent': 'HapticAI-Updater/1.0',
                 'Accept': 'application/vnd.github.v3+json',
                 'Authorization': f'token {token}'
             }

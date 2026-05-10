@@ -311,7 +311,7 @@ class AppFileManager:
         # Construct the final funscript data object
         funscript_data = {
             "version": "1.0",
-            "author": f"FunGen beta {APP_VERSION}",
+            "author": f"HapticAI (Beta) {APP_VERSION}",
             "inverted": False,
             "range": 100,
             "actions": sorted(sanitized_actions, key=lambda x: x["at"]),

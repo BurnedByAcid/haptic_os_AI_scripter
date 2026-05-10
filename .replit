@@ -18,10 +18,10 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "FunGen Dev Server"
+args = "HapticAI Dev Server"
 
 [[workflows.workflow]]
-name = "FunGen Dev Server"
+name = "HapticAI Dev Server"
 author = "agent"
 
 [workflows.workflow.metadata]
@@ -29,8 +29,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd artifacts/fungen-server && pip install -r web.requirements.txt -q && python web_app.py"
-waitForPort = 8000
+args = "cd artifacts/hapticai-server && pip install -r web.requirements.txt -q && python web_app.py"
 
 [agent]
 stack = "PNPM_WORKSPACE"

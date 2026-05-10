@@ -86,8 +86,8 @@ class ImGuiFileDialog:
             author = data.get('author', '')
             version = metadata.get('version', '') if isinstance(metadata, dict) else ''
 
-            if author.startswith("FunGen") and version == FUNSCRIPT_METADATA_VERSION:
-                return 'fungen'
+            if author.startswith("HapticAI") and version == FUNSCRIPT_METADATA_VERSION:
+                return 'hapticai'
             else:
                 return 'other'
         except Exception as e:
@@ -384,10 +384,10 @@ class ImGuiFileDialog:
 
             imgui.same_line()
             # Draw the funscript indicator or a placeholder for alignment
-            if funscript_status == 'fungen':
+            if funscript_status == 'hapticai':
                 imgui.text_colored("[FG]", 0.2, 0.9, 0.2, 1.0)  # Green
                 if imgui.is_item_hovered():
-                    imgui.set_tooltip("Funscript created by this version of FunGen")
+                    imgui.set_tooltip("Funscript created by this version of HapticAI")
             elif funscript_status == 'other':
                 imgui.text_colored("[FS]", 0.9, 0.9, 0.2, 1.0)  # Yellow
                 if imgui.is_item_hovered():

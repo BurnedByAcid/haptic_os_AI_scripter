@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller spec for HapticAI (Beta) — macOS
-Bundles web_app.py + all FunGen source into a .app bundle
+PyInstaller spec for HapticAI (Beta) — Windows
+Bundles web_app.py + all FunGen source into a single-file .exe
 """
 
 import sys
@@ -46,6 +46,8 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=['imgui', 'glfw', 'moderngl', 'OpenGL', 'tkinter'],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
 )
@@ -55,43 +57,22 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
-    name='FunGen',
+    name='HapticAI',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     upx_exclude=[],
+    runtime_tmpdir=None,
     console=True,
     disable_windowed_traceback=False,
-    argv_emulation=True,
+    argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
     icon=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='FunGen',
-)
-
-app = BUNDLE(
-    coll,
-    name='FunGen.app',
-    icon=None,
-    bundle_identifier='ai.haptic.fungen',
-    info_plist={
-        'CFBundleShortVersionString': '0.5.4',
-        'CFBundleVersion': '0.5.4',
-        'NSHighResolutionCapable': True,
-        'LSBackgroundOnly': True,
-    },
 )

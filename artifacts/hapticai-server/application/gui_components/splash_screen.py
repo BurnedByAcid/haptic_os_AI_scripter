@@ -205,7 +205,7 @@ class SplashScreen:
         imgui.dummy(1, 30)
 
         # Title: "FUNGEN" with gradient-like effect (cyan to purple)
-        title_text = "FUNGEN"
+        title_text = "HAPTICAI"
         title_font_size = imgui.get_font_size() * 3.0
 
         # Calculate text width for centering
@@ -507,7 +507,7 @@ class StandaloneSplashWindow:
             splash_height = 1080
 
         # Create a borderless window just shy of fullscreen
-        self.window = glfw.create_window(splash_width, splash_height, "FunGen", None, None)
+        self.window = glfw.create_window(splash_width, splash_height, "HapticAI", None, None)
         if not self.window:
             glfw.terminate()
             return False
@@ -911,7 +911,7 @@ class StandaloneSplashWindow:
 
             # "Loading FunGen..." text below the logo
             if current_time > 0.3:  # Show after fade-in
-                loading_text = "Loading FunGen..."
+                loading_text = "Loading HapticAI..."
 
                 # Use draw list for manual positioning
                 text_size = imgui.calc_text_size(loading_text)
