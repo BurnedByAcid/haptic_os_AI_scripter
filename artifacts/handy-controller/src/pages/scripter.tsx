@@ -286,6 +286,10 @@ export default function Scripter() {
 
   // ─── HapticAI import: if the user navigated here from HapticAI with a
   //     generated script stored in sessionStorage, load it automatically. ───
+  // This ref is set synchronously so the draft-picker useEffect (which fires
+  // later, when planLoaded becomes true) can reliably suppress itself even
+  // before the async setPoints() call has propagated to pointsRef.current.
+  const hapticAiImportedRef = useRef(false);
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("hapticai_import");
@@ -293,11 +297,11 @@ export default function Scripter() {
       sessionStorage.removeItem("hapticai_import");
       const parsed = JSON.parse(raw) as { funscript?: string; name?: string };
       if (!parsed.funscript) return;
-      const nextPoints = applyFunscriptJson(parsed.funscript, parsed.name ?? "HapticAI");
-      markClean(nextPoints);
+      hapticAiImportedRef.current = true;
+      applyFunscriptJson(parsed.funscript, parsed.name ?? "HapticAI");
       toast({ title: "HapticAI script loaded", description: "Your generated script is ready to edit." });
     } catch { /* silent */ }
-  // Only run once on mount; applyFunscriptJson and markClean are stable callbacks.
+  // Only run once on mount; applyFunscriptJson is a stable callback.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -308,6 +312,10 @@ export default function Scripter() {
     if (resumeCheckedRef.current) return;
     if (!planLoaded) return;
     resumeCheckedRef.current = true;
+    // Don't show the picker if a HapticAI script was just imported — the flag
+    // is set synchronously so it's always reliable regardless of React's async
+    // state propagation to pointsRef.current.
+    if (hapticAiImportedRef.current) return;
     if (pointsRef.current.length > 0) return;
     (async () => {
       try {
