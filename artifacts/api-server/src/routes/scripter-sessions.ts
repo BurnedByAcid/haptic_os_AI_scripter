@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
+import { getPlan } from "../lib/getPlan";
 import { sanitizeText } from "../lib/validation";
 import { validateFunscriptJson } from "@workspace/validation";
 import { writeLimiter } from "../middlewares/rateLimiters";
@@ -10,14 +11,6 @@ const router = Router();
 const NAME_MAX = 120;
 const JSON_MAX_BYTES = 10 * 1024 * 1024;
 const SUBSCRIBER_PLANS = new Set(["subscriber", "pro", "admin"]);
-
-async function getPlan(userId: string): Promise<string> {
-  const { rows } = await pool.query(
-    `SELECT plan FROM users WHERE clerk_id = $1`,
-    [userId],
-  );
-  return (rows[0] as { plan?: string } | undefined)?.plan ?? "free";
-}
 
 function parseId(raw: string): number | null {
   const n = Number(raw);

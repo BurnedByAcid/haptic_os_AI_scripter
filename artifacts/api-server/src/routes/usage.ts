@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
+import { getPlan } from "../lib/getPlan";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -47,18 +48,27 @@ router.post("/usage/scripter/start", async (req: Request, res: Response) => {
     return;
   }
 
+  // Check effective plan outside the transaction — getPlan falls back to
+  // Clerk metadata so bootstrapped admins are correctly recognised.
+  const plan = await getPlan(auth.userId);
+  if (plan !== "free") {
+    res.json({ allowed: true, count: null, limit: FREE_DAILY_LIMIT });
+    return;
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
+    // Re-check inside the transaction with a row-level lock so the counter
+    // update is serialised against concurrent requests for the same user.
     const { rows: userRows } = await client.query(
       `SELECT plan FROM users WHERE clerk_id = $1 FOR UPDATE`,
       [auth.userId]
     );
-    const userRow = userRows[0] as { plan: string } | undefined;
-    const plan = userRow?.plan ?? "free";
+    const lockedPlan = (userRows[0] as { plan: string } | undefined)?.plan ?? "free";
 
-    if (plan !== "free") {
+    if (lockedPlan !== "free") {
       await client.query("COMMIT");
       res.json({ allowed: true, count: null, limit: FREE_DAILY_LIMIT });
       return;

@@ -72,10 +72,17 @@ router.post("/admin/bootstrap", async (req: Request, res: Response) => {
       return;
     }
 
-    // Promote this user to admin
-    await client.users.updateUserMetadata(auth.userId, {
-      publicMetadata: { plan: "admin" },
-    });
+    // Promote this user to admin in both Clerk metadata and the DB so that
+    // all DB-based plan checks (getPlan) immediately reflect the promotion.
+    await Promise.all([
+      client.users.updateUserMetadata(auth.userId, {
+        publicMetadata: { plan: "admin" },
+      }),
+      db.query(
+        "UPDATE users SET plan = 'admin' WHERE clerk_id = $1",
+        [auth.userId],
+      ),
+    ]);
 
     res.json({ message: "You have been granted admin access.", plan: "admin" });
   } finally {

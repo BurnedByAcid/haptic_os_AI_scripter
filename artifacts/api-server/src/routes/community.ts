@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
+import { getPlan as getEffectivePlan } from "../lib/getPlan";
 import sanitizeHtml from "sanitize-html";
 import { scriptUploadLimiter, writeLimiter } from "../middlewares/rateLimiters";
 import { logger } from "../lib/logger";
@@ -45,10 +46,6 @@ function validateFunscriptJson(raw: unknown): string | null {
   return null;
 }
 
-async function getCallerPlan(userId: string): Promise<string> {
-  const { rows } = await pool.query(`SELECT plan FROM users WHERE clerk_id = $1`, [userId]);
-  return (rows[0] as { plan: string } | undefined)?.plan ?? "free";
-}
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
@@ -157,7 +154,7 @@ router.post("/community", writeLimiter, scriptUploadLimiter, async (req: Request
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
 
-  const plan = await getCallerPlan(auth.userId);
+  const plan = await getEffectivePlan(auth.userId);
   if (plan === "free") {
     res.status(403).json({ error: "Community sharing requires a Pro subscription." }); return;
   }

@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
+import { getPlan } from "../lib/getPlan";
 import { sanitizeText, validateFunscriptJson } from "../lib/validation";
 import { writeLimiter } from "../middlewares/rateLimiters";
 
@@ -17,14 +18,6 @@ function parseSlot(raw: string): number | null {
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1 || n > MAX_SLOTS) return null;
   return n;
-}
-
-async function getPlan(userId: string): Promise<string> {
-  const { rows } = await pool.query(
-    `SELECT plan FROM users WHERE clerk_id = $1`,
-    [userId],
-  );
-  return (rows[0] as { plan?: string } | undefined)?.plan ?? "free";
 }
 
 async function pruneExpired(userId: string): Promise<void> {

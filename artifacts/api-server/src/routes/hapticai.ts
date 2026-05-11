@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { getAuth, clerkClient } from "@clerk/express";
 import multer from "multer";
 import { pool } from "../lib/db";
+import { getPlan } from "../lib/getPlan";
 import { uploadReleaseToGCS, downloadReleaseFromGCS } from "../lib/hapticaiStorage";
 import { logger } from "../lib/logger";
 
@@ -260,14 +261,6 @@ router.get("/hapticai/release", async (_req: Request, res: Response) => {
 });
 
 const SUBSCRIBER_PLANS = new Set(["subscriber", "pro", "admin"]);
-
-async function getPlan(userId: string): Promise<string> {
-  const { rows } = await pool.query<{ plan: string }>(
-    `SELECT plan FROM users WHERE clerk_id = $1`,
-    [userId],
-  );
-  return rows[0]?.plan ?? "free";
-}
 
 /**
  * GET /api/hapticai/download/:platform
