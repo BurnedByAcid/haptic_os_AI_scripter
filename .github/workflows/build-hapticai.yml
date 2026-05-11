@@ -1,5 +1,5 @@
 # ============================================================
-#  HapticAI Windows Build — GitHub Actions
+#  HapticAI Build — GitHub Actions  (Windows + macOS)
 # ============================================================
 #
 #  SETUP (one-time, per repository):
@@ -15,13 +15,13 @@
 #    The build starts automatically; the version is taken from the tag name.
 #
 #  Option B — manual trigger (fallback):
-#  1. Go to Actions → "Build HapticAI Windows" → Run workflow
+#  1. Go to Actions → "Build HapticAI" → Run workflow
 #  2. Enter a version string, e.g.  v0.1.0
-#  3. Click "Run workflow" — the .exe will build and upload automatically
+#  3. Click "Run workflow" — both builds will run in parallel and upload automatically
 #
 # ============================================================
 
-name: Build HapticAI Windows
+name: Build HapticAI
 
 on:
   push:
@@ -112,4 +112,96 @@ jobs:
         with:
           name: HapticAI-Setup-${{ inputs.version || github.ref_name }}
           path: artifacts/hapticai-server/dist/HapticAI-Setup.exe
+          retention-days: 30
+
+  build-macos:
+    name: Build macOS .app
+    runs-on: macos-latest
+
+    defaults:
+      run:
+        working-directory: artifacts/hapticai-server
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip wheel pyinstaller
+
+      - name: Install core dependencies
+        run: |
+          pip install -r core.requirements.txt --ignore-requires-python
+
+      - name: Install CPU/MPS torch
+        run: |
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "arm64" ]; then
+            echo "Apple Silicon detected — installing MPS-compatible torch from PyPI"
+            pip install -r cpu.requirements.txt
+          else
+            echo "Intel Mac detected — installing CPU torch from PyTorch wheel index"
+            pip install -r cpu.requirements.txt --index-url https://download.pytorch.org/whl/cpu
+          fi
+
+      - name: Install web dependencies
+        run: |
+          pip install -r web.requirements.txt
+          pip install opencv-python-headless --upgrade flask-cors
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller hapticai_macos.spec --clean --noconfirm
+
+      - name: Package .app bundle
+        run: |
+          BUNDLE="dist/HapticAI.app"
+          BINARY="dist/HapticAI"
+          if [ -d "$BUNDLE" ]; then
+            echo "Packaging $BUNDLE as zip..."
+            ditto -c -k --sequesterRsrc --keepParent "$BUNDLE" dist/HapticAI-macos.zip
+            echo "Output: dist/HapticAI-macos.zip"
+            du -sh dist/HapticAI-macos.zip
+          elif [ -f "$BINARY" ]; then
+            echo "Packaging standalone binary as zip..."
+            zip -j dist/HapticAI-macos.zip "$BINARY"
+            echo "Output: dist/HapticAI-macos.zip"
+            du -sh dist/HapticAI-macos.zip
+          else
+            echo "ERROR: Build failed — neither dist/HapticAI.app nor dist/HapticAI found"
+            exit 1
+          fi
+
+      - name: Upload to HapticOS
+        env:
+          HAPTICAI_ADMIN_TOKEN: ${{ secrets.HAPTICAI_ADMIN_TOKEN }}
+          VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          HTTP_STATUS=$(curl -s -o response.txt -w "%{http_code}" \
+            -X POST https://hapticos.replit.app/api/hapticai/upload \
+            -H "Authorization: Bearer $HAPTICAI_ADMIN_TOKEN" \
+            -F "platform=macos" \
+            -F "version=$VERSION" \
+            -F "file=@dist/HapticAI-macos.zip")
+          BODY=$(cat response.txt)
+          echo "HTTP $HTTP_STATUS"
+          echo "$BODY"
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "ERROR: Upload failed with HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo ""
+          echo "Download live at: https://hapticos.replit.app/api/hapticai/download/macos"
+
+      - name: Save .app as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HapticAI-macos-${{ inputs.version || github.ref_name }}
+          path: artifacts/hapticai-server/dist/HapticAI-macos.zip
           retention-days: 30
