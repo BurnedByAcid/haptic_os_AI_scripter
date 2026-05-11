@@ -32,8 +32,8 @@ call build_venv\Scripts\activate.bat
 echo [2/5] Installing build tools...
 python -m pip install --upgrade pip wheel pyinstaller
 
-:: Install FunGen dependencies from official requirements files
-echo [3/5] Installing FunGen dependencies...
+:: Install HapticAI dependencies from official requirements files
+echo [3/5] Installing HapticAI dependencies...
 
 :: Core requirements (GUI packages install fine on Windows, just not used in web mode)
 pip install -r core.requirements.txt --ignore-requires-python
@@ -51,16 +51,15 @@ pip install opencv-python-headless --upgrade flask-cors
 echo [4/5] Running PyInstaller...
 pyinstaller hapticai_windows.spec --clean --noconfirm
 
-:: Check result
-if not exist dist\HapticAI-Setup.exe (
-    if not exist dist\FunGen.exe (
-        echo ERROR: Build failed. Check output above.
-        call build_venv\Scripts\deactivate.bat
-        pause & exit /b 1
-    )
-    :: Rename legacy output
-    rename dist\FunGen.exe HapticAI-Setup.exe
+:: Check result — PyInstaller outputs dist\HapticAI.exe (name= in spec)
+if not exist dist\HapticAI.exe (
+    echo ERROR: Build failed. Check output above.
+    call build_venv\Scripts\deactivate.bat
+    pause & exit /b 1
 )
+
+:: Rename to the canonical installer name
+rename dist\HapticAI.exe HapticAI-Setup.exe
 
 :: Deactivate
 call build_venv\Scripts\deactivate.bat
@@ -79,7 +78,7 @@ echo  Set your admin token first:
 echo    set HAPTICAI_ADMIN_TOKEN=^<token from HAPTICAI_ADMIN_TOKEN env var^>
 echo.
 echo  Then run:
-echo    curl -X POST https://hapticos.replit.app/api/hapticai/upload ^
+echo    curl.exe -X POST https://hapticos.replit.app/api/hapticai/upload ^
 echo         -H "Authorization: Bearer %HAPTICAI_ADMIN_TOKEN%" ^
 echo         -F "platform=windows" ^
 echo         -F "version=%VERSION%" ^

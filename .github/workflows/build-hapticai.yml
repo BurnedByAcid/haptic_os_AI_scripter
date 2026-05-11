@@ -1,0 +1,107 @@
+# ============================================================
+#  HapticAI Windows Build — GitHub Actions
+# ============================================================
+#
+#  SETUP (one-time, per repository):
+#  1. Go to your GitHub repo → Settings → Secrets and variables → Actions
+#  2. Click "New repository secret"
+#  3. Name:  HAPTICAI_ADMIN_TOKEN
+#     Value: <your admin token from the HapticOS environment>
+#  4. Save
+#
+#  USAGE:
+#  1. Go to Actions → "Build HapticAI Windows" → Run workflow
+#  2. Enter a version string, e.g.  v0.1.0
+#  3. Click "Run workflow" — the .exe will build and upload automatically
+#
+# ============================================================
+
+name: Build HapticAI Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. v0.1.0)'
+        required: true
+        type: string
+
+jobs:
+  build-windows:
+    name: Build Windows .exe
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        working-directory: artifacts/hapticai-server
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip wheel pyinstaller
+
+      - name: Install core dependencies
+        run: |
+          pip install -r core.requirements.txt --ignore-requires-python
+
+      - name: Install CPU torch
+        run: |
+          pip install -r cpu.requirements.txt --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install web dependencies
+        run: |
+          pip install -r web.requirements.txt
+          pip install opencv-python-headless --upgrade flask-cors
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller hapticai_windows.spec --clean --noconfirm
+
+      - name: Rename output
+        run: |
+          if (!(Test-Path "dist\HapticAI.exe")) {
+            Write-Error "Build failed — dist\HapticAI.exe not found"
+            exit 1
+          }
+          Rename-Item "dist\HapticAI.exe" "HapticAI-Setup.exe"
+          Write-Host "Output: dist\HapticAI-Setup.exe"
+          $size = (Get-Item "dist\HapticAI-Setup.exe").Length
+          Write-Host "Size: $size bytes"
+        shell: pwsh
+
+      - name: Upload to HapticOS
+        env:
+          HAPTICAI_ADMIN_TOKEN: ${{ secrets.HAPTICAI_ADMIN_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          $response = curl.exe -s -o response.txt -w "%{http_code}" `
+            -X POST https://hapticos.replit.app/api/hapticai/upload `
+            -H "Authorization: Bearer $env:HAPTICAI_ADMIN_TOKEN" `
+            -F "platform=windows" `
+            -F "version=$env:VERSION" `
+            -F "file=@dist\HapticAI-Setup.exe"
+          $body = Get-Content response.txt -Raw
+          Write-Host "HTTP $response"
+          Write-Host $body
+          if ($response -ne "200") {
+            Write-Error "Upload failed with HTTP $response"
+            exit 1
+          }
+          Write-Host ""
+          Write-Host "Download live at: https://hapticos.replit.app/api/hapticai/download/windows"
+        shell: pwsh
+
+      - name: Save .exe as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HapticAI-Setup-${{ inputs.version }}
+          path: artifacts/hapticai-server/dist/HapticAI-Setup.exe
+          retention-days: 30
