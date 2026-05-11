@@ -101,6 +101,25 @@ function writeReleaseCache(release: HapticAIRelease): void {
   }
 }
 
+const HAPTICAI_LAST_DOWNLOADED_KEY = "hapticai_last_downloaded_version";
+const HAPTICAI_DISMISSED_UPDATE_KEY = "hapticai_dismissed_update_version";
+
+function readLastDownloadedVersion(): string | null {
+  try { return localStorage.getItem(HAPTICAI_LAST_DOWNLOADED_KEY); } catch { return null; }
+}
+
+function writeLastDownloadedVersion(version: string): void {
+  try { localStorage.setItem(HAPTICAI_LAST_DOWNLOADED_KEY, version); } catch {}
+}
+
+function readDismissedUpdateVersion(): string | null {
+  try { return localStorage.getItem(HAPTICAI_DISMISSED_UPDATE_KEY); } catch { return null; }
+}
+
+function writeDismissedUpdateVersion(version: string): void {
+  try { localStorage.setItem(HAPTICAI_DISMISSED_UPDATE_KEY, version); } catch {}
+}
+
 function useHapticAIRelease(): { release: HapticAIRelease | null; state: ReleaseState } {
   const [release, setRelease] = useState<HapticAIRelease | null>(() => readReleaseCache());
   const [state, setState] = useState<ReleaseState>(() => {
@@ -128,6 +147,25 @@ function useHapticAIRelease(): { release: HapticAIRelease | null; state: Release
   return { release, state };
 }
 
+function HapticAIUpdateBanner({ version, onDismiss }: { version: string; onDismiss: () => void }) {
+  return (
+    <div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-4 py-2">
+      <Download className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+      <span className="text-xs text-foreground flex-1">
+        <span className="font-medium">HapticAI {version} is available.</span>
+        {" "}Download the latest version to get new features and fixes.
+      </span>
+      <button
+        onClick={onDismiss}
+        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 ml-2"
+        aria-label="Dismiss update notification"
+      >
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
 function UnavailableMessage({ label }: { label: string }) {
   return (
     <div className="space-y-1">
@@ -150,10 +188,11 @@ function UnavailableMessage({ label }: { label: string }) {
   );
 }
 
-function DownloadLink({ os, release, state }: {
+function DownloadLink({ os, release, state, onDownloaded }: {
   os: "windows" | "mac" | "other";
   release: HapticAIRelease | null;
   state: ReleaseState;
+  onDownloaded?: (version: string) => void;
 }) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -266,6 +305,10 @@ function DownloadLink({ os, release, state }: {
           a.download = filename;
           a.click();
           URL.revokeObjectURL(url);
+          if (release?.version) {
+            writeLastDownloadedVersion(release.version);
+            onDownloaded?.(release.version);
+          }
           return;
         }
 
@@ -313,6 +356,10 @@ function DownloadLink({ os, release, state }: {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+      if (release?.version) {
+        writeLastDownloadedVersion(release.version);
+        onDownloaded?.(release.version);
+      }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         // User cancelled — reset silently, no error message
@@ -401,14 +448,16 @@ function DownloadLink({ os, release, state }: {
   );
 }
 
-function SetupPanel({ os, serverUrl, onUrlChange }: {
+function SetupPanel({ os, serverUrl, onUrlChange, onDownloaded, release, state }: {
   os: "windows" | "mac" | "other";
   serverUrl: string;
   onUrlChange: (url: string) => void;
+  onDownloaded?: (version: string) => void;
+  release: HapticAIRelease | null;
+  state: ReleaseState;
 }) {
   const [urlInput, setUrlInput] = useState(serverUrl);
   const [expanded, setExpanded] = useState(true);
-  const { release, state } = useHapticAIRelease();
 
   const handleSaveUrl = () => {
     const trimmed = urlInput.trim().replace(/\/$/, "");
@@ -448,7 +497,7 @@ function SetupPanel({ os, serverUrl, onUrlChange }: {
               <p className="text-xs text-muted-foreground">
                 Download the HapticAI executable for your operating system. It is self-contained — no installation required.
               </p>
-              <DownloadLink os={os} release={release} state={state} />
+              <DownloadLink os={os} release={release} state={state} onDownloaded={onDownloaded} />
             </div>
           </li>
 
@@ -817,6 +866,29 @@ function HapticAIContent() {
   const checkedRef = useRef(false);
   const { status, capabilities, serverUrl, sessionToken, setServerUrl } = useHapticAIConnection();
   const os = detectOS();
+  const { release, state: releaseState } = useHapticAIRelease();
+  const [lastDownloadedVersion, setLastDownloadedVersion] = useState<string | null>(
+    () => readLastDownloadedVersion()
+  );
+  const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<string | null>(
+    () => readDismissedUpdateVersion()
+  );
+
+  const handleDownloaded = useCallback((version: string) => {
+    setLastDownloadedVersion(version);
+  }, []);
+
+  const handleDismissUpdate = useCallback((version: string) => {
+    writeDismissedUpdateVersion(version);
+    setDismissedUpdateVersion(version);
+  }, []);
+
+  const showUpdateBanner =
+    lastDownloadedVersion !== null &&
+    release?.available === true &&
+    release.version !== undefined &&
+    release.version !== lastDownloadedVersion &&
+    release.version !== dismissedUpdateVersion;
 
   useEffect(() => {
     if (checkedRef.current) return;
@@ -868,6 +940,13 @@ function HapticAIContent() {
         <HapticAIEuaModal onAccepted={handleAccepted} />
       )}
 
+      {showUpdateBanner && release?.version && (
+        <HapticAIUpdateBanner
+          version={release.version}
+          onDismiss={() => handleDismissUpdate(release!.version!)}
+        />
+      )}
+
       <HapticAIWarningBanner />
 
       <div className="flex-1 overflow-y-auto">
@@ -903,7 +982,7 @@ function HapticAIContent() {
 
           {/* Setup panel — shown when unreachable */}
           {status !== "connected" && (
-            <SetupPanel os={os} serverUrl={serverUrl} onUrlChange={setServerUrl} />
+            <SetupPanel os={os} serverUrl={serverUrl} onUrlChange={setServerUrl} onDownloaded={handleDownloaded} release={release} state={releaseState} />
           )}
 
           {/* Generation UI — shown when connected */}

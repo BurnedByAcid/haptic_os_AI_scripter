@@ -106,7 +106,12 @@ jobs:
             exit 1
           }
           Write-Host ""
+          Write-Host "Upload complete — version $env:VERSION is now live."
           Write-Host "Download live at: https://hapticos.replit.app/api/hapticai/download/windows"
+          Write-Host ""
+          Write-Host "The HapticOS web app will show an update prompt to any user whose"
+          Write-Host "last-downloaded version differs from $env:VERSION."
+          Write-Host "Version info is served by: https://hapticos.replit.app/api/hapticai/release"
         shell: pwsh
 
       - name: Save .exe as workflow artifact
