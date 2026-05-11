@@ -172,9 +172,39 @@ interface GithubRelease {
   dmgUrl: string | null;
 }
 
+const GITHUB_RELEASE_CACHE_KEY = "hapticai_github_release_v1_cache";
+const GITHUB_RELEASE_CACHE_TTL_MS = 60 * 60 * 1000;
+
+interface GithubReleaseCache {
+  release: GithubRelease;
+  fetchedAt: number;
+}
+
+function readGithubReleaseCache(): GithubRelease | null {
+  try {
+    const raw = localStorage.getItem(GITHUB_RELEASE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed: GithubReleaseCache = JSON.parse(raw);
+    if (Date.now() - parsed.fetchedAt > GITHUB_RELEASE_CACHE_TTL_MS) return null;
+    return parsed.release;
+  } catch {
+    return null;
+  }
+}
+
+function writeGithubReleaseCache(release: GithubRelease): void {
+  try {
+    localStorage.setItem(GITHUB_RELEASE_CACHE_KEY, JSON.stringify({ release, fetchedAt: Date.now() }));
+  } catch {
+  }
+}
+
 function useGithubRelease(): { githubRelease: GithubRelease | null; githubState: "loading" | "ready" | "error" } {
-  const [githubRelease, setGithubRelease] = useState<GithubRelease | null>(null);
-  const [githubState, setGithubState] = useState<"loading" | "ready" | "error">("loading");
+  const [githubRelease, setGithubRelease] = useState<GithubRelease | null>(() => readGithubReleaseCache());
+  const [githubState, setGithubState] = useState<"loading" | "ready" | "error">(() => {
+    const cached = readGithubReleaseCache();
+    return cached ? "ready" : "loading";
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -182,11 +212,12 @@ function useGithubRelease(): { githubRelease: GithubRelease | null; githubState:
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((data: GithubRelease) => {
         if (cancelled) return;
+        writeGithubReleaseCache(data);
         setGithubRelease(data);
         setGithubState("ready");
       })
       .catch(() => {
-        if (!cancelled) setGithubState("error");
+        if (!cancelled) setGithubState((prev) => (prev === "loading" ? "error" : prev));
       });
     return () => { cancelled = true; };
   }, []);
