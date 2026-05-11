@@ -166,33 +166,92 @@ function HapticAIUpdateBanner({ version, onDismiss }: { version: string; onDismi
   );
 }
 
-function UnavailableMessage({ label }: { label: string }) {
+interface GithubRelease {
+  tag: string;
+  exeUrl: string | null;
+  dmgUrl: string | null;
+}
+
+function useGithubRelease(): { githubRelease: GithubRelease | null; githubState: "loading" | "ready" | "error" } {
+  const [githubRelease, setGithubRelease] = useState<GithubRelease | null>(null);
+  const [githubState, setGithubState] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API}/api/hapticai/github-release`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data: GithubRelease) => {
+        if (cancelled) return;
+        setGithubRelease(data);
+        setGithubState("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setGithubState("error");
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  return { githubRelease, githubState };
+}
+
+function UnavailableMessage({
+  label,
+  githubUrl,
+  githubTag,
+}: {
+  label: string;
+  githubUrl?: string | null;
+  githubTag?: string | null;
+}) {
   return (
     <div className="space-y-1">
-      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Download className="h-3 w-3" />
-        {label}
-        <span className="text-[10px]">(not yet available)</span>
-      </span>
-      <p className="text-[11px] text-muted-foreground">
-        The download isn&apos;t ready yet.{" "}
-        <a
-          href="mailto:support@hapticos.app"
-          className="underline underline-offset-2 hover:text-foreground transition-colors"
-        >
-          Contact support
-        </a>{" "}
-        if you need access.
-      </p>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Download className="h-3 w-3" />
+          {label}
+          {!githubUrl && <span className="text-[10px]">(not yet available)</span>}
+        </span>
+        {githubTag && (
+          <span className="inline-flex items-center rounded bg-primary/10 border border-primary/25 px-1.5 py-0.5 text-[10px] font-semibold text-primary leading-none">
+            {githubTag}
+          </span>
+        )}
+      </div>
+      {githubUrl ? (
+        <p className="text-[11px] text-muted-foreground">
+          <a
+            href={githubUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+          >
+            <Download className="h-3 w-3" />
+            Download directly from GitHub
+          </a>
+        </p>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">
+          The download isn&apos;t ready yet.{" "}
+          <a
+            href="mailto:support@hapticos.app"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            Contact support
+          </a>{" "}
+          if you need access.
+        </p>
+      )}
     </div>
   );
 }
 
-function DownloadLink({ os, release, state, onDownloaded }: {
+function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubState }: {
   os: "windows" | "mac" | "other";
   release: HapticAIRelease | null;
   state: ReleaseState;
   onDownloaded?: (version: string) => void;
+  githubRelease: GithubRelease | null;
+  githubState: "loading" | "ready" | "error";
 }) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -232,8 +291,24 @@ function DownloadLink({ os, release, state, onDownloaded }: {
     );
   }
 
+  const githubFallbackUrl =
+    githubState === "ready" && githubRelease
+      ? os === "windows"
+        ? githubRelease.exeUrl
+        : githubRelease.dmgUrl
+      : null;
+
+  const githubTagForLabel =
+    githubState === "ready" && githubRelease ? githubRelease.tag : null;
+
   if (state !== "available" || !platformRelease) {
-    return <UnavailableMessage label={label} />;
+    return (
+      <UnavailableMessage
+        label={label}
+        githubUrl={githubFallbackUrl}
+        githubTag={githubTagForLabel}
+      />
+    );
   }
 
   const MAX_RANGE_RETRIES = 3;
@@ -376,25 +451,39 @@ function DownloadLink({ os, release, state, onDownloaded }: {
   };
 
   const totalBytes = platformRelease.sizeBytes;
+  const githubDirectUrl =
+    githubState === "ready" && githubRelease
+      ? os === "windows"
+        ? githubRelease.exeUrl
+        : githubRelease.dmgUrl
+      : null;
+  const githubTag = githubState === "ready" && githubRelease ? githubRelease.tag : null;
 
   return (
     <div className="space-y-1.5">
-      <button
-        onClick={handleDownload}
-        disabled={downloading}
-        className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        {downloading
-          ? <Loader2 className="h-3 w-3 animate-spin" />
-          : <Download className="h-3 w-3" />
-        }
-        {downloading ? "Downloading…" : label}
-        {!downloading && (
-          <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
-            {formatBytes(platformRelease.sizeBytes)}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {downloading
+            ? <Loader2 className="h-3 w-3 animate-spin" />
+            : <Download className="h-3 w-3" />
+          }
+          {downloading ? "Downloading…" : label}
+          {!downloading && (
+            <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
+              {formatBytes(platformRelease.sizeBytes)}
+            </span>
+          )}
+        </button>
+        {githubTag && (
+          <span className="inline-flex items-center rounded bg-primary/10 border border-primary/25 px-1.5 py-0.5 text-[10px] font-semibold text-primary leading-none">
+            {githubTag}
           </span>
         )}
-      </button>
+      </div>
 
       {downloading && (
         <div className="space-y-1 pt-0.5">
@@ -442,19 +531,48 @@ function DownloadLink({ os, release, state, onDownloaded }: {
               Contact support
             </a>
           )}
+          {githubDirectUrl && (
+            <>
+              {" "}or{" "}
+              <a
+                href={githubDirectUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-destructive/80 transition-colors"
+              >
+                download directly from GitHub
+              </a>
+            </>
+          )}
+        </p>
+      )}
+
+      {!downloading && !downloadError && githubDirectUrl && (
+        <p className="text-[10px] text-muted-foreground">
+          or{" "}
+          <a
+            href={githubDirectUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-foreground transition-colors"
+          >
+            download directly from GitHub
+          </a>
         </p>
       )}
     </div>
   );
 }
 
-function SetupPanel({ os, serverUrl, onUrlChange, onDownloaded, release, state }: {
+function SetupPanel({ os, serverUrl, onUrlChange, onDownloaded, release, state, githubRelease, githubState }: {
   os: "windows" | "mac" | "other";
   serverUrl: string;
   onUrlChange: (url: string) => void;
   onDownloaded?: (version: string) => void;
   release: HapticAIRelease | null;
   state: ReleaseState;
+  githubRelease: GithubRelease | null;
+  githubState: "loading" | "ready" | "error";
 }) {
   const [urlInput, setUrlInput] = useState(serverUrl);
   const [expanded, setExpanded] = useState(true);
@@ -497,7 +615,7 @@ function SetupPanel({ os, serverUrl, onUrlChange, onDownloaded, release, state }
               <p className="text-xs text-muted-foreground">
                 Download the HapticAI executable for your operating system. It is self-contained — no installation required.
               </p>
-              <DownloadLink os={os} release={release} state={state} onDownloaded={onDownloaded} />
+              <DownloadLink os={os} release={release} state={state} onDownloaded={onDownloaded} githubRelease={githubRelease} githubState={githubState} />
             </div>
           </li>
 
@@ -867,6 +985,7 @@ function HapticAIContent() {
   const { status, capabilities, serverUrl, sessionToken, setServerUrl } = useHapticAIConnection();
   const os = detectOS();
   const { release, state: releaseState } = useHapticAIRelease();
+  const { githubRelease, githubState } = useGithubRelease();
   const [lastDownloadedVersion, setLastDownloadedVersion] = useState<string | null>(
     () => readLastDownloadedVersion()
   );
@@ -982,7 +1101,7 @@ function HapticAIContent() {
 
           {/* Setup panel — shown when unreachable */}
           {status !== "connected" && (
-            <SetupPanel os={os} serverUrl={serverUrl} onUrlChange={setServerUrl} onDownloaded={handleDownloaded} release={release} state={releaseState} />
+            <SetupPanel os={os} serverUrl={serverUrl} onUrlChange={setServerUrl} onDownloaded={handleDownloaded} release={release} state={releaseState} githubRelease={githubRelease} githubState={githubState} />
           )}
 
           {/* Generation UI — shown when connected */}

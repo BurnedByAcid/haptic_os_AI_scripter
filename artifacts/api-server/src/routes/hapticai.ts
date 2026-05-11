@@ -7,6 +7,92 @@ import { logger } from "../lib/logger";
 
 const router = Router();
 
+// ---------------------------------------------------------------------------
+// GitHub release proxy — cached in-memory for 1 h to avoid rate-limit hits
+// ---------------------------------------------------------------------------
+
+const GITHUB_REPO =
+  process.env.HAPTICAI_GITHUB_REPO ??
+  "HapticAI/HapticAI-Powered-Funscript-Generator";
+
+interface GitHubReleaseCache {
+  data: {
+    tag: string;
+    exeUrl: string | null;
+    dmgUrl: string | null;
+  };
+  fetchedAt: number;
+}
+
+let githubReleaseCache: GitHubReleaseCache | null = null;
+const GITHUB_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+async function fetchLatestGithubRelease(): Promise<GitHubReleaseCache["data"]> {
+  const url = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github.v3+json",
+    "User-Agent": "HapticOS/1.0",
+  };
+  if (process.env.GITHUB_TOKEN) {
+    headers["Authorization"] = `token ${process.env.GITHUB_TOKEN}`;
+  }
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    throw new Error(`GitHub API responded with ${res.status}`);
+  }
+
+  const json = (await res.json()) as {
+    tag_name: string;
+    assets: Array<{ name: string; browser_download_url: string }>;
+  };
+
+  // Prefer exact well-known filename first; fall back to extension match so
+  // the endpoint keeps working if the file is ever renamed.
+  const exeAsset =
+    json.assets.find((a) => a.name === "HapticAI-Setup.exe") ??
+    json.assets.find((a) => a.name.toLowerCase().endsWith(".exe"));
+  const dmgAsset =
+    json.assets.find((a) => a.name.toLowerCase().endsWith(".dmg"));
+
+  return {
+    tag: json.tag_name,
+    exeUrl: exeAsset?.browser_download_url ?? null,
+    dmgUrl: dmgAsset?.browser_download_url ?? null,
+  };
+}
+
+/**
+ * GET /api/hapticai/github-release
+ * Public. Returns the latest GitHub Release tag and direct asset download URLs.
+ * Response: { tag: string, exeUrl: string|null, dmgUrl: string|null }
+ * Cached server-side for 1 hour to stay within GitHub API rate limits.
+ */
+router.get("/hapticai/github-release", async (_req: Request, res: Response) => {
+  try {
+    const now = Date.now();
+    if (
+      githubReleaseCache &&
+      now - githubReleaseCache.fetchedAt < GITHUB_CACHE_TTL_MS
+    ) {
+      res.json(githubReleaseCache.data);
+      return;
+    }
+
+    const data = await fetchLatestGithubRelease();
+    githubReleaseCache = { data, fetchedAt: now };
+    res.json(data);
+  } catch (err) {
+    logger.warn({ err }, "Failed to fetch latest GitHub release");
+    // Return cached data if available, even if stale
+    if (githubReleaseCache) {
+      res.json(githubReleaseCache.data);
+      return;
+    }
+    res.status(502).json({ error: "Could not fetch release info from GitHub." });
+  }
+});
+
 /**
  * Middleware: allows the request only when the caller is authorised as an
  * admin via ONE of two mechanisms (checked in order, runs BEFORE multer so
