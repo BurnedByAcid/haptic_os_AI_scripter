@@ -230,7 +230,28 @@ export default function Scripter() {
   const { openBlockedReport } = useBlockedReport();
   const [currentTime, setCurrentTime] = useState(0);
   // Tracks how many times each base filename has been exported this session
-  const exportCountsRef = useRef<Map<string, number>>(new Map());
+  // Versioning counts per base filename — persisted to localStorage so the
+  // (01), (02) suffixes continue across browser sessions for the same video.
+  const EXPORT_COUNTS_KEY = "hc_scripter_export_counts";
+  // Lazy-init pattern: useRef runs its initializer on every render, so we
+  // initialise to null and populate from localStorage exactly once.
+  const exportCountsRef = useRef<Map<string, number> | null>(null);
+  if (exportCountsRef.current === null) {
+    try {
+      const raw = localStorage.getItem(EXPORT_COUNTS_KEY);
+      const obj = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+      exportCountsRef.current = new Map(Object.entries(obj));
+    } catch {
+      exportCountsRef.current = new Map();
+    }
+  }
+  const persistExportCounts = useCallback(() => {
+    try {
+      const obj: Record<string, number> = {};
+      exportCountsRef.current!.forEach((v, k) => { obj[k] = v; });
+      localStorage.setItem(EXPORT_COUNTS_KEY, JSON.stringify(obj));
+    } catch { /* ignore quota errors */ }
+  }, []);
   const [realtimeTest, setRealtimeTest] = useState(false);
 
   // ─── Layout state ───
@@ -1481,19 +1502,23 @@ export default function Scripter() {
 
     // Build versioned filename: first export = baseName.<ext>,
     // subsequent exports = baseName (01).<ext>, baseName (02).<ext> …
-    const counts = exportCountsRef.current;
+    const counts = exportCountsRef.current!;
     const count = counts.get(baseName) ?? 0;
     const suffix = count === 0 ? "" : ` (${String(count).padStart(2, "0")})`;
     const fileName = `${baseName}${suffix}.${ext}`;
     counts.set(baseName, count + 1);
 
     // Try the File System Access API (Chrome / Edge) so the save dialog opens
-    // pre-filled with the right name and in the same folder as the video.
+    // pre-filled with the right name.  The `id` option groups picker memory:
+    // browsers remember the last folder used for this id across sessions, so
+    // subscribers' chosen save location is reused automatically until they
+    // pick a different one.
     const fsa = (window as unknown as Record<string, unknown>).showSaveFilePicker;
     if (typeof fsa === "function") {
       try {
         const handle = await (fsa as (opts: unknown) => Promise<FileSystemFileHandle>)({
           suggestedName: fileName,
+          id: "hc-funscript-save",
           types: isCSV
             ? [{ description: "CSV", accept: { "text/csv": [".csv"] } }]
             : [{ description: "Funscript", accept: { "application/json": [".funscript"] } }],
@@ -1501,11 +1526,16 @@ export default function Scripter() {
         const writable = await handle.createWritable();
         await writable.write(content);
         await writable.close();
+        persistExportCounts();
         markClean();
+        toast({ title: "Funscript saved", description: fileName });
         return;
       } catch (err) {
-        // User cancelled the picker — do nothing
-        if ((err as { name?: string }).name === "AbortError") return;
+        // User cancelled the picker — roll back the version count bump
+        if ((err as { name?: string }).name === "AbortError") {
+          counts.set(baseName, count);
+          return;
+        }
         // Other error — fall through to anchor download
       }
     }
@@ -1518,7 +1548,9 @@ export default function Scripter() {
     a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
+    persistExportCounts();
     markClean();
+    toast({ title: "Funscript saved", description: fileName });
   };
 
   const deleteSelected = () => {
@@ -2715,6 +2747,31 @@ export default function Scripter() {
           <Button variant="outline" size="sm" className="relative cursor-pointer w-full justify-start text-xs h-7" data-testid="button-import-funscript">
             <Download className="mr-1.5 h-3 w-3 flex-shrink-0" /><span className="truncate">Import .funscript</span>
             <input type="file" accept=".funscript,.json,application/json" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImportFunscript} />
+          </Button>
+          {/* ── Save Funscript — appears on every tab (Audio / Video / Editor)
+              For local videos: saves with the video's base name.
+              For URL videos: prompts where to save (browser remembers location). */}
+          <Button
+            size="sm"
+            variant="outline-primary"
+            className="w-full justify-start text-xs h-7 mt-1"
+            onClick={() => exportScript()}
+            disabled={points.length === 0}
+            data-testid="button-save-funscript"
+            title={
+              points.length === 0
+                ? "Add some points before saving"
+                : videoUrl && /^https?:/i.test(videoUrl)
+                  ? "Save funscript — choose where (location is remembered)"
+                  : videoFileName
+                    ? `Save as ${videoFileName.replace(/\.[^/.]+$/, "")}.${scriptOutputFiletype}`
+                    : "Save funscript"
+            }
+          >
+            <BookmarkPlus className="mr-1.5 h-3 w-3 flex-shrink-0" />
+            <span className="truncate">
+              {videoUrl && /^https?:/i.test(videoUrl) ? "Save Funscript…" : "Save Funscript"}
+            </span>
           </Button>
           <div className="mt-auto pt-2 border-t border-border/50">
             <label className="flex items-center gap-1.5 text-[11px] cursor-pointer leading-tight">
