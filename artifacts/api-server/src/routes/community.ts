@@ -8,6 +8,8 @@ import { logger } from "../lib/logger";
 import { validateTagsForWrite, parseTagsFilter } from "@workspace/validation";
 
 const router = Router();
+const COMMUNITY_VIDEO_MAX_BYTES = 200 * 1024 * 1024;
+const SUBSCRIBER_VIDEO_STORAGE_MAX_BYTES = 550 * 1024 * 1024;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -46,6 +48,15 @@ function validateFunscriptJson(raw: unknown): string | null {
   return null;
 }
 
+async function getSubscriberVideoBytes(userId: string): Promise<number> {
+  const { rows } = await pool.query<{ total: string }>(
+    `SELECT COALESCE(SUM(CASE WHEN video_url IS NOT NULL THEN pg_column_size(video_url) ELSE 0 END), 0)::text AS total
+     FROM community_scripts
+     WHERE user_id = $1`,
+    [userId],
+  );
+  return Number(rows[0]?.total ?? 0);
+}
 
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
@@ -200,6 +211,11 @@ router.post("/community", writeLimiter, scriptUploadLimiter, async (req: Request
   }
   const fsErr = validateFunscriptJson(parsed);
   if (fsErr) { res.status(400).json({ error: fsErr }); return; }
+
+  const subscriberVideoBytes = await getSubscriberVideoBytes(auth.userId);
+  if (subscriberVideoBytes >= SUBSCRIBER_VIDEO_STORAGE_MAX_BYTES) {
+    res.status(413).json({ error: "Video storage limit reached for this account." }); return;
+  }
 
   try {
     const { rows: dupeRows } = await pool.query(

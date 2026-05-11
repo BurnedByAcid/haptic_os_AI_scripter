@@ -27,6 +27,9 @@ export type {
   UrlValidationError,
 } from "@workspace/validation";
 
+export const PRIVATE_LIBRARY_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+export const COMMUNITY_VIDEO_MAX_BYTES = 200 * 1024 * 1024;
+
 /**
  * Validate a funscript File before parsing.
  * Returns null on success, or a structured error.
@@ -45,6 +48,19 @@ export function validateFunscriptFile(
     return {
       code: "WRONG_EXTENSION",
       message: "Only .funscript or .json files are accepted.",
+    };
+  }
+  return null;
+}
+
+export function validateVideoFile(
+  file: File,
+  maxBytes = COMMUNITY_VIDEO_MAX_BYTES,
+): FunscriptValidationError | null {
+  if (file.size > maxBytes) {
+    return {
+      code: "TOO_LARGE",
+      message: `File is too large (${(file.size / 1_048_576).toFixed(1)} MB). Maximum allowed is ${Math.round(maxBytes / 1_048_576)} MB.`,
     };
   }
   return null;
