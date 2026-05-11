@@ -1,0 +1,339 @@
+PS B:\hapticai-server\hapticai-server> .\build_windows.bat v0.1.0
+============================================================
+ HapticAI (Beta) Windows Build Script
+============================================================
+[1/5] Creating virtual environment...
+[2/5] Installing build tools...
+Requirement already satisfied: pip in .\build_venv\Lib\site-packages (26.0.1)
+Collecting pip
+  Using cached pip-26.1.1-py3-none-any.whl.metadata (4.6 kB)
+WARNING: Cache entry deserialization failed, entry ignored
+Collecting wheel
+  Using cached wheel-0.47.0-py3-none-any.whl.metadata (2.3 kB)
+Collecting pyinstaller
+  Using cached pyinstaller-6.20.0-py3-none-win_amd64.whl.metadata (8.5 kB)
+WARNING: Cache entry deserialization failed, entry ignored
+Collecting packaging>=24.0 (from wheel)
+  Using cached packaging-26.2-py3-none-any.whl.metadata (3.5 kB)
+Collecting altgraph (from pyinstaller)
+  Using cached altgraph-0.17.5-py2.py3-none-any.whl.metadata (7.5 kB)
+Collecting pefile>=2022.5.30 (from pyinstaller)
+  Using cached pefile-2024.8.26-py3-none-any.whl.metadata (1.4 kB)
+Collecting pyinstaller-hooks-contrib>=2026.4 (from pyinstaller)
+  Using cached pyinstaller_hooks_contrib-2026.5-py3-none-any.whl.metadata (16 kB)
+Collecting pywin32-ctypes>=0.2.1 (from pyinstaller)
+  Using cached pywin32_ctypes-0.2.3-py3-none-any.whl.metadata (3.9 kB)
+WARNING: Cache entry deserialization failed, entry ignored
+Collecting setuptools>=42.0.0 (from pyinstaller)
+  Using cached setuptools-82.0.1-py3-none-any.whl.metadata (6.5 kB)
+Using cached pip-26.1.1-py3-none-any.whl (1.8 MB)
+Using cached wheel-0.47.0-py3-none-any.whl (32 kB)
+Using cached pyinstaller-6.20.0-py3-none-win_amd64.whl (1.4 MB)
+Using cached packaging-26.2-py3-none-any.whl (100 kB)
+Using cached pefile-2024.8.26-py3-none-any.whl (74 kB)
+Using cached pyinstaller_hooks_contrib-2026.5-py3-none-any.whl (457 kB)
+Using cached pywin32_ctypes-0.2.3-py3-none-any.whl (30 kB)
+Using cached setuptools-82.0.1-py3-none-any.whl (1.0 MB)
+Using cached altgraph-0.17.5-py2.py3-none-any.whl (21 kB)
+Installing collected packages: altgraph, setuptools, pywin32-ctypes, pip, pefile, packaging, wheel, pyinstaller-hooks-contrib, pyinstaller
+  Attempting uninstall: pip
+    Found existing installation: pip 26.0.1
+    Uninstalling pip-26.0.1:
+      Successfully uninstalled pip-26.0.1
+Successfully installed altgraph-0.17.5 packaging-26.2 pefile-2024.8.26 pip-26.1.1 pyinstaller-6.20.0 pyinstaller-hooks-contrib-2026.5 pywin32-ctypes-0.2.3 setuptools-82.0.1 wheel-0.47.0
+[3/5] Installing FunGen dependencies...
+Collecting numpy (from -r core.requirements.txt (line 1))
+  Using cached numpy-2.4.4-cp314-cp314-win_amd64.whl.metadata (6.6 kB)
+Collecting imgui (from -r core.requirements.txt (line 2))
+  Using cached imgui-2.0.0.tar.gz (1.5 MB)
+  Installing build dependencies ... done
+  Getting requirements to build wheel ... done
+  Preparing metadata (pyproject.toml) ... done
+Collecting ultralytics==8.3.78 (from -r core.requirements.txt (line 3))
+  Using cached ultralytics-8.3.78-py3-none-any.whl.metadata (35 kB)
+Collecting glfw~=2.8.0 (from -r core.requirements.txt (line 4))
+  Using cached glfw-2.8.0-py2.py27.py3.py30.py31.py32.py33.py34.py35.py36.py37.py38.p39.p310.p311.p312.p313-none-win_amd64.whl.metadata (5.4 kB)
+Collecting pyopengl~=3.1.7 (from -r core.requirements.txt (line 5))
+  Using cached pyopengl-3.1.10-py3-none-any.whl.metadata (3.3 kB)
+Collecting moderngl~=5.11.1 (from -r core.requirements.txt (line 6))
+  Using cached moderngl-5.11.1.tar.gz (185 kB)
+  Installing build dependencies ... done
+  Getting requirements to build wheel ... done
+  Preparing metadata (pyproject.toml) ... done
+Collecting imageio~=2.36.1 (from -r core.requirements.txt (line 7))
+  Using cached imageio-2.36.1-py3-none-any.whl.metadata (5.2 kB)
+Collecting tqdm~=4.67.1 (from -r core.requirements.txt (line 8))
+  Using cached tqdm-4.67.3-py3-none-any.whl.metadata (57 kB)
+Collecting colorama~=0.4.6 (from -r core.requirements.txt (line 9))
+  Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+Collecting opencv-python~=4.10.0.84 (from -r core.requirements.txt (line 10))
+  Using cached opencv_python-4.10.0.84-cp37-abi3-win_amd64.whl.metadata (20 kB)
+Collecting scipy~=1.15.1 (from -r core.requirements.txt (line 11))
+  Using cached scipy-1.15.3.tar.gz (59.4 MB)
+  Installing build dependencies ... done
+  Getting requirements to build wheel ... done
+  Installing backend dependencies ... done
+  Preparing metadata (pyproject.toml) ... error
+  error: subprocess-exited-with-error
+
+  × Preparing metadata (pyproject.toml) did not run successfully.
+  │ exit code: 1
+  ╰─> [13 lines of output]
+      + meson setup C:\Users\james\AppData\Local\Temp\pip-install-rji8_ydy\scipy_7bd30b93cc444b33a54fdfe79657942c C:\Users\james\AppData\Local\Temp\pip-install-rji8_ydy\scipy_7bd30b93cc444b33a54fdfe79657942c\.mesonpy-vvolc0ic -Dbuildtype=release -Db_ndebug=if-release -Db_vscrt=md --native-file=C:\Users\james\AppData\Local\Temp\pip-install-rji8_ydy\scipy_7bd30b93cc444b33a54fdfe79657942c\.mesonpy-vvolc0ic\meson-python-native-file.ini
+      The Meson build system
+      Version: 1.11.1
+      Source dir: C:\Users\james\AppData\Local\Temp\pip-install-rji8_ydy\scipy_7bd30b93cc444b33a54fdfe79657942c
+      Build dir: C:\Users\james\AppData\Local\Temp\pip-install-rji8_ydy\scipy_7bd30b93cc444b33a54fdfe79657942c\.mesonpy-vvolc0ic
+      Build type: native build
+      Activating VS 18.5.2
+      Project name: scipy
+      Project version: 1.15.3
+
+      ..\meson.build:1:0: ERROR: Could not invoke sanity check executable: [WinError 4551] An Application Control policy has blocked this file.
+
+      A full log can be found at C:\Users\james\AppData\Local\Temp\pip-install-rji8_ydy\scipy_7bd30b93cc444b33a54fdfe79657942c\.mesonpy-vvolc0ic\meson-logs\meson-log.txt
+      [end of output]
+
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+error: metadata-generation-failed
+
+× Encountered error while generating package metadata.
+╰─> scipy
+
+note: This is an issue with the package mentioned above, not pip.
+hint: See above for details.
+Looking in indexes: https://download.pytorch.org/whl/cpu
+ERROR: Could not find a version that satisfies the requirement torch~=2.5.1 (from versions: 2.9.0+cpu, 2.9.1+cpu, 2.10.0+cpu, 2.11.0+cpu)
+ERROR: No matching distribution found for torch~=2.5.1
+Collecting flask (from -r web.requirements.txt (line 5))
+  Using cached flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+Collecting flask-socketio (from -r web.requirements.txt (line 6))
+  Using cached flask_socketio-5.6.1-py3-none-any.whl.metadata (2.6 kB)
+Collecting flask-cors (from -r web.requirements.txt (line 7))
+  Using cached flask_cors-6.0.2-py3-none-any.whl.metadata (5.3 kB)
+Collecting numpy (from -r web.requirements.txt (line 8))
+  Using cached numpy-2.4.4-cp314-cp314-win_amd64.whl.metadata (6.6 kB)
+Collecting ultralytics==8.3.78 (from -r web.requirements.txt (line 9))
+  Using cached ultralytics-8.3.78-py3-none-any.whl.metadata (35 kB)
+Collecting imageio~=2.36.1 (from -r web.requirements.txt (line 10))
+  Using cached imageio-2.36.1-py3-none-any.whl.metadata (5.2 kB)
+Collecting tqdm~=4.67.1 (from -r web.requirements.txt (line 11))
+  Using cached tqdm-4.67.3-py3-none-any.whl.metadata (57 kB)
+Collecting colorama~=0.4.6 (from -r web.requirements.txt (line 12))
+  Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+Collecting opencv-python-headless (from -r web.requirements.txt (line 13))
+  Using cached opencv_python_headless-4.13.0.92-cp37-abi3-win_amd64.whl.metadata (20 kB)
+Collecting scipy~=1.15.1 (from -r web.requirements.txt (line 14))
+  Using cached scipy-1.15.3.tar.gz (59.4 MB)
+  Installing build dependencies ... done
+  Getting requirements to build wheel ... done
+  Installing backend dependencies ... done
+  Preparing metadata (pyproject.toml) ... error
+  error: subprocess-exited-with-error
+
+  × Preparing metadata (pyproject.toml) did not run successfully.
+  │ exit code: 1
+  ╰─> [50 lines of output]
+      + meson setup C:\Users\james\AppData\Local\Temp\pip-install-03zap8vo\scipy_e815ef930fa54553810c739259cfa708 C:\Users\james\AppData\Local\Temp\pip-install-03zap8vo\scipy_e815ef930fa54553810c739259cfa708\.mesonpy-ihr49j64 -Dbuildtype=release -Db_ndebug=if-release -Db_vscrt=md --native-file=C:\Users\james\AppData\Local\Temp\pip-install-03zap8vo\scipy_e815ef930fa54553810c739259cfa708\.mesonpy-ihr49j64\meson-python-native-file.ini
+      The Meson build system
+      Version: 1.11.1
+      Source dir: C:\Users\james\AppData\Local\Temp\pip-install-03zap8vo\scipy_e815ef930fa54553810c739259cfa708
+      Build dir: C:\Users\james\AppData\Local\Temp\pip-install-03zap8vo\scipy_e815ef930fa54553810c739259cfa708\.mesonpy-ihr49j64
+      Build type: native build
+      Activating VS 18.5.2
+      Project name: scipy
+      Project version: 1.15.3
+      C compiler for the host machine: cl (msvc 19.50.35730 "Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35730 for x64")
+      C linker for the host machine: link link 14.50.35730.0
+      C++ compiler for the host machine: cl (msvc 19.50.35730 "Microsoft (R) C/C++ Optimizing Compiler Version 19.50.35730 for x64")
+      C++ linker for the host machine: link link 14.50.35730.0
+      Cython compiler for the host machine: cython (cython 3.0.12)
+      Host machine cpu family: x86_64
+      Host machine cpu: x86_64
+      Program python found: YES (B:\hapticai-server\hapticai-server\build_venv\Scripts\python.exe)
+      Run-time dependency python found: YES 3.14
+      Program cython found: YES (C:\Users\james\AppData\Local\Temp\pip-build-env-bn725bex\overlay\Scripts\cython.EXE)
+      Compiler for C supports arguments -Wno-unused-but-set-variable: NO
+      Compiler for C supports arguments -Wno-unused-function: NO
+      Compiler for C supports arguments -Wno-conversion: NO
+      Compiler for C supports arguments -Wno-misleading-indentation: NO
+      Library m found: NO
+
+      ..\meson.build:80:0: ERROR: Unknown compiler(s): [['ifort'], ['ifx'], ['gfortran'], ['flang-new'], ['flang'], ['pgfortran'], ['g95']]
+      The following exception(s) were encountered:
+      Running `ifort --help` gave "[WinError 2] The system cannot find the file specified"
+      Running `ifort --version` gave "[WinError 2] The system cannot find the file specified"
+      Running `ifort -V` gave "[WinError 2] The system cannot find the file specified"
+      Running `ifx --help` gave "[WinError 2] The system cannot find the file specified"
+      Running `ifx --version` gave "[WinError 2] The system cannot find the file specified"
+      Running `ifx -V` gave "[WinError 2] The system cannot find the file specified"
+      Running `gfortran --help` gave "[WinError 2] The system cannot find the file specified"
+      Running `gfortran --version` gave "[WinError 2] The system cannot find the file specified"
+      Running `gfortran -V` gave "[WinError 2] The system cannot find the file specified"
+      Running `flang-new --help` gave "[WinError 2] The system cannot find the file specified"
+      Running `flang-new --version` gave "[WinError 2] The system cannot find the file specified"
+      Running `flang-new -V` gave "[WinError 2] The system cannot find the file specified"
+      Running `flang --help` gave "[WinError 2] The system cannot find the file specified"
+      Running `flang --version` gave "[WinError 2] The system cannot find the file specified"
+      Running `flang -V` gave "[WinError 2] The system cannot find the file specified"
+      Running `pgfortran --help` gave "[WinError 2] The system cannot find the file specified"
+      Running `pgfortran --version` gave "[WinError 2] The system cannot find the file specified"
+      Running `pgfortran -V` gave "[WinError 2] The system cannot find the file specified"
+      Running `g95 --help` gave "[WinError 2] The system cannot find the file specified"
+      Running `g95 --version` gave "[WinError 2] The system cannot find the file specified"
+      Running `g95 -V` gave "[WinError 2] The system cannot find the file specified"
+
+      A full log can be found at C:\Users\james\AppData\Local\Temp\pip-install-03zap8vo\scipy_e815ef930fa54553810c739259cfa708\.mesonpy-ihr49j64\meson-logs\meson-log.txt
+      [end of output]
+
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+error: metadata-generation-failed
+
+× Encountered error while generating package metadata.
+╰─> scipy
+
+note: This is an issue with the package mentioned above, not pip.
+hint: See above for details.
+Collecting opencv-python-headless
+  Using cached opencv_python_headless-4.13.0.92-cp37-abi3-win_amd64.whl.metadata (20 kB)
+Collecting flask-cors
+  Using cached flask_cors-6.0.2-py3-none-any.whl.metadata (5.3 kB)
+Collecting numpy>=2 (from opencv-python-headless)
+  Using cached numpy-2.4.4-cp314-cp314-win_amd64.whl.metadata (6.6 kB)
+Collecting flask>=0.9 (from flask-cors)
+  Using cached flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+Collecting Werkzeug>=0.7 (from flask-cors)
+  Using cached werkzeug-3.1.8-py3-none-any.whl.metadata (4.0 kB)
+Collecting blinker>=1.9.0 (from flask>=0.9->flask-cors)
+  Using cached blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+Collecting click>=8.1.3 (from flask>=0.9->flask-cors)
+  Using cached click-8.3.3-py3-none-any.whl.metadata (2.6 kB)
+Collecting itsdangerous>=2.2.0 (from flask>=0.9->flask-cors)
+  Using cached itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+Collecting jinja2>=3.1.2 (from flask>=0.9->flask-cors)
+  Using cached jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+Collecting markupsafe>=2.1.1 (from flask>=0.9->flask-cors)
+  Using cached markupsafe-3.0.3-cp314-cp314-win_amd64.whl.metadata (2.8 kB)
+Collecting colorama (from click>=8.1.3->flask>=0.9->flask-cors)
+  Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+Using cached opencv_python_headless-4.13.0.92-cp37-abi3-win_amd64.whl (40.1 MB)
+Using cached flask_cors-6.0.2-py3-none-any.whl (13 kB)
+Using cached flask-3.1.3-py3-none-any.whl (103 kB)
+Using cached blinker-1.9.0-py3-none-any.whl (8.5 kB)
+Using cached click-8.3.3-py3-none-any.whl (110 kB)
+Using cached itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+Using cached jinja2-3.1.6-py3-none-any.whl (134 kB)
+Using cached markupsafe-3.0.3-cp314-cp314-win_amd64.whl (15 kB)
+Using cached numpy-2.4.4-cp314-cp314-win_amd64.whl (12.4 MB)
+Using cached werkzeug-3.1.8-py3-none-any.whl (226 kB)
+Using cached colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+Installing collected packages: numpy, markupsafe, itsdangerous, colorama, blinker, Werkzeug, opencv-python-headless, jinja2, click, flask, flask-cors
+Successfully installed Werkzeug-3.1.8 blinker-1.9.0 click-8.3.3 colorama-0.4.6 flask-3.1.3 flask-cors-6.0.2 itsdangerous-2.2.0 jinja2-3.1.6 markupsafe-3.0.3 numpy-2.4.4 opencv-python-headless-4.13.0.92
+[4/5] Running PyInstaller...
+241 INFO: PyInstaller: 6.20.0, contrib hooks: 2026.5
+241 INFO: Python: 3.14.4
+277 INFO: Platform: Windows-11-10.0.26200-SP0
+277 INFO: Python environment: B:\hapticai-server\hapticai-server\build_venv
+280 INFO: Removing temporary files and cleaning cache in C:\Users\james\AppData\Local\pyinstaller
+295 INFO: Module search paths (PYTHONPATH):
+['B:\\hapticai-server\\hapticai-server\\build_venv\\Scripts\\pyinstaller.exe',
+ 'C:\\Python314\\python314.zip',
+ 'C:\\Python314\\DLLs',
+ 'C:\\Python314\\Lib',
+ 'C:\\Python314',
+ 'B:\\hapticai-server\\hapticai-server\\build_venv',
+ 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages',
+ 'B:\\hapticai-server\\hapticai-server']
+1066 INFO: Appending 'datas' from .spec
+1094 INFO: checking Analysis
+1094 INFO: Building Analysis because Analysis-00.toc is non existent
+1095 INFO: Looking for Python shared library...
+1095 INFO: Using Python shared library: C:\Python314\python314.dll
+1095 INFO: Running Analysis Analysis-00.toc
+1095 INFO: Target bytecode optimization level: 0
+1095 INFO: Initializing module dependency graph...
+1097 INFO: Initializing module graph hook caches...
+1118 INFO: Analyzing modules for base_library.zip ...
+3305 INFO: Processing standard module hook 'hook-encodings.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+3971 INFO: Processing standard module hook 'hook-pickle.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4478 INFO: Processing standard module hook 'hook-difflib.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4495 INFO: Processing standard module hook 'hook-heapq.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7775 INFO: Caching module dependency graph...
+7807 INFO: Analyzing B:\hapticai-server\hapticai-server\web_app.py
+7934 INFO: Processing standard module hook 'hook-platform.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7980 INFO: Processing standard module hook 'hook-sysconfig.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7986 INFO: Processing standard module hook 'hook-_ctypes.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+8341 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+8342 INFO: SetuptoolsInfo: initializing cached setuptools info...
+9646 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+9751 INFO: Processing standard module hook 'hook-xml.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+11004 INFO: Processing standard module hook 'hook-jinja2.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+12592 INFO: Processing pre-safe-import-module hook 'hook-importlib_metadata.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+12592 INFO: Setuptools: 'importlib_metadata' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.importlib_metadata'!
+12601 INFO: Processing standard module hook 'hook-setuptools.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+12621 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+12669 INFO: Processing pre-safe-import-module hook 'hook-jaraco.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+12669 INFO: Setuptools: 'jaraco' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.jaraco'!
+12685 INFO: Processing pre-safe-import-module hook 'hook-more_itertools.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+12685 INFO: Setuptools: 'more_itertools' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.more_itertools'!
+12957 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+13226 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+13228 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+13238 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+13239 INFO: Setuptools: 'backports' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.backports'!
+13771 INFO: Processing pre-safe-import-module hook 'hook-tomli.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+13771 INFO: Setuptools: 'tomli' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.tomli'!
+14373 INFO: Processing pre-safe-import-module hook 'hook-wheel.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+14443 INFO: Processing standard module hook 'hook-setuptools._vendor.importlib_metadata.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+14472 INFO: Processing pre-safe-import-module hook 'hook-zipp.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+14473 INFO: Setuptools: 'zipp' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.zipp'!
+14635 INFO: Processing standard module hook 'hook-numpy.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+17134 INFO: Processing standard module hook 'hook-cv2.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+19254 INFO: Processing pre-safe-import-module hook 'hook-gi.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+20111 INFO: Processing standard module hook 'hook-sqlite3.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+21695 INFO: Analyzing hidden import 'engineio'
+21696 ERROR: Hidden import 'engineio' not found
+21696 INFO: Analyzing hidden import 'socketio'
+21696 ERROR: Hidden import 'socketio' not found
+21696 INFO: Analyzing hidden import 'eventlet'
+21697 ERROR: Hidden import 'eventlet' not found
+21697 INFO: Processing module hooks (post-graph stage)...
+22339 INFO: Performing binary vs. data reclassification (218 entries)
+22382 INFO: Looking for ctypes DLLs
+22476 INFO: Analyzing run-time hooks ...
+22481 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+22484 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+22487 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+22490 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+22511 INFO: Creating base_library.zip...
+22531 INFO: Looking for dynamic libraries
+OpenGL not available - GPU rendering will fall back to CPU mode
+Stage 2 module not available: No module named 'msgpack'. This tracker will not function.
+Stage 3 Mixed module not available: No module named 'msgpack'. This tracker will not function.
+Stage 3 module not available: No module named 'msgpack'. This tracker will not function.
+23961 INFO: Extra DLL search directories (AddDllDirectory): ['B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\numpy.libs', 'B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\cv2\\../../x64/vc17/bin']
+23961 INFO: Extra DLL search directories (PATH): ['B:\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\cv2\\../../x64/vc17/bin']
+24600 INFO: Warnings written to B:\hapticai-server\hapticai-server\build\hapticai_windows\warn-hapticai_windows.txt
+24671 INFO: Graph cross-reference written to B:\hapticai-server\hapticai-server\build\hapticai_windows\xref-hapticai_windows.html
+24706 INFO: checking PYZ
+24707 INFO: Building PYZ because PYZ-00.toc is non existent
+24707 INFO: Building PYZ (ZlibArchive) B:\hapticai-server\hapticai-server\build\hapticai_windows\PYZ-00.pyz
+25253 INFO: Building PYZ (ZlibArchive) B:\hapticai-server\hapticai-server\build\hapticai_windows\PYZ-00.pyz completed successfully.
+25278 INFO: checking PKG
+25279 INFO: Building PKG because PKG-00.toc is non existent
+25279 INFO: Building PKG (CArchive) HapticAI.pkg
+31994 INFO: Building PKG (CArchive) HapticAI.pkg completed successfully.
+32001 INFO: Bootloader B:\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\run.exe
+32001 INFO: checking EXE
+32002 INFO: Building EXE because EXE-00.toc is non existent
+32002 INFO: Building EXE from EXE-00.toc
+32009 INFO: Copying bootloader EXE to B:\hapticai-server\hapticai-server\dist\HapticAI.exe
+32021 INFO: Copying icon to EXE
+32024 INFO: Copying 0 resources to EXE
+32024 INFO: Embedding manifest in EXE
+32027 INFO: Appending PKG archive to EXE
+32065 INFO: Fixing EXE headers
+32352 INFO: Building EXE from EXE-00.toc completed successfully.
+32360 INFO: Build complete! The results are available in: B:\hapticai-server\hapticai-server\dist
+ERROR: Build failed. Check output above.
+Press any key to continue . . .
