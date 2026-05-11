@@ -1,64 +1,48 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useFeatureTracking } from "@/hooks/use-analytics";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@clerk/react";
+import { enqueueRetry } from "@/hooks/use-retry-queue";
+import { useMutation } from "@tanstack/react-query";
+import { useAuth, useUser } from "@clerk/react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { TagPicker, ActiveTagChips, CardTagChips } from "@/components/tag-picker";
-import { parseTagsFilter, MAX_TAG_FILTERS, type LibraryTag } from "@workspace/validation";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  BookmarkPlus, Download, Play, Trash2, Clock, Link as LinkIcon, HardDrive,
-  RefreshCw, Globe, Crown, Loader2, Check, FileJson, Star, Pencil, Plus, X, Upload,
-  ChevronDown,
+  Download, Play, Upload, Plus, X, Clock, User, Eye,
+  Crown, Loader2, Globe, Trash2, ChevronDown
 } from "lucide-react";
-import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuLabel, DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { ToastAction } from "@/components/ui/toast";
-import { useLocation } from "wouter";
-import { Link } from "wouter";
-import {
-  loadFileHandle,
-  storeFileHandle,
-  deleteFileHandle,
-  verifyHandlePermission,
-} from "@/lib/file-handle-store";
-import { validateAndParseFunscriptFile, validateVideoUrl, sanitizeName, validateVideoFile, PRIVATE_LIBRARY_VIDEO_MAX_BYTES } from "@/lib/validation";
+import { validateVideoUrl, validateAndParseFunscriptFile } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
+import { Link, useLocation } from "wouter";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { funscriptJsonToCSV, triggerDownload } from "@/lib/script-export";
+import { TagPicker, ActiveTagChips, CardTagChips } from "@/components/tag-picker";
+import { parseTagsFilter, MAX_TAG_FILTERS, type LibraryTag } from "@workspace/validation";
 
 const API = import.meta.env.VITE_API_URL ?? "";
+const PAGE_SIZE = 20;
 
-interface LibraryEntry {
+interface CommunityScript {
   id: number;
+  user_id: string;
+  username: string;
   title: string;
-  video_url: string | null;
-  local_file_path: string | null;
+  description: string;
+  video_url: string;
+  view_count: number;
   created_at: string;
-  script_count?: number;
+  favorite_count: number;
+  avg_rating: number | null;
+  rating_count: number;
+  user_favorited: boolean;
+  user_rating: number | null;
   tags?: string[];
 }
 
-interface AttachedScript {
-  id: number;
-  name: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-interface FunscriptListResponse {
-  cap: number;
-  plan: string;
-  funscripts: AttachedScript[];
+interface PageResult {
+  scripts: CommunityScript[];
+  total: number;
 }
 
 function timeAgo(dateStr: string): string {
@@ -72,683 +56,726 @@ function timeAgo(dateStr: string): string {
   return "just now";
 }
 
-interface ShareDialogProps {
-  entry: LibraryEntry | null;
-  onClose: () => void;
-  authHeaders: () => Promise<Record<string, string>>;
-  onSuccess: () => void;
+function VideoIcon({ url }: { url: string }) {
+  const h = url.toLowerCase();
+  if (h.includes("pornhub")) return <span className="text-[10px] font-bold bg-amber-500 text-black px-1.5 py-0.5 rounded">PH</span>;
+  if (h.includes("youtube") || h.includes("youtu.be")) return <span className="text-[10px] font-bold bg-red-600 text-white px-1.5 py-0.5 rounded">YT</span>;
+  if (h.includes("xvideos")) return <span className="text-[10px] font-bold bg-red-700 text-white px-1.5 py-0.5 rounded">XV</span>;
+  if (h.includes("xhamster")) return <span className="text-[10px] font-bold bg-orange-600 text-white px-1.5 py-0.5 rounded">XH</span>;
+  if (h.includes("redtube")) return <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded">RT</span>;
+  if (h.includes("vimeo")) return <span className="text-[10px] font-bold bg-red-700 text-white px-1.5 py-0.5 rounded">VI</span>;
+  return <span className="text-[10px] font-bold bg-zinc-600 text-white px-1.5 py-0.5 rounded">VID</span>;
 }
 
-function ShareToCommunityDialog({ entry, onClose, authHeaders, onSuccess }: ShareDialogProps) {
-  const [description, setDescription] = useState("");
-  const [tags, setTags] = useState<LibraryTag[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+function BananaRating({
+  avgRating,
+  userRating,
+  ratingCount,
+  onRate,
+  disabled,
+}: {
+  avgRating: number | null;
+  userRating: number | null;
+  ratingCount: number;
+  onRate: (r: number) => void;
+  disabled?: boolean;
+}) {
+  const [hover, setHover] = useState(0);
+  const display = hover || userRating || 0;
+
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          className={`text-base leading-none transition-transform hover:scale-110 ${disabled ? "cursor-default" : "cursor-pointer"}`}
+          onMouseEnter={() => !disabled && setHover(n)}
+          onMouseLeave={() => setHover(0)}
+          onClick={() => !disabled && onRate(n)}
+          title={disabled ? undefined : `Rate ${n} banana${n !== 1 ? "s" : ""}`}
+          aria-label={`${n} banana${n !== 1 ? "s" : ""}`}
+        >
+          {n <= display ? "🍌" : <span className="opacity-25">🍌</span>}
+        </button>
+      ))}
+      {ratingCount > 0 && avgRating !== null && (
+        <span className="text-[11px] text-muted-foreground ml-1">
+          {avgRating.toFixed(1)} ({ratingCount})
+        </span>
+      )}
+    </div>
+  );
+}
+
+function EggplantButton({
+  favorited,
+  count,
+  onClick,
+  loading,
+}: {
+  favorited: boolean;
+  count: number;
+  onClick: () => void;
+  loading?: boolean;
+}) {
+  return (
+    <button
+      className={`flex items-center gap-1 text-sm transition-transform hover:scale-110 ${loading ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
+      onClick={onClick}
+      disabled={loading}
+      title={favorited ? "Remove from favorites" : "Add to favorites"}
+      aria-label={favorited ? "Unfavorite" : "Favorite"}
+    >
+      <span className={`text-base ${favorited ? "" : "opacity-40"}`}>🍆</span>
+      <span className="text-[11px] text-muted-foreground">{count}</span>
+    </button>
+  );
+}
+
+export default function Community() {
+  useFeatureTracking("community");
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const { isPro } = useSubscription();
   const { toast } = useToast();
+  const [location, setLocation] = useLocation();
   const { reportAction } = useBlockedReport();
-  const [, navigate] = useLocation();
+  const { scriptOutputFiletype } = useAppSettings();
 
-  if (!entry) return null;
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState<{
+    title: string; description: string; video_url: string; tags: LibraryTag[];
+  }>({ title: "", description: "", video_url: "", tags: [] });
+  const [scriptFile, setScriptFile] = useState<File | null>(null);
+  const [search, setSearch] = useState("");
+  const [favoriteLoadingId, setFavoriteLoadingId] = useState<number | null>(null);
+  const [rateLoadingId, setRateLoadingId] = useState<number | null>(null);
+  const [editingTagsId, setEditingTagsId] = useState<number | null>(null);
 
-  const hasUrl = Boolean(entry.video_url);
+  const [allScripts, setAllScripts] = useState<CommunityScript[]>([]);
+  const [total, setTotal] = useState(0);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  async function handleShare() {
-    if (!entry || !entry.video_url) return;
-    setSaving(true);
+  const [tagFilter, setTagFilter] = useState<LibraryTag[]>(() =>
+    parseTagsFilter(new URLSearchParams(window.location.search).get("tags")),
+  );
+
+  const initializedRef = useRef(false);
+
+  async function authHeaders(): Promise<Record<string, string>> {
+    const token = await getToken();
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) h["Authorization"] = `Bearer ${token}`;
+    return h;
+  }
+
+  async function fetchPage(offset: number, tags: readonly string[] = tagFilter): Promise<PageResult> {
+    const headers = await authHeaders();
+    const tagsQs = tags.length > 0 ? `&tags=${encodeURIComponent(tags.join(","))}` : "";
+    const res = await fetch(`${API}/api/community?limit=${PAGE_SIZE}&offset=${offset}${tagsQs}`, { headers });
+    if (!res.ok) throw new Error("Failed to load");
+    return res.json() as Promise<PageResult>;
+  }
+
+  function getUrlOffset(): number {
+    const params = new URLSearchParams(window.location.search);
+    return Math.max(0, parseInt(params.get("offset") ?? "0", 10));
+  }
+
+  function setUrlOffset(offset: number, tags: readonly string[] = tagFilter) {
+    const params = new URLSearchParams(window.location.search);
+    if (offset === 0) params.delete("offset");
+    else params.set("offset", String(offset));
+    if (tags.length === 0) params.delete("tags");
+    else params.set("tags", tags.join(","));
+    const search = params.toString();
+    const newPath = location.split("?")[0] + (search ? `?${search}` : "");
+    setLocation(newPath, { replace: true });
+  }
+
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    const urlOffset = getUrlOffset();
+    const pagesToLoad = Math.floor(urlOffset / PAGE_SIZE) + 1;
+
+    async function init() {
+      try {
+        const offsets = Array.from({ length: pagesToLoad }, (_, i) => i * PAGE_SIZE);
+        const results = await Promise.all(offsets.map((o) => fetchPage(o)));
+        const accumulated = results.flatMap((r) => r.scripts);
+        const lastResult = results[results.length - 1];
+        setAllScripts(accumulated);
+        setTotal(lastResult.total);
+        setNextOffset(pagesToLoad * PAGE_SIZE);
+      } catch {
+        toast({ title: "Failed to load community scripts", variant: "destructive" });
+      } finally {
+        setIsInitialLoading(false);
+      }
+    }
+
+    init();
+  }, []);
+
+  function applyTagFilter(next: LibraryTag[]) {
+    setTagFilter(next);
+    setUrlOffset(0, next);
+    setIsInitialLoading(true);
+    setAllScripts([]);
+    setNextOffset(0);
+    fetchPage(0, next)
+      .then((r) => {
+        setAllScripts(r.scripts);
+        setTotal(r.total);
+        setNextOffset(PAGE_SIZE);
+      })
+      .catch(() => toast({ title: "Failed to apply tag filter", variant: "destructive" }))
+      .finally(() => setIsInitialLoading(false));
+  }
+
+  function addTagToFilter(tag: string) {
+    if (tagFilter.includes(tag as LibraryTag)) return;
+    if (tagFilter.length >= MAX_TAG_FILTERS) {
+      toast({
+        title: `Up to ${MAX_TAG_FILTERS} tags at a time`,
+        description: "Remove a filter chip to add another.",
+      });
+      return;
+    }
+    applyTagFilter([...tagFilter, tag as LibraryTag]);
+  }
+
+  async function handleEditTags(s: CommunityScript, next: LibraryTag[]) {
+    setEditingTagsId(s.id);
     try {
       const headers = await authHeaders();
-      const funscriptRes = await fetch(`${API}/api/library/${entry.id}/funscript`, { headers });
-      if (!funscriptRes.ok) throw new Error("Failed to load funscript");
-      const { funscript } = await funscriptRes.json() as { funscript: string };
-
-      const res = await fetch(`${API}/api/community`, {
-        method: "POST",
+      const res = await fetch(`${API}/api/community/${s.id}/tags`, {
+        method: "PATCH",
         headers,
-        body: JSON.stringify({
-          title: entry.title,
-          description: description.trim(),
-          video_url: entry.video_url,
-          tags,
-          funscript,
-        }),
+        body: JSON.stringify({ tags: next }),
       });
-
-      if (res.status === 413) {
-        const d = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(d.error ?? "Video storage limit reached for this account.");
-      }
-
-      if (res.status === 409) {
-        const d = await res.json().catch(() => ({})) as { error?: string; existing_title?: string };
-        const existingTitle = d.existing_title ?? entry.title;
-        toast({
-          title: "Already shared",
-          description: `"${existingTitle}" is already live in the Community.`,
-          action: (
-            <ToastAction altText="View in Community" onClick={() => { onClose(); navigate("/community"); }}>
-              View in Community
-            </ToastAction>
-          ),
-        });
-        return;
-      }
-
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(d.error ?? "Failed to share");
+        throw new Error(d.error ?? "Failed to update tags");
       }
-      setSaved(true);
-      toast({ title: "Shared to Community!", description: `"${entry.title}" is now live.` });
-      onSuccess();
-      setTimeout(() => { setSaved(false); onClose(); setDescription(""); setTags([]); }, 1200);
+      updateScript(s.id, (sc) => ({ ...sc, tags: next }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       toast({
-        title: "Could not share",
+        title: "Could not update tags",
         description: msg,
         variant: "destructive",
         action: reportAction({
-          kind: "community_submission",
-          item: entry?.video_url ?? entry?.title ?? "(submission)",
+          kind: "other",
+          item: `community tag update for "${s.title}"`,
           blockMessage: msg,
         }),
       });
     } finally {
-      setSaving(false);
+      setEditingTagsId(null);
     }
   }
 
-  return (
-    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Share to Community</DialogTitle>
-          <DialogDescription>
-            Publish "{entry.title}" so others can rate and use it.
-          </DialogDescription>
-        </DialogHeader>
+  const hasMore = nextOffset < total;
 
-        {!hasUrl ? (
-          <div className="text-sm text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-md px-3 py-3">
-            Community sharing requires an https:// video URL. This script was saved from a local file and cannot be shared publicly.
-          </div>
+  async function loadMore() {
+    setIsLoadingMore(true);
+    try {
+      const result = await fetchPage(nextOffset, tagFilter);
+      setAllScripts((prev) => [...prev, ...result.scripts]);
+      setTotal(result.total);
+      const newNextOffset = nextOffset + PAGE_SIZE;
+      setNextOffset(newNextOffset);
+      setUrlOffset(nextOffset);
+    } catch {
+      toast({ title: "Failed to load more scripts", variant: "destructive" });
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }
+
+  function updateScript(id: number, updater: (s: CommunityScript) => CommunityScript) {
+    setAllScripts((prev) => prev.map((s) => (s.id === id ? updater(s) : s)));
+  }
+
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      if (!scriptFile) throw new Error("No script file selected.");
+      const urlErr = validateVideoUrl(form.video_url.trim());
+      if (urlErr) throw new Error(urlErr.message);
+      const script = await validateAndParseFunscriptFile(scriptFile);
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/community`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          title: form.title,
+          description: form.description,
+          video_url: form.video_url,
+          tags: form.tags,
+          funscript: JSON.stringify(script),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string; details?: string[] | string };
+        const detailsMsg = Array.isArray(data.details) ? data.details.join(" ") : data.details;
+        if (res.status === 429) {
+          const retryAfter = res.headers.get("Retry-After");
+          const waitHint = retryAfter ? ` Try again in ${retryAfter}s.` : "";
+          throw new Error(
+            (data.error ?? "You're sharing scripts too quickly. Please slow down.") + waitHint,
+          );
+        }
+        if (res.status === 413) {
+          throw new Error(data.error ?? "Video storage limit reached. Remove some community entries to free up space.");
+        }
+        throw new Error(detailsMsg ?? data.error ?? "Failed to submit script.");
+      }
+      return res.json() as Promise<CommunityScript>;
+    },
+    onSuccess: (newScript) => {
+      setAllScripts((prev) => [
+        {
+          ...newScript,
+          favorite_count: 0,
+          avg_rating: null,
+          rating_count: 0,
+          user_favorited: false,
+          user_rating: null,
+        },
+        ...prev,
+      ]);
+      setTotal((t) => t + 1);
+      setNextOffset((n) => n + 1);
+      setShowForm(false);
+      setForm({ title: "", description: "", video_url: "", tags: [] });
+      setScriptFile(null);
+      toast({ title: "Script shared!", description: "Your script is now live in the community." });
+    },
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : "Unknown error.";
+      toast({
+        title: "Could not share script",
+        description: msg,
+        variant: "destructive",
+        action: reportAction({
+          kind: "community_submission",
+          item: form.video_url || form.title || "(submission)",
+          blockMessage: msg,
+        }),
+      });
+    },
+  });
+
+  async function handleFavorite(s: CommunityScript) {
+    setFavoriteLoadingId(s.id);
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/community/${s.id}/favorite`, { method: "POST", headers });
+      if (!res.ok) throw new Error("Failed");
+      updateScript(s.id, (sc) => {
+        const nowFav = !sc.user_favorited;
+        return { ...sc, user_favorited: nowFav, favorite_count: sc.favorite_count + (nowFav ? 1 : -1) };
+      });
+    } catch {
+      toast({ title: "Could not update favorite", variant: "destructive" });
+    } finally {
+      setFavoriteLoadingId(null);
+    }
+  }
+
+  async function handleRate(s: CommunityScript, rating: number) {
+    setRateLoadingId(s.id);
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/community/${s.id}/rate`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ rating }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const result = await res.json() as { avg_rating: number; rating_count: number; user_rating: number };
+      updateScript(s.id, (sc) => ({
+        ...sc,
+        user_rating: result.user_rating,
+        avg_rating: result.avg_rating,
+        rating_count: result.rating_count,
+      }));
+    } catch {
+      toast({ title: "Could not save rating", variant: "destructive" });
+    } finally {
+      setRateLoadingId(null);
+    }
+  }
+
+  async function handleUseInPlayer(s: CommunityScript) {
+    if (!navigator.onLine) {
+      enqueueRetry(`use-in-player-${s.id}`, () => handleUseInPlayer(s));
+      toast({
+        title: "You're offline",
+        description: `"${s.title}" will open in the player when you reconnect.`,
+      });
+      return;
+    }
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/community/${s.id}`, { headers });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json() as CommunityScript & { funscript: string };
+      localStorage.setItem("handy_pending_script", data.funscript);
+      localStorage.setItem("handy_pending_script_name", s.title);
+      localStorage.setItem("handy_pending_video_url", s.video_url);
+      setLocation("/player");
+    } catch {
+      toast({ title: "Could not load into player", variant: "destructive" });
+    }
+  }
+
+  async function handleDownload(s: CommunityScript) {
+    if (!navigator.onLine) {
+      enqueueRetry(`download-script-${s.id}`, () => handleDownload(s));
+      toast({
+        title: "You're offline",
+        description: `"${s.title}" will download when you reconnect.`,
+      });
+      return;
+    }
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/community/${s.id}`, { headers });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json() as CommunityScript & { funscript: string };
+      const safeName = s.title.replace(/[^a-z0-9]/gi, "_");
+
+      let content: string;
+      let mimeType: string;
+      let ext: string;
+      if (scriptOutputFiletype === "csv") {
+        content = funscriptJsonToCSV(data.funscript) ?? "";
+        mimeType = "text/csv";
+        ext = "csv";
+      } else {
+        content = data.funscript;
+        mimeType = "application/json";
+        ext = "funscript";
+      }
+
+      triggerDownload(content, `${safeName}.${ext}`, mimeType);
+    } catch {
+      toast({ title: "Download failed", variant: "destructive" });
+    }
+  }
+
+  async function handleDelete(s: CommunityScript) {
+    if (!window.confirm(`Delete "${s.title}"? This cannot be undone.`)) return;
+    try {
+      const headers = await authHeaders();
+      const res = await fetch(`${API}/api/community/${s.id}`, { method: "DELETE", headers });
+      if (!res.ok) throw new Error("Failed");
+      setAllScripts((prev) => prev.filter((sc) => sc.id !== s.id));
+      setTotal((t) => Math.max(0, t - 1));
+      setNextOffset((n) => Math.max(0, n - 1));
+      toast({ title: "Deleted", description: "Your shared script has been removed." });
+    } catch {
+      toast({ title: "Delete failed", variant: "destructive" });
+    }
+  }
+
+  const filtered = allScripts.filter((s) =>
+    s.title.toLowerCase().includes(search.toLowerCase()) ||
+    s.username.toLowerCase().includes(search.toLowerCase()) ||
+    s.description.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="p-6 h-full flex flex-col max-w-[1400px] mx-auto gap-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Community Scripts</h1>
+          <p className="text-muted-foreground">Browse, rate, and favorite video + funscript pairs from the community.</p>
+        </div>
+        {isPro ? (
+          <Button
+            className="gap-2"
+            onClick={() => setShowForm((v) => !v)}
+            variant={showForm ? "outline" : "default"}
+          >
+            {showForm ? <><X className="h-4 w-4" /> Cancel</> : <><Plus className="h-4 w-4" /> Share a Script</>}
+          </Button>
         ) : (
-          <div className="space-y-4 pt-1">
-            <div className="space-y-1.5">
-              <label className="text-xs text-muted-foreground font-medium">Description (optional)</label>
+          <Link href="/upgrade">
+            <Button className="gap-2">
+              <Crown className="h-4 w-4 text-amber-400" />
+              Upgrade to Share
+            </Button>
+          </Link>
+        )}
+      </div>
+
+      {showForm && isPro && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="pt-5 pb-4 space-y-4">
+            <h2 className="font-semibold text-base">Share a Script</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground font-medium">Title *</label>
+                <Input
+                  placeholder="Scene title…"
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  className="bg-background/50"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground font-medium">Video URL *</label>
+                <Input
+                  placeholder="https://…"
+                  value={form.video_url}
+                  onChange={(e) => setForm((f) => ({ ...f, video_url: e.target.value }))}
+                  className="bg-background/50"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground font-medium">Description</label>
               <Input
-                placeholder="Brief description…"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                autoFocus
+                placeholder="Optional description…"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                className="bg-background/50"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <label className="text-xs text-muted-foreground font-medium">Tags (optional)</label>
               <div className="flex items-center gap-2 flex-wrap">
                 <TagPicker
                   mode="edit"
-                  selected={tags}
-                  onChange={(next) => setTags(next)}
+                  selected={form.tags}
+                  onChange={(next) => setForm((f) => ({ ...f, tags: next }))}
                 />
                 <ActiveTagChips
-                  selected={tags}
-                  onRemove={(tag) => setTags((prev) => prev.filter((t) => t !== tag) as LibraryTag[])}
+                  selected={form.tags}
+                  onRemove={(tag) =>
+                    setForm((f) => ({ ...f, tags: f.tags.filter((t) => t !== tag) as LibraryTag[] }))
+                  }
                 />
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={onClose} disabled={saving}>Cancel</Button>
-              <Button size="sm" className="flex-1 gap-2" disabled={saving || saved} onClick={handleShare}>
-                {saved ? <><Check className="h-4 w-4" /> Shared!</>
-                  : saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Sharing…</>
-                  : <><Globe className="h-4 w-4" /> Share to Community</>
-                }
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground font-medium">Funscript File *</label>
+              <div className="relative">
+                <Button variant="outline" className="w-full relative h-10 text-sm justify-start gap-2">
+                  <Upload className="h-4 w-4 text-muted-foreground" />
+                  {scriptFile
+                    ? <span className="truncate text-foreground">{scriptFile.name}</span>
+                    : <span className="text-muted-foreground">Choose .funscript file…</span>
+                  }
+                  <input
+                    type="file"
+                    accept=".funscript,.json"
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    onChange={(e) => setScriptFile(e.target.files?.[0] ?? null)}
+                  />
+                </Button>
+              </div>
+            </div>
+            <Button
+              className="gap-2"
+              onClick={() => submitMutation.mutate()}
+              disabled={!form.title || !form.video_url || !scriptFile || submitMutation.isPending}
+            >
+              {submitMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />}
+              {submitMutation.isPending ? "Sharing…" : "Share Script"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="flex gap-3 items-center flex-wrap">
+        <Input
+          placeholder="Search by title, author, or description…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm bg-background/50 border-border/50"
+        />
+        <TagPicker
+          mode="filter"
+          selected={tagFilter}
+          onChange={(next) => applyTagFilter(next)}
+        />
+        <ActiveTagChips
+          selected={tagFilter}
+          onRemove={(tag) =>
+            applyTagFilter(tagFilter.filter((t) => t !== tag) as LibraryTag[])
+          }
+        />
+        {!isInitialLoading && (
+          <span className="text-sm text-muted-foreground">
+            {search
+              ? `${filtered.length} match${filtered.length !== 1 ? "es" : ""} in ${allScripts.length} loaded`
+              : `Showing ${allScripts.length} of ${total} script${total !== 1 ? "s" : ""}`}
+          </span>
+        )}
+      </div>
+
+      {isInitialLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-56 rounded-xl border border-border/50 bg-card/30 animate-pulse" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center text-muted-foreground gap-3 py-20">
+          <Globe className="h-12 w-12 opacity-30" />
+          {tagFilter.length > 0 ? (
+            <>
+              <p className="text-lg font-medium text-foreground">
+                No entries match these tags.
+              </p>
+              <p className="max-w-xs text-sm">Remove a filter to broaden the search.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => applyTagFilter([])}
+                data-testid="button-clear-tag-filter"
+              >
+                Clear tag filters
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-medium text-foreground">
+                {search ? "No scripts match your search" : "No scripts yet"}
+              </p>
+              <p className="max-w-xs text-sm">
+                {search
+                  ? "Try different keywords, or clear the search to see all loaded scripts."
+                  : isPro
+                  ? "Be the first to share a video + funscript pair with the community."
+                  : "Upgrade to Pro to share scripts with the community."}
+              </p>
+              {!search && isPro && (
+                <Button className="mt-2 gap-2" onClick={() => setShowForm(true)}>
+                  <Plus className="h-4 w-4" /> Share the First Script
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((s) => {
+              const isOwner = user?.id === s.user_id;
+              return (
+                <Card key={s.id} className="relative border-border/50 bg-card/50 hover:border-primary/30 transition-colors flex flex-col card-gradient-shimmer">
+                  <CardContent className="pt-5 pb-4 flex flex-col flex-1 gap-3">
+                    <div className="flex items-start gap-2">
+                      <VideoIcon url={s.video_url} />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground leading-tight truncate" title={s.title}>
+                          {s.title}
+                        </h3>
+                        {s.description && (
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{s.description}</p>
+                        )}
+                      </div>
+                      {isOwner && (
+                        <button
+                          onClick={() => handleDelete(s)}
+                          className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                          title="Delete your shared script"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <EggplantButton
+                        favorited={s.user_favorited}
+                        count={s.favorite_count}
+                        onClick={() => handleFavorite(s)}
+                        loading={favoriteLoadingId === s.id}
+                      />
+                      <BananaRating
+                        avgRating={s.avg_rating}
+                        userRating={s.user_rating}
+                        ratingCount={s.rating_count}
+                        onRate={(r) => handleRate(s, r)}
+                        disabled={rateLoadingId === s.id}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-auto flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <User className="h-3 w-3" />{s.username}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />{timeAgo(s.created_at)}
+                      </span>
+                      <span className="flex items-center gap-1 ml-auto">
+                        <Eye className="h-3 w-3" />{s.view_count}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <CardTagChips tags={s.tags} onTagClick={addTagToFilter} />
+                      {isOwner && (
+                        <TagPicker
+                          mode="edit"
+                          selected={s.tags ?? []}
+                          onChange={(next) => handleEditTags(s, next)}
+                          buttonLabel={editingTagsId === s.id ? "Saving…" : "Edit tags"}
+                        />
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline-primary"
+                        className="flex-1 text-xs h-8 gap-1.5"
+                        onClick={() => handleDownload(s)}
+                      >
+                        <Download className="h-3.5 w-3.5" /> Download .{scriptOutputFiletype === "csv" ? "csv" : "funscript"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 text-xs h-8 gap-1.5"
+                        onClick={() => handleUseInPlayer(s)}
+                      >
+                        <Play className="h-3.5 w-3.5" /> Use in Player
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {hasMore && !search && (
+            <div className="flex flex-col items-center gap-2 py-4">
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={loadMore}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : <ChevronDown className="h-4 w-4" />}
+                {isLoadingMore ? "Loading…" : `Load more (${total - nextOffset} remaining)`}
               </Button>
             </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+          )}
+        </>
+      )}
+    </div>
   );
 }
-
-interface ScriptsDialogProps {
-  entry: LibraryEntry | null;
-  onClose: () => void;
-  authHeaders: () => Promise<Record<string, string>>;
-}
-
-function ScriptsManagerDialog({ entry, onClose, authHeaders }: ScriptsDialogProps) {
-  const qc = useQueryClient();
-  const { toast } = useToast();
-  const { reportAction, upgradeAndReportAction } = useBlockedReport();
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editingName, setEditingName] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [addMode, setAddMode] = useState<"file" | "library">("file");
-  const [newName, setNewName] = useState("");
-  const [copySourceLibraryId, setCopySourceLibraryId] = useState<string>("");
-  const [copySourceScriptId, setCopySourceScriptId] = useState<string>("");
-
-  // For "Copy from another media" mode: list user's other library entries.
-  const { data: otherEntries = [] } = useQuery<LibraryEntry[]>({
-    queryKey: ["my-library"],
-    enabled: !!entry && adding && addMode === "library",
-    queryFn: async () => {
-      const headers = await authHeaders();
-      const res = await fetch(`${API}/api/library`, { headers });
-      if (!res.ok) throw new Error("Failed to load library");
-      return res.json();
-    },
-  });
-
-  // Scripts attached to the chosen source media (for copy mode).
-  const sourceLibraryIdNum = copySourceLibraryId ? Number(copySourceLibraryId) : null;
-  const { data: sourceFunscripts } = useQuery<FunscriptListResponse>({
-    queryKey: ["media-funscripts", sourceLibraryIdNum],
-    enabled: !!sourceLibraryIdNum,
-    queryFn: async () => {
-      const headers = await authHeaders();
-      const res = await fetch(`${API}/api/library/${sourceLibraryIdNum}/funscripts`, { headers });
-      if (!res.ok) throw new Error("Failed to load source scripts");
-      return res.json();
-    },
-  });
-
-  const queryKey = ["media-funscripts", entry?.id];
-
-  const { data, isLoading } = useQuery<FunscriptListResponse>({
-    queryKey,
-    enabled: !!entry,
-    queryFn: async () => {
-      if (!entry) throw new Error("no entry");
-      const headers = await authHeaders();
-      const res = await fetch(`${API}/api/library/${entry.id}/funscripts`, { headers });
-      if (!res.ok) throw new Error("Failed to load funscripts");
-      return res.json();
-    },
-  });
-
-  const cap = data?.cap ?? 1;
-  const plan = data?.plan ?? "free";
-  const scripts = data?.funscripts ?? [];
-  const atCap = scripts.length >= cap;
-  const isSubscriber = plan !== "free";
-
-  const renameMutation = useMutation({
-    mutationFn: async (vars: { id: number; name: string }) => {
-      if (!entry) throw new Error("no entry");
-      const headers = await authHeaders();
-      const res = await fetch(`${API}/api/library/${entry.id}/funscripts/${vars.id}`, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify({ name: vars.name }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(d.error ?? "Rename failed");
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey });
-      qc.invalidateQueries({ queryKey: ["my-library"] });
-      setEditingId(null);
-    },
-    onError: (err) => toast({
-      title: "Could not rename",
-      description: err instanceof Error ? err.message : "Unknown error",
-      variant: "destructive",
-    }),
-  });
-
-  const setActiveMutation = useMutation({
-    mutationFn: async (id: number) => {
-      if (!entry) throw new Error("no entry");
-      const headers = await authHeaders();
-      const res = await fetch(`${API}/api/library/${entry.id}/funscripts/${id}`, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify({ set_active: true }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(d.error ?? "Failed to set active");
-      }
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey }),
-    onError: (err) => toast({
-      title: "Could not set active",
-      description: err instanceof Error ? err.message : "Unknown error",
-      variant: "destructive",
-    }),
-  });
-
-  const replaceMutation = useMutation({
-    mutationFn: async (vars: { id: number; funscriptStr: string }) => {
-      if (!entry) throw new Error("no entry");
-      const headers = await authHeaders();
-      const res = await fetch(`${API}/api/library/${entry.id}/funscripts/${vars.id}`, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify({ funscript_json: vars.funscriptStr }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(d.error ?? "Replace failed");
-      }
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey }),
-    onError: (err) => toast({
-      title: "Could not replace script",
-      description: err instanceof Error ? err.message : "Unknown error",
-      variant: "destructive",
-    }),
-  });
-
-  async function handleReplaceFile(id: number, file: File) {
-    try {
-      const parsed = await validateAndParseFunscriptFile(file);
-      replaceMutation.mutate({ id, funscriptStr: JSON.stringify(parsed) });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Could not parse funscript.";
-      toast({
-        title: `Invalid funscript: ${file.name}`,
-        description: msg,
-        variant: "destructive",
-        action: reportAction({
-          kind: "library_file",
-          item: file.name,
-          blockMessage: msg,
-        }),
-      });
-    }
-  }
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      if (!entry) throw new Error("no entry");
-      const headers = await authHeaders();
-      const res = await fetch(`${API}/api/library/${entry.id}/funscripts/${id}`, {
-        method: "DELETE",
-        headers,
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(d.error ?? "Delete failed");
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey });
-      qc.invalidateQueries({ queryKey: ["my-library"] });
-    },
-    onError: (err) => toast({
-      title: "Could not delete",
-      description: err instanceof Error ? err.message : "Unknown error",
-      variant: "destructive",
-    }),
-  });
-
-  const addMutation = useMutation({
-    mutationFn: async (vars: { name: string; funscriptStr: string; setActive: boolean }) => {
-      if (!entry) throw new Error("no entry");
-      const headers = await authHeaders();
-      const res = await fetch(`${API}/api/library/${entry.id}/funscripts`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          name: vars.name,
-          funscript_json: vars.funscriptStr,
-          set_active: vars.setActive,
-        }),
-      });
-      const body = await res.json().catch(() => ({})) as { error?: string; code?: string };
-      if (!res.ok) {
-        const err = new Error(body.error ?? "Add failed");
-        (err as Error & { code?: string }).code = body.code;
-        throw err;
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey });
-      qc.invalidateQueries({ queryKey: ["my-library"] });
-      setAdding(false);
-      setNewName("");
-      setCopySourceLibraryId("");
-      setCopySourceScriptId("");
-    },
-    onError: (err) => {
-      const e = err as Error & { code?: string };
-      const isCap = e.code === "CAP_REACHED";
-      // Only show the Upgrade CTA when upgrading would actually raise the
-      // cap — i.e. for free-tier users. Subscribers/pro/admin already at
-      // 5/5 just get the standard report action.
-      const showUpgrade = isCap && !isSubscriber;
-      toast({
-        title: isCap ? "Script cap reached" : "Could not add script",
-        description: e.message,
-        variant: "destructive",
-        action: showUpgrade
-          ? upgradeAndReportAction({
-              kind: "library_file",
-              item: entry?.title ?? "",
-              blockMessage: e.message,
-            })
-          : reportAction({
-              kind: "library_file",
-              item: entry?.title ?? "",
-              blockMessage: e.message,
-            }),
-      });
-    },
-  });
-
-  async function handleCopyFromLibrary() {
-    if (!copySourceLibraryId || !copySourceScriptId || !newName.trim()) return;
-    try {
-      const headers = await authHeaders();
-      const res = await fetch(
-        `${API}/api/library/${copySourceLibraryId}/funscripts/${copySourceScriptId}`,
-        { headers },
-      );
-      if (!res.ok) throw new Error("Failed to load source script");
-      const body = await res.json() as { funscript_json: string };
-      addMutation.mutate({
-        name: newName.trim(),
-        funscriptStr: body.funscript_json,
-        setActive: scripts.length === 0,
-      });
-    } catch (err) {
-      toast({
-        title: "Could not copy script",
-        description: err instanceof Error ? err.message : "Unknown error",
-        variant: "destructive",
-      });
-    }
-  }
-
-  async function handleAddFile(file: File, name: string) {
-    try {
-      const parsed = await validateAndParseFunscriptFile(file);
-      // Default new script to active if there are no scripts yet, else preserve current active
-      const setActive = scripts.length === 0;
-      addMutation.mutate({
-        name,
-        funscriptStr: JSON.stringify(parsed),
-        setActive,
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Could not parse funscript.";
-      toast({
-        title: `Invalid funscript: ${file.name}`,
-        description: msg,
-        variant: "destructive",
-        action: reportAction({
-          kind: "library_file",
-          item: file.name,
-          blockMessage: msg,
-        }),
-      });
-    }
-  }
-
-  if (!entry) return null;
-
-  return (
-    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileJson className="h-5 w-5 text-primary" />
-            Funscripts for "{entry.title}"
-          </DialogTitle>
-          <DialogDescription>
-            {isSubscriber
-              ? `Subscribers can attach up to ${cap} scripts per media item.`
-              : `Free tier supports ${cap} script per media. Upgrade for up to 5.`}
-          </DialogDescription>
-        </DialogHeader>
-
-        {isLoading ? (
-          <div className="py-10 flex justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {scripts.length === 0 && (
-              <div className="text-sm text-muted-foreground italic px-3 py-6 text-center border border-dashed border-border/50 rounded-md">
-                No scripts attached yet.
-              </div>
-            )}
-            {scripts.map((s) => (
-              <div
-                key={s.id}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md border ${
-                  s.is_active ? "border-primary/40 bg-primary/5" : "border-border/40 bg-card/40"
-                }`}
-              >
-                <button
-                  onClick={() => !s.is_active && setActiveMutation.mutate(s.id)}
-                  disabled={s.is_active || setActiveMutation.isPending}
-                  className={`flex-shrink-0 ${s.is_active ? "text-primary" : "text-muted-foreground hover:text-primary"}`}
-                  title={s.is_active ? "Active script" : "Set as active"}
-                  data-testid={`button-set-active-${s.id}`}
-                >
-                  <Star className={`h-4 w-4 ${s.is_active ? "fill-primary" : ""}`} />
-                </button>
-
-                {editingId === s.id ? (
-                  <div className="flex-1 flex items-center gap-2">
-                    <Input
-                      value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
-                      className="h-7 text-sm"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && editingName.trim()) {
-                          renameMutation.mutate({ id: s.id, name: editingName.trim() });
-                        } else if (e.key === "Escape") {
-                          setEditingId(null);
-                        }
-                      }}
-                    />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 px-2"
-                      disabled={!editingName.trim() || renameMutation.isPending}
-                      onClick={() => renameMutation.mutate({ id: s.id, name: editingName.trim() })}
-                    >
-                      <Check className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 px-2"
-                      onClick={() => setEditingId(null)}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{s.name}</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {s.is_active && <span className="text-primary mr-2">Active</span>}
-                        {timeAgo(s.updated_at)}
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                      onClick={() => { setEditingId(s.id); setEditingName(s.name); }}
-                      data-testid={`button-rename-script-${s.id}`}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      asChild
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground cursor-pointer"
-                      title="Replace file"
-                      disabled={replaceMutation.isPending}
-                    >
-                      <label>
-                        {replaceMutation.isPending && replaceMutation.variables?.id === s.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Upload className="h-3.5 w-3.5" />
-                        )}
-                        <input
-                          type="file"
-                          accept=".funscript,.json,application/json"
-                          className="hidden"
-                          disabled={replaceMutation.isPending}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            e.target.value = "";
-                            if (file) handleReplaceFile(s.id, file);
-                          }}
-                          data-testid={`input-replace-script-${s.id}`}
-                        />
-                      </label>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      disabled={deleteMutation.isPending || scripts.length <= 1}
-                      title={scripts.length <= 1 ? "Can't delete the only script" : "Delete script"}
-                      onClick={() => {
-                        if (window.confirm(`Delete "${s.name}"?`)) {
-                          deleteMutation.mutate(s.id);
-                        }
-                      }}
-                      data-testid={`button-delete-script-${s.id}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            ))}
-
-            {atCap && !adding && (
-              <div className="text-xs text-muted-foreground bg-muted/40 border border-border/40 rounded-md px-3 py-2 flex items-center gap-2">
-                <Crown className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
-                {isSubscriber
-                  ? `You've reached the ${cap}-script limit for this media (${scripts.length}/${cap}).`
-                  : (
-                    <span>
-                      Free tier limit reached ({scripts.length}/{cap}).{" "}
-                      <Link href="/upgrade" className="text-primary hover:underline">
-                        Upgrade
-                      </Link>{" "}
-                      for up to 5 scripts per media.
-                    </span>
-                  )
-                }
-              </div>
-            )}
-
-            {adding ? (
-              <div className="border border-primary/30 bg-primary/5 rounded-md p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Add new script
-                  </div>
-                  <div className="flex rounded-md border border-border/60 overflow-hidden text-[11px]">
-                    <button
-                      type="button"
-                      className={`px-2 py-1 ${addMode === "file" ? "bg-primary/20 text-primary" : "bg-background/40 text-muted-foreground hover:text-foreground"}`}
-                      onClick={() => setAddMode("file")}
-                      data-testid="button-add-mode-file"
-                    >
-                      From file
-                    </button>
-                    <button
-                      type="button"
-                      className={`px-2 py-1 border-l border-border/60 ${addMode === "library" ? "bg-primary/20 text-primary" : "bg-background/40 text-muted-foreground hover:text-foreground"}`}
-                      onClick={() => setAddMode("library")}
-                      data-testid="button-add-mode-library"
-                    >
-                      From library
-                    </button>
-                  </div>
-                </div>
-
-                <Input
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Script name (e.g. Soft, Hardcore, Remix)"
-                  autoFocus
-                  className="h-8 text-sm"
-                  data-testid="input-new-script-name"
-                />
-
-                {addMode === "file" ? (
-                  <div className="flex gap-2">
-                    <Button
-                      asChild
-                      size="sm"
-                      className="flex-1 h-8 text-xs gap-1.5 cursor-pointer"
-                      disabled={!newName.trim() || addMutation.isPending}
-                    >
-                      <label>
-                        {addMutation.isPending ? (
-                          <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
-                        ) : (
-                          <><Upload className="h-3.5 w-3.5" /> Choose .funscript file</>
-                        )}
-                        <input
-                          type="file"
-                          accept=".funscript,.json,application/json"
-                          className="hidden"
-                          disabled={!newName.trim() || addMutation.isPending}
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            e.target.value = "";
-                            if (file && newName.trim()) handleAddFile(file, newName.trim());
-                          }}
-                          data-testid="input-new-script-file"
-                        />
-                      </label>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 text-xs"
-                      onClick={() => { setAdding(false); setNewName(""); }}
-                      disabled={addMutation.isPending}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <select
-                      value={copySourceLibraryId}
-                      onChange={(e) => {
-                        setCopySourceLibraryId(e.target.value);
-                        setCopySourceScriptId("");
-                      }}
-                      className="w-full h-8 text-xs rounded-md border border-input bg-background px-2"
-                      data-testid="select-copy-source-library"
-                    >
-                      <option value="">Pick a media item…</option>
-                      {otherEntries
-                        .filter((e) => e.id !== entry.id)
-                        .map((e) => (
-                          <option key={e.id} value={e.id}>{e.title}</option>
-                        ))}
-                    </select>
-                    {copySourceLibraryId && (
-                      <select
-                        value={copySourceScriptId}
-                        onChange={(e) => setCopySourceScriptId(e.target.value)}
-                        className="w-full h-8 text-xs rounded-md border border-input bg-background px-2"
-                        data-testid="select-copy-source-script"
-                      >

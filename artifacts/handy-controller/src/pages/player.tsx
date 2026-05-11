@@ -173,7 +173,9 @@ export default function Player() {
   // ── Resolve a page URL to a direct CDN URL via yt-dlp on the backend ────────
   // Declared here (before loadLibraryEntry) so it is initialized before the
   // useCallback dependency array that references it is evaluated.
-  const resolvePageUrl = useCallback(async (pageUrl: string): Promise<string | null> => {
+  // When `silent` is true, errors are returned as null without showing a toast
+  // (used when we intend to fall back gracefully to iframe mode).
+  const resolvePageUrl = useCallback(async (pageUrl: string, silent = false): Promise<string | null> => {
     try {
       const token = await getToken();
       const headers: Record<string, string> = {};
@@ -184,11 +186,13 @@ export default function Player() {
       );
       const data = await res.json() as { token?: string; cdnUrl?: string; isHls?: boolean; error?: string };
       if (!res.ok || !data.cdnUrl) {
-        toast({
-          title: "Couldn't resolve video URL",
-          description: data.error ?? "Paste a direct .mp4 link or load a file instead.",
-          variant: "destructive",
-        });
+        if (!silent) {
+          toast({
+            title: "Couldn't resolve video URL",
+            description: data.error ?? "Paste a direct .mp4 link or load a file instead.",
+            variant: "destructive",
+          });
+        }
         return null;
       }
       if (data.isHls && data.token) {
@@ -196,14 +200,14 @@ export default function Player() {
       }
       return data.cdnUrl;
     } catch {
-      toast({ title: "Network error resolving video URL", variant: "destructive" });
+      if (!silent) toast({ title: "Network error resolving video URL", variant: "destructive" });
       return null;
     }
   }, [getToken, toast]);
 
   // ── Load a LibraryEntry in-memory (for queue navigation) ──────────────────
-  // Mirrors the single-item pendingVideoUrl flow: blob/file refs use as-is,
-  // known embed platforms are rewritten, unknown page URLs go through yt-dlp.
+  // Tries yt-dlp first for ALL http URLs so that generators and script sync
+  // get a real <video> element.  Falls back to iframe only when yt-dlp fails.
   const loadLibraryEntry = useCallback(async (entry: LibraryEntry) => {
     if (entry.url) {
       const raw = entry.url;
@@ -231,24 +235,25 @@ export default function Player() {
         return;
       }
 
-      if (detected.embedUrl !== raw) {
-        // Known embed platform — rewritten URL (YouTube, Pornhub, etc.)
-        setEmbedUrl(detected.embedUrl);
-        setVideoUrl(null);
-        setVideoMode("embed");
-        setVideoLabel(entry.name);
-        setVideoLabelIsFile(false);
-        return;
-      }
-
-      // Unknown page URL — resolve via yt-dlp for direct playback
+      // For all page URLs (known platforms + unknown) — try yt-dlp first so
+      // we get a real <video> element that supports script sync and generators.
       setUrlResolving(true);
-      const cdnUrl = await resolvePageUrl(raw);
+      const cdnUrl = await resolvePageUrl(raw, /* silent */ true);
       setUrlResolving(false);
       if (cdnUrl) {
         setVideoUrl(cdnUrl);
         setEmbedUrl(null);
         setVideoMode("url");
+        setVideoLabel(entry.name);
+        setVideoLabelIsFile(false);
+        return;
+      }
+
+      // yt-dlp failed — fall back to iframe if the URL maps to a known platform
+      if (detected.embedUrl !== raw) {
+        setEmbedUrl(detected.embedUrl);
+        setVideoUrl(null);
+        setVideoMode("embed");
         setVideoLabel(entry.name);
         setVideoLabelIsFile(false);
       }
@@ -360,7 +365,7 @@ export default function Player() {
     if (!detected) return; // malformed URL
 
     if (detected.mode === "url") {
-      // Direct video file
+      // Direct video file — use as-is
       setVideoUrl(detected.embedUrl);
       setEmbedUrl(null);
       setVideoMode("url");
@@ -369,25 +374,25 @@ export default function Player() {
       return;
     }
 
-    if (detected.embedUrl !== pendingVideoUrl) {
-      // Known embed platform — rewritten to embed URL
-      setEmbedUrl(detected.embedUrl);
-      setVideoUrl(null);
-      setVideoMode("embed");
-      setVideoLabel(pendingVideoUrl);
-      setVideoLabelIsFile(false);
-      return;
-    }
-
-    // Unknown page URL — resolve via yt-dlp for direct playback (async)
+    // For all page URLs (known platforms + unknown) — try yt-dlp first so
+    // we get a real <video> element that supports script sync and generators.
     void (async () => {
       setUrlResolving(true);
-      const cdnUrl = await resolvePageUrl(pendingVideoUrl);
+      const cdnUrl = await resolvePageUrl(pendingVideoUrl, /* silent */ true);
       setUrlResolving(false);
       if (cdnUrl) {
         setVideoUrl(cdnUrl);
         setEmbedUrl(null);
         setVideoMode("url");
+        setVideoLabel(pendingVideoUrl);
+        setVideoLabelIsFile(false);
+        return;
+      }
+      // yt-dlp failed — fall back to iframe for known embed platforms
+      if (detected.embedUrl !== pendingVideoUrl) {
+        setEmbedUrl(detected.embedUrl);
+        setVideoUrl(null);
+        setVideoMode("embed");
         setVideoLabel(pendingVideoUrl);
         setVideoLabelIsFile(false);
       }
@@ -572,6 +577,7 @@ export default function Player() {
     if (!detected) return;
 
     if (detected.mode === "url") {
+      // Direct video file — use immediately
       setVideoUrl(detected.embedUrl);
       setEmbedUrl(null);
       setVideoMode("url");
@@ -580,17 +586,10 @@ export default function Player() {
       return;
     }
 
-    if (detected.embedUrl !== raw) {
-      setEmbedUrl(detected.embedUrl);
-      setVideoUrl(null);
-      setVideoMode("embed");
-      setVideoLabel(raw);
-      setVideoLabelIsFile(false);
-      return;
-    }
-
+    // For all page URLs (known platforms + unknown) — try yt-dlp first so
+    // we get a real <video> element that supports script sync and generators.
     setUrlResolving(true);
-    const cdnUrl = await resolvePageUrl(raw);
+    const cdnUrl = await resolvePageUrl(raw, /* silent */ true);
     setUrlResolving(false);
     if (cdnUrl) {
       setVideoUrl(cdnUrl);
@@ -598,7 +597,29 @@ export default function Player() {
       setVideoMode("url");
       setVideoLabel(raw);
       setVideoLabelIsFile(false);
+      return;
     }
+
+    // yt-dlp failed — fall back to iframe if it's a known embed platform
+    if (detected.embedUrl !== raw) {
+      setEmbedUrl(detected.embedUrl);
+      setVideoUrl(null);
+      setVideoMode("embed");
+      setVideoLabel(raw);
+      setVideoLabelIsFile(false);
+      toast({
+        title: "Playing in embedded mode",
+        description: "Script sync isn't available for embedded videos. Download the video file and load it locally for full sync.",
+      });
+      return;
+    }
+
+    // Unknown URL — yt-dlp failed and no embed fallback; show error
+    toast({
+      title: "Couldn't load video",
+      description: "This site blocked direct resolution. Try a direct .mp4 link, or download the video and load it as a file.",
+      variant: "destructive",
+    });
   };
 
   const { reportAction } = useBlockedReport();
@@ -739,7 +760,9 @@ export default function Player() {
                   onChange={e => setUrlInput(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleUrlLoad()}
                 />
-                <Button size="sm" className="h-9 px-4" onClick={handleUrlLoad}>Load</Button>
+                <Button size="sm" className="h-9 px-4 gap-1.5" onClick={handleUrlLoad} disabled={urlResolving}>
+                  {urlResolving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Resolving…</> : "Load"}
+                </Button>
               </>
             ) : (
               <Button className="h-9 relative px-4 text-sm">
@@ -791,15 +814,27 @@ export default function Player() {
 
                 </div>
               ) : embedUrl ? (
-                <div className="flex-1 min-h-0 relative">
+                <div className="flex-1 min-h-0 relative flex flex-col">
+                  <div className="bg-amber-950/60 border-b border-amber-700/40 px-4 py-2 flex items-center gap-2 text-xs text-amber-300 shrink-0">
+                    <WifiOff className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      <strong>Embedded mode</strong> — script sync and generators won&apos;t work.
+                      For full sync, download the video and load it as a local file.
+                    </span>
+                  </div>
                   <iframe
                     src={embedUrl}
-                    className="w-full h-full border-0"
+                    className="flex-1 border-0"
                     allowFullScreen
                     allow="autoplay; fullscreen; picture-in-picture"
                     title="Embedded video"
                     sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
                   />
+                </div>
+              ) : urlResolving ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center gap-3">
+                  <Loader2 className="h-10 w-10 animate-spin opacity-60" />
+                  <p className="text-sm">Resolving video URL…</p>
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">

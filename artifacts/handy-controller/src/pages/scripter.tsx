@@ -1687,7 +1687,8 @@ export default function Scripter() {
       );
       const data = await res.json() as { token?: string; title?: string; isHls?: boolean; cdnUrl?: string; error?: string };
       if (!res.ok || !data.token) {
-        setUrlError(data.error ?? "Could not resolve that URL. Try a direct .mp4 link, load a file, or paste the site's embed code.");
+        const fallback = "Could not resolve that URL. Most streaming sites block server-side resolution — download the video and load it as a file for best results.";
+        setUrlError(data.error ?? fallback);
         return;
       }
       // For HLS, route through our manifest proxy so segment requests stay
