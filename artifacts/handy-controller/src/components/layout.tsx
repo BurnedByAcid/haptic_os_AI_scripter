@@ -3,7 +3,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { useHandy } from "@/hooks/use-handy";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useRetryQueue } from "@/hooks/use-retry-queue";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Pencil, ShieldCheck, Settings, Check, WifiOff, Sparkles, type LucideIcon } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Settings, Check, WifiOff, Sparkles, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useUser, useClerk, useAuth, Show } from "@clerk/react";
 import { HapticAIConsentDialog } from "@/components/haptic-ai-consent-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { useProfile } from "@/hooks/use-profile";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { PlanBadge } from "@/components/plan-badge";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -137,6 +138,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { signOut, openSignIn } = useClerk();
   const [collapsed, setCollapsed] = useState(false);
   const { isAdmin, isPro, plan } = useSubscription();
+  const { username: dbUsername } = useProfile();
   const appSettings = useAppSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -288,43 +290,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     setKeyError(null);
   };
 
-  // ─── Privacy handle ───────────────────────────────────────────────────────
-  // Stored per user in localStorage. null = never asked; "" = skipped; "x" = chosen.
-  const handleStorageKey = user?.id ? `hc_handle_${user.id}` : null;
-  const [handle, setHandle] = useState<string>(() => {
-    if (!user?.id) return "";
-    return localStorage.getItem(`hc_handle_${user.id}`) ?? "";
-  });
-  const [handleDialogOpen, setHandleDialogOpen] = useState(false);
-  const [handleInput, setHandleInput] = useState("");
-
-  // Open the dialog the first time a user signs in (localStorage key doesn't exist yet)
-  useEffect(() => {
-    if (!user?.id) return;
-    const stored = localStorage.getItem(`hc_handle_${user.id}`);
-    if (stored === null) {
-      // First time we've seen this user — prompt them
-      setHandleInput("");
-      setHandleDialogOpen(true);
-    } else {
-      setHandle(stored);
-    }
-  }, [user?.id]);
-
-  const saveHandle = useCallback(() => {
-    const trimmed = handleInput.trim();
-    if (handleStorageKey) localStorage.setItem(handleStorageKey, trimmed);
-    setHandle(trimmed);
-    setHandleDialogOpen(false);
-    if (trimmed) toast({ title: "Handle saved", description: `You'll appear as "${trimmed}"` });
-  }, [handleInput, handleStorageKey, toast]);
-
-  const skipHandle = useCallback(() => {
-    if (handleStorageKey) localStorage.setItem(handleStorageKey, "");
-    setHandle("");
-    setHandleDialogOpen(false);
-  }, [handleStorageKey]);
-
   const handleFeedbackSubmit = async () => {
     if (!feedbackText.trim()) return;
     setFeedbackSubmitting(true);
@@ -358,9 +323,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Display name shown in the sidebar
-  const displayName = handle || user?.fullName || user?.primaryEmailAddress?.emailAddress || "Account";
-  const displaySub  = handle ? "private handle" : (user?.primaryEmailAddress?.emailAddress ?? "");
+  // Display name — always uses the permanent DB username chosen at registration
+  const displayName = dbUsername ?? user?.primaryEmailAddress?.emailAddress ?? "Account";
+  const displaySub  = user?.primaryEmailAddress?.emailAddress ?? "";
 
   const handleSaveKey = () => {
     const trimmed = inputKey.trim();
@@ -813,13 +778,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
                 <PlanBadge collapsed />
-                <button
-                  onClick={() => { setHandleInput(handle); setHandleDialogOpen(true); }}
-                  className="h-5 w-5 flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                  title="Change handle"
-                >
-                  <Pencil className="h-3 w-3" />
-                </button>
               </div>
             ) : (
               <div className="flex items-center gap-2 px-1 py-1 rounded-md">
@@ -837,15 +795,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </div>
                   <p className="text-[10px] text-muted-foreground truncate">{displaySub}</p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-muted-foreground/50 hover:text-muted-foreground flex-shrink-0"
-                  onClick={() => { setHandleInput(handle); setHandleDialogOpen(true); }}
-                  title="Change privacy handle"
-                >
-                  <Pencil className="h-3 w-3" />
-                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -1088,49 +1037,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
               data-testid="button-submit-feedback"
             >
               {feedbackSubmitting ? "Sending…" : "Send"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Privacy handle dialog — shown once on first sign-in */}
-      <Dialog open={handleDialogOpen} onOpenChange={setHandleDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-primary" />
-              Keep your identity private
-            </DialogTitle>
-            <DialogDescription className="text-sm leading-relaxed">
-              Your real name and email are never shown to other users. You can
-              choose a handle — a nickname that appears in your place — or skip
-              to use the app without one.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 py-2">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Preferred handle (optional)
-            </label>
-            <Input
-              placeholder="e.g. NightOwl, CoolUser99…"
-              value={handleInput}
-              onChange={e => setHandleInput(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") saveHandle(); }}
-              autoFocus
-              maxLength={32}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              You can change this any time via the pencil icon in the sidebar.
-            </p>
-          </div>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="ghost" onClick={skipHandle} className="sm:order-first">
-              Skip for now
-            </Button>
-            <Button onClick={saveHandle} disabled={!handleInput.trim()}>
-              Save handle
             </Button>
           </DialogFooter>
         </DialogContent>

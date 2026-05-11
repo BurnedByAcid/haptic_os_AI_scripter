@@ -41,6 +41,33 @@ router.get("/users/check-username", async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/users/me
+ * Returns the signed-in user's profile from the DB: { username, plan }.
+ * Returns 404 if the user has not yet completed onboarding.
+ */
+router.get("/users/me", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    res.status(401).json({ error: "Not authenticated." });
+    return;
+  }
+  try {
+    const { rows } = await pool.query<{ username: string; plan: string }>(
+      `SELECT username, plan FROM users WHERE clerk_id = $1 LIMIT 1`,
+      [auth.userId],
+    );
+    if (rows.length === 0) {
+      res.status(404).json({ error: "User not found. Complete onboarding first." });
+      return;
+    }
+    res.json({ username: rows[0].username, plan: rows[0].plan });
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch user profile");
+    res.status(500).json({ error: "Failed to fetch profile." });
+  }
+});
+
+/**
  * POST /api/users/onboard
  * Body: { username: string }
  * Requires a valid Clerk session.
