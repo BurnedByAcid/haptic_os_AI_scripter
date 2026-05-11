@@ -61,6 +61,11 @@ if _has_flask_cors:
     _CORS(app, origins=_allowed_origins,
           allow_headers=["Content-Type", "Authorization", "X-HapticAI-Token"],
           expose_headers=["Content-Disposition"])
+
+    @app.after_request
+    def _add_private_network_header(response):
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
 else:
     @app.after_request
     def _add_cors_headers(response):
@@ -69,6 +74,7 @@ else:
             response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-HapticAI-Token"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
         return response
 
     @app.route("/status", methods=["OPTIONS"])
@@ -81,6 +87,7 @@ else:
             r.headers["Access-Control-Allow-Origin"] = origin
         r.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-HapticAI-Token"
         r.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        r.headers["Access-Control-Allow-Private-Network"] = "true"
         return r
 
 logging.basicConfig(level=logging.INFO)

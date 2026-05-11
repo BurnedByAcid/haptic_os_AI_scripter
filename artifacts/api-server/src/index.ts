@@ -117,10 +117,39 @@ async function migrateHapticAiWarnDismissed(): Promise<void> {
   }
 }
 
+/**
+ * Idempotent migration: create hapticai_releases table if it does not exist.
+ * This table tracks HapticAI binary releases uploaded to object storage.
+ * Safe to run on every boot — CREATE TABLE IF NOT EXISTS is a no-op when
+ * the table already exists.
+ */
+async function migrateHapticAiReleases(): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS hapticai_releases (
+        id          SERIAL PRIMARY KEY,
+        platform    TEXT        NOT NULL,
+        version     TEXT        NOT NULL,
+        size_bytes  BIGINT      NOT NULL,
+        storage_key TEXT        NOT NULL,
+        uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS hapticai_releases_platform_idx
+        ON hapticai_releases (platform, uploaded_at DESC)
+    `);
+  } catch (err) {
+    logger.warn({ err }, "Could not create hapticai_releases table — continuing");
+  }
+}
+
 await initStripe();
 await migrateLegacyFunscripts();
 await migrateCommunityUniqueConstraint();
 await migrateHapticAiWarnDismissed();
+await migrateHapticAiReleases();
 
 app.listen(port, (err) => {
   if (err) {
