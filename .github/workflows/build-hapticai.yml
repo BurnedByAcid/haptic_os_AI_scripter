@@ -10,6 +10,11 @@
 #  4. Save
 #
 #  USAGE:
+#  Option A — push a release tag:
+#    git tag v0.2.0 && git push origin v0.2.0
+#    The build starts automatically; the version is taken from the tag name.
+#
+#  Option B — manual trigger (fallback):
 #  1. Go to Actions → "Build HapticAI Windows" → Run workflow
 #  2. Enter a version string, e.g.  v0.1.0
 #  3. Click "Run workflow" — the .exe will build and upload automatically
@@ -19,6 +24,9 @@
 name: Build HapticAI Windows
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -80,7 +88,7 @@ jobs:
       - name: Upload to HapticOS
         env:
           HAPTICAI_ADMIN_TOKEN: ${{ secrets.HAPTICAI_ADMIN_TOKEN }}
-          VERSION: ${{ inputs.version }}
+          VERSION: ${{ inputs.version || github.ref_name }}
         run: |
           $response = curl.exe -s -o response.txt -w "%{http_code}" `
             -X POST https://hapticos.replit.app/api/hapticai/upload `
@@ -102,6 +110,6 @@ jobs:
       - name: Save .exe as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HapticAI-Setup-${{ inputs.version }}
+          name: HapticAI-Setup-${{ inputs.version || github.ref_name }}
           path: artifacts/hapticai-server/dist/HapticAI-Setup.exe
           retention-days: 30
