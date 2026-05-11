@@ -161,7 +161,13 @@ function DownloadLink({ os, release, state }: {
   const { getToken } = useAuth();
   const [progress, setProgress] = useState<number | null>(null);
   const [receivedBytes, setReceivedBytes] = useState(0);
+  const [downloadSpeed, setDownloadSpeed] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const speedRef = useRef<{ lastTime: number; lastBytes: number; smoothed: number | null }>({
+    lastTime: 0,
+    lastBytes: 0,
+    smoothed: null,
+  });
 
   if (os === "other") {
     return (
@@ -207,6 +213,8 @@ function DownloadLink({ os, release, state }: {
     setUpgradeUrl(null);
     setProgress(null);
     setReceivedBytes(0);
+    setDownloadSpeed(null);
+    speedRef.current = { lastTime: performance.now(), lastBytes: 0, smoothed: null };
 
     const chunks: BlobPart[] = [];
     let received = 0;
@@ -272,6 +280,16 @@ function DownloadLink({ os, release, state }: {
             if (totalBytes > 0) {
               setProgress(Math.min(100, Math.round((received / totalBytes) * 100)));
             }
+            const now = performance.now();
+            const elapsed = (now - speedRef.current.lastTime) / 1000;
+            if (elapsed >= 1) {
+              const bytesDelta = received - speedRef.current.lastBytes;
+              const rawMBps = bytesDelta / elapsed / (1024 * 1024);
+              const prev = speedRef.current.smoothed;
+              const smoothed = prev === null ? rawMBps : prev * 0.6 + rawMBps * 0.4;
+              speedRef.current = { lastTime: now, lastBytes: received, smoothed };
+              setDownloadSpeed(smoothed);
+            }
           }
         } catch {
           streamError = true;
@@ -306,6 +324,7 @@ function DownloadLink({ os, release, state }: {
       setDownloading(false);
       setProgress(null);
       setReceivedBytes(0);
+      setDownloadSpeed(null);
     }
   };
 
@@ -351,6 +370,9 @@ function DownloadLink({ os, release, state }: {
             {progress !== null
               ? `${formatBytes(receivedBytes)} of ${formatBytes(totalBytes)} — ${progress}%`
               : `${formatBytes(receivedBytes)} received…`}
+            {downloadSpeed !== null && (
+              <span className="ml-2 text-muted-foreground/70">{downloadSpeed.toFixed(1)} MB/s</span>
+            )}
           </p>
         </div>
       )}
