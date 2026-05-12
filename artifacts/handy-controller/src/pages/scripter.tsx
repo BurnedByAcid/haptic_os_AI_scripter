@@ -1609,9 +1609,10 @@ export default function Scripter() {
   };
 
   /**
-   * Dynamic: alternating hi/lo, but stroke height auto-scaled so that the
-   * total |Δpos| traveled across any 1-second window of the SELECTED markers
-   * stays within `vtMovementLimit` units/sec. All selected markers are kept;
+   * Dynamic: alternating hi/lo, with stroke height auto-scaled LOCALLY per
+   * marker so the total |Δpos| traveled in any 1-second window stays within
+   * `vtMovementLimit` units/sec. Sparse sections get full 0↔100; dense
+   * sections shrink toward the midpoint. All selected markers are kept;
    * only the heights are reduced — never the marker count.
    */
   const applyDynamicPattern = () => {
@@ -1620,30 +1621,33 @@ export default function Scripter() {
       .sort((a, b) => a.time - b.time);
     if (sel.length === 0) return;
 
-    // Find the densest 1-second window across the selected markers.
-    let maxInWindow = 1;
-    for (let i = 0; i < sel.length; i++) {
-      let count = 1;
-      for (let j = i + 1; j < sel.length && sel[j].time - sel[i].time < 1000; j++) count++;
-      if (count > maxInWindow) maxInWindow = count;
-    }
-
-    // N markers in a window alternating hi/lo produce (N-1) transitions, each
-    // contributing (hi-lo) units. Solve for max stroke that fits the limit.
-    // With 0 transitions (single marker) there is no movement constraint.
-    const transitions = maxInWindow - 1;
-    let stroke = transitions <= 0 ? 100 : Math.floor(vtMovementLimit / transitions);
-    stroke = Math.max(0, Math.min(100, stroke));
-
-    // Center the stroke around 50, clamped to [0, 100].
-    const half = Math.round(stroke / 2);
-    const lo = Math.max(0, 50 - half);
-    const hi = Math.min(100, 50 + (stroke - half));
+    // For each marker, find the densest 1-second window that contains it.
+    // We slide a window over [t - 1000, t + 1000] and take the worst case.
+    const localStroke: number[] = sel.map((_, i) => {
+      const t = sel[i].time;
+      let maxN = 1;
+      // Any window ending at or after t and starting before t+1: scan
+      // markers whose time falls within ±1000ms of i, then for each
+      // candidate left edge, count markers in [left, left+1000).
+      for (let a = i; a >= 0 && t - sel[a].time < 1000; a--) {
+        const left = sel[a].time;
+        let count = 0;
+        for (let b = a; b < sel.length && sel[b].time - left < 1000; b++) count++;
+        if (count > maxN) maxN = count;
+      }
+      const transitions = maxN - 1;
+      if (transitions <= 0) return 100;
+      return Math.max(0, Math.min(100, Math.floor(vtMovementLimit / transitions)));
+    });
 
     const idxMap = new Map(sel.map((s, i) => [s.id, i]));
     setPoints(prev => prev.map(p => {
       const i = idxMap.get(p.id);
       if (i === undefined) return p;
+      const stroke = localStroke[i];
+      const half = Math.round(stroke / 2);
+      const lo = Math.max(0, 50 - half);
+      const hi = Math.min(100, 50 + (stroke - half));
       return { ...p, pos: i % 2 === 0 ? lo : hi };
     }));
     setShowToolsMenu(false);
