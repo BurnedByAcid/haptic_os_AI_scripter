@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2, BookmarkPlus, Link2, Activity } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -513,6 +514,10 @@ export default function Scripter() {
   const [vtTolerance, setVtTolerance] = useState(20); // RMS threshold 0-255
   const [vtMinDelay, setVtMinDelay] = useState(200);   // ms cooldown between triggers
   const [vtMovementLimit, setVtMovementLimit] = useState(300);
+  // Shared toggle for the adaptive movement limiter (visual + audio detection).
+  const [limiterEnabled, setLimiterEnabled] = useState(true);
+  const limiterEnabledRef = useRef(true);
+  useEffect(() => { limiterEnabledRef.current = limiterEnabled; }, [limiterEnabled]);
   const [vtChosenRange, setVtChosenRange] = useState<[number, number]>([0, 100]);
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
   const vtCancelRef = useRef(false);
@@ -668,27 +673,28 @@ export default function Scripter() {
     if (wasRecording && !bdIsRecording && bdSessionTimestampsRef.current.length > 0 && mountedRef.current) {
       downloadRawFunscript(bdSessionTimestampsRef.current, "beat-detect", scriptOutputFiletype);
 
-      // Redistribute heights of the just-recorded beats so |Δpos| stays
-      // within vtMovementLimit per any 1-second window. Live recording
-      // alternates 0/100 for visual feedback; this pass auto-shrinks dense
-      // bursts (and ramps in/out) without dropping any beats.
-      const sessionIds = bdSessionIdsRef.current;
-      const sessionTimes = bdSessionTimestampsRef.current;
-      // Build [time, id] pairs sorted by time so the per-marker positions
-      // align with the chronological order even if recordings interleaved.
-      const ordered = sessionIds
-        .map((id, i) => ({ id, time: sessionTimes[i] }))
-        .sort((a, b) => a.time - b.time);
-      const positions = computeAdaptivePositions(
-        ordered.map(o => o.time),
-        vtMovementLimit,
-        true, // first beat was 100 (matches bdBeatPosRef initial value)
-      );
-      const posById = new Map(ordered.map((o, i) => [o.id, positions[i]]));
-      setPoints(prev => prev.map(p => {
-        const np = posById.get(p.id);
-        return np === undefined ? p : { ...p, pos: np };
-      }));
+      // When the limiter is enabled, redistribute heights of the just-recorded
+      // beats so |Δpos| stays within vtMovementLimit per any 1-second window.
+      // Live recording alternates 0/100 for visual feedback; this pass auto-
+      // shrinks dense bursts (and ramps in/out) without dropping any beats.
+      // When disabled, the live 0/100 alternation is kept as-is.
+      if (limiterEnabledRef.current) {
+        const sessionIds = bdSessionIdsRef.current;
+        const sessionTimes = bdSessionTimestampsRef.current;
+        const ordered = sessionIds
+          .map((id, i) => ({ id, time: sessionTimes[i] }))
+          .sort((a, b) => a.time - b.time);
+        const positions = computeAdaptivePositions(
+          ordered.map(o => o.time),
+          vtMovementLimit,
+          true, // first beat was 100 (matches bdBeatPosRef initial value)
+        );
+        const posById = new Map(ordered.map((o, i) => [o.id, positions[i]]));
+        setPoints(prev => prev.map(p => {
+          const np = posById.get(p.id);
+          return np === undefined ? p : { ...p, pos: np };
+        }));
+      }
 
       bdSessionTimestampsRef.current = [];
       lastGeneratedPointIdsRef.current = new Set(bdSessionIdsRef.current);
@@ -2668,8 +2674,11 @@ export default function Scripter() {
     // Adaptive per-marker stroke that fits vtMovementLimit across every
     // 1-second window of the timeline. All triggers preserved; only heights
     // are scaled. Sparse sections get full 0↔100, dense sections shrink
-    // toward the midpoint with a smooth ramp.
-    const positions = computeAdaptivePositions(sortedTriggerTimes, vtMovementLimit, true);
+    // toward the midpoint with a smooth ramp. When the limiter is off, every
+    // marker just alternates raw 0/100.
+    const positions = limiterEnabled
+      ? computeAdaptivePositions(sortedTriggerTimes, vtMovementLimit, true)
+      : sortedTriggerTimes.map((_, i) => (i % 2 === 0 ? 100 : 0));
 
     // Update the displayed Output Range to the widest stroke actually used,
     // so the user sees the looser bounds when most of the script isn't dense.
@@ -3155,6 +3164,28 @@ export default function Scripter() {
                   <span className="font-mono text-primary text-xs">{bdSensitivity.toFixed(1)}×</span>
                 </div>
                 <Slider min={1.0} max={3.0} step={0.1} value={[bdSensitivity]} onValueChange={v => setBdSensitivity(v[0])} />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/50 border-border/50 flex-shrink-0">
+              <CardContent className="pt-3 pb-3 space-y-2">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <Checkbox
+                      checked={limiterEnabled}
+                      onCheckedChange={v => setLimiterEnabled(v === true)}
+                    />
+                    Movement Limit
+                  </span>
+                  <span className={`font-mono text-xs ${limiterEnabled ? "text-primary" : "text-muted-foreground/60"}`}>
+                    {vtMovementLimit} u/sec
+                  </span>
+                </label>
+                <p className="text-[10px] text-muted-foreground leading-snug">
+                  {limiterEnabled
+                    ? "Beats auto-scale to fit the limit per 1-second window. Applied when recording stops."
+                    : "Off — beats stay at 0↔100 even in dense bursts."}
+                </p>
               </CardContent>
             </Card>
 
@@ -3846,11 +3877,30 @@ export default function Scripter() {
 
                   <div>
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm font-medium">Movement Limit</span>
-                      <span className="text-xs font-mono text-primary">{vtMovementLimit} units/sec</span>
+                      <label className="text-sm font-medium flex items-center gap-2 cursor-pointer">
+                        <Checkbox
+                          checked={limiterEnabled}
+                          onCheckedChange={v => setLimiterEnabled(v === true)}
+                        />
+                        Movement Limit
+                      </label>
+                      <span className={`text-xs font-mono ${limiterEnabled ? "text-primary" : "text-muted-foreground/60"}`}>
+                        {vtMovementLimit} units/sec
+                      </span>
                     </div>
-                    <Slider min={60} max={400} step={10} value={[vtMovementLimit]} onValueChange={v => setVtMovementLimit(v[0])} />
-                    <p className="text-[10px] text-muted-foreground mt-1">Max total movement in any 1-second window (default 300)</p>
+                    <Slider
+                      min={60}
+                      max={400}
+                      step={10}
+                      value={[vtMovementLimit]}
+                      onValueChange={v => setVtMovementLimit(v[0])}
+                      disabled={!limiterEnabled}
+                    />
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {limiterEnabled
+                        ? "Max total movement in any 1-second window (default 300). Applied after scan."
+                        : "Limiter off — every detection alternates raw 0↔100."}
+                    </p>
                   </div>
 
                   <div>
