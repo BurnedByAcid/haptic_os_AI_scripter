@@ -1621,14 +1621,11 @@ export default function Scripter() {
       .sort((a, b) => a.time - b.time);
     if (sel.length === 0) return;
 
-    // For each marker, find the densest 1-second window that contains it.
-    // We slide a window over [t - 1000, t + 1000] and take the worst case.
-    const localStroke: number[] = sel.map((_, i) => {
+    // Step 1 — local target stroke per marker, from densest 1s window
+    // containing that marker.
+    const target: number[] = sel.map((_, i) => {
       const t = sel[i].time;
       let maxN = 1;
-      // Any window ending at or after t and starting before t+1: scan
-      // markers whose time falls within ±1000ms of i, then for each
-      // candidate left edge, count markers in [left, left+1000).
       for (let a = i; a >= 0 && t - sel[a].time < 1000; a--) {
         const left = sel[a].time;
         let count = 0;
@@ -1640,14 +1637,27 @@ export default function Scripter() {
       return Math.max(0, Math.min(100, Math.floor(vtMovementLimit / transitions)));
     });
 
+    // Step 2 — two-pass ramp so stroke never changes by more than RAMP_STEP
+    // units between adjacent markers (e.g. 100→80→60→40→29 instead of
+    // 100→29). Both passes clamp upward so stroke stays ≤ each target,
+    // which preserves the per-window movement budget.
+    const RAMP_STEP = 20;
+    const stroke = [...target];
+    for (let i = 1; i < stroke.length; i++) {
+      stroke[i] = Math.min(stroke[i], stroke[i - 1] + RAMP_STEP);
+    }
+    for (let i = stroke.length - 2; i >= 0; i--) {
+      stroke[i] = Math.min(stroke[i], stroke[i + 1] + RAMP_STEP);
+    }
+
     const idxMap = new Map(sel.map((s, i) => [s.id, i]));
     setPoints(prev => prev.map(p => {
       const i = idxMap.get(p.id);
       if (i === undefined) return p;
-      const stroke = localStroke[i];
-      const half = Math.round(stroke / 2);
+      const s = stroke[i];
+      const half = Math.round(s / 2);
       const lo = Math.max(0, 50 - half);
-      const hi = Math.min(100, 50 + (stroke - half));
+      const hi = Math.min(100, 50 + (s - half));
       return { ...p, pos: i % 2 === 0 ? lo : hi };
     }));
     setShowToolsMenu(false);
