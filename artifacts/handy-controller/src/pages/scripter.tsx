@@ -627,7 +627,7 @@ export default function Scripter() {
   const bdSensitivityRef = useRef(bdSensitivity);
   const bdIsRecordingRef = useRef(bdIsRecording);
   const bdRecordStartRef = useRef(0);
-  const bdBeatPosRef = useRef(0); // alternates 0 ↔ 100
+  const bdBeatPosRef = useRef(100); // alternates 100 ↔ 0; first beat = 100
   const [bdPointsAdded, setBdPointsAdded] = useState(0);
   /** Beat timestamps (ms) accumulated during the current recording session. */
   const bdSessionTimestampsRef = useRef<number[]>([]);
@@ -667,6 +667,29 @@ export default function Scripter() {
     bdPrevIsRecordingRef.current = bdIsRecording;
     if (wasRecording && !bdIsRecording && bdSessionTimestampsRef.current.length > 0 && mountedRef.current) {
       downloadRawFunscript(bdSessionTimestampsRef.current, "beat-detect", scriptOutputFiletype);
+
+      // Redistribute heights of the just-recorded beats so |Δpos| stays
+      // within vtMovementLimit per any 1-second window. Live recording
+      // alternates 0/100 for visual feedback; this pass auto-shrinks dense
+      // bursts (and ramps in/out) without dropping any beats.
+      const sessionIds = bdSessionIdsRef.current;
+      const sessionTimes = bdSessionTimestampsRef.current;
+      // Build [time, id] pairs sorted by time so the per-marker positions
+      // align with the chronological order even if recordings interleaved.
+      const ordered = sessionIds
+        .map((id, i) => ({ id, time: sessionTimes[i] }))
+        .sort((a, b) => a.time - b.time);
+      const positions = computeAdaptivePositions(
+        ordered.map(o => o.time),
+        vtMovementLimit,
+        true, // first beat was 100 (matches bdBeatPosRef initial value)
+      );
+      const posById = new Map(ordered.map((o, i) => [o.id, positions[i]]));
+      setPoints(prev => prev.map(p => {
+        const np = posById.get(p.id);
+        return np === undefined ? p : { ...p, pos: np };
+      }));
+
       bdSessionTimestampsRef.current = [];
       lastGeneratedPointIdsRef.current = new Set(bdSessionIdsRef.current);
       bdSessionIdsRef.current = [];
@@ -1609,11 +1632,69 @@ export default function Scripter() {
   };
 
   /**
-   * Dynamic: alternating hi/lo, with stroke height auto-scaled LOCALLY per
-   * marker so the total |Δpos| traveled in any 1-second window stays within
-   * `vtMovementLimit` units/sec. Sparse sections get full 0↔100; dense
-   * sections shrink toward the midpoint. All selected markers are kept;
-   * only the heights are reduced — never the marker count.
+   * Compute per-marker alternating positions so the total |Δpos| traveled
+   * in any 1-second window stays within `limit` units/sec. Stroke is scaled
+   * LOCALLY per marker (sparse sections → 0↔100, dense → squeezed) and
+   * smoothed with a bidirectional ramp so it can't change by more than
+   * RAMP_STEP units between adjacent markers.
+   *
+   * `times` must already be sorted ascending. Returned array is parallel:
+   * positions[i] alternates between lo and hi around 50, with the first
+   * marker = hi when startHigh is true (else lo).
+   */
+  const computeAdaptivePositions = (
+    times: number[],
+    limit: number,
+    startHigh: boolean,
+  ): number[] => {
+    const n = times.length;
+    if (n === 0) return [];
+
+    // Step 1 — local target stroke per marker, from densest 1s window
+    // containing that marker.
+    const target = new Array<number>(n);
+    for (let i = 0; i < n; i++) {
+      const t = times[i];
+      let maxN = 1;
+      for (let a = i; a >= 0 && t - times[a] < 1000; a--) {
+        const left = times[a];
+        let count = 0;
+        for (let b = a; b < n && times[b] - left < 1000; b++) count++;
+        if (count > maxN) maxN = count;
+      }
+      const transitions = maxN - 1;
+      target[i] = transitions <= 0
+        ? 100
+        : Math.max(0, Math.min(100, Math.floor(limit / transitions)));
+    }
+
+    // Step 2 — two-pass ramp so stroke never changes by more than RAMP_STEP
+    // between adjacent markers (e.g. 100→80→60→40→29, not 100→29). Both
+    // passes clamp upward so each stroke stays ≤ target, preserving the
+    // per-window movement budget.
+    const RAMP_STEP = 20;
+    const stroke = [...target];
+    for (let i = 1; i < n; i++) {
+      stroke[i] = Math.min(stroke[i], stroke[i - 1] + RAMP_STEP);
+    }
+    for (let i = n - 2; i >= 0; i--) {
+      stroke[i] = Math.min(stroke[i], stroke[i + 1] + RAMP_STEP);
+    }
+
+    // Step 3 — alternating hi/lo per marker around midpoint 50.
+    return stroke.map((s, i) => {
+      const half = Math.round(s / 2);
+      const lo = Math.max(0, 50 - half);
+      const hi = Math.min(100, 50 + (s - half));
+      const evenIsHi = startHigh;
+      return (i % 2 === 0) === evenIsHi ? hi : lo;
+    });
+  };
+
+  /**
+   * Dynamic preset — adaptive per-marker stroke that respects vtMovementLimit
+   * across the entire selection. All selected markers are kept; only heights
+   * change.
    */
   const applyDynamicPattern = () => {
     const sel = [...pointsRef.current]
@@ -1621,44 +1702,17 @@ export default function Scripter() {
       .sort((a, b) => a.time - b.time);
     if (sel.length === 0) return;
 
-    // Step 1 — local target stroke per marker, from densest 1s window
-    // containing that marker.
-    const target: number[] = sel.map((_, i) => {
-      const t = sel[i].time;
-      let maxN = 1;
-      for (let a = i; a >= 0 && t - sel[a].time < 1000; a--) {
-        const left = sel[a].time;
-        let count = 0;
-        for (let b = a; b < sel.length && sel[b].time - left < 1000; b++) count++;
-        if (count > maxN) maxN = count;
-      }
-      const transitions = maxN - 1;
-      if (transitions <= 0) return 100;
-      return Math.max(0, Math.min(100, Math.floor(vtMovementLimit / transitions)));
-    });
-
-    // Step 2 — two-pass ramp so stroke never changes by more than RAMP_STEP
-    // units between adjacent markers (e.g. 100→80→60→40→29 instead of
-    // 100→29). Both passes clamp upward so stroke stays ≤ each target,
-    // which preserves the per-window movement budget.
-    const RAMP_STEP = 20;
-    const stroke = [...target];
-    for (let i = 1; i < stroke.length; i++) {
-      stroke[i] = Math.min(stroke[i], stroke[i - 1] + RAMP_STEP);
-    }
-    for (let i = stroke.length - 2; i >= 0; i--) {
-      stroke[i] = Math.min(stroke[i], stroke[i + 1] + RAMP_STEP);
-    }
+    const positions = computeAdaptivePositions(
+      sel.map(p => p.time),
+      vtMovementLimit,
+      false, // start low (matches previous Dynamic parity)
+    );
 
     const idxMap = new Map(sel.map((s, i) => [s.id, i]));
     setPoints(prev => prev.map(p => {
       const i = idxMap.get(p.id);
       if (i === undefined) return p;
-      const s = stroke[i];
-      const half = Math.round(s / 2);
-      const lo = Math.max(0, 50 - half);
-      const hi = Math.min(100, 50 + (s - half));
-      return { ...p, pos: i % 2 === 0 ? lo : hi };
+      return { ...p, pos: positions[i] };
     }));
     setShowToolsMenu(false);
     setShowPresetsPopup(false);
@@ -2232,36 +2286,6 @@ export default function Scripter() {
     try { glRef.current?.setReference(gray, w, h); } catch { /* ignore */ }
   };
 
-  /**
-   * Range levels sorted from widest stroke to narrowest.
-   * Each entry is [lo, hi]; stroke size = hi - lo.
-   * Rule: each trigger = one movement of strokeSize.
-   * Max total movement in any 1-second window must stay ≤ 400.
-   */
-  const VT_RANGE_LEVELS: [number, number][] = [
-    [0, 100], // 100 — up to 4 triggers/sec
-    [0,  95], //  95
-    [5,  95], //  90
-    [5,  90], //  85
-    [10, 90], //  80 — up to 5 triggers/sec
-    [10, 85], //  75
-    [15, 85], //  70
-    [15, 80], //  65
-    [20, 80], //  60
-    [20, 75], //  55
-    [25, 75], //  50
-    [25, 70], //  45
-    [30, 70], //  40
-    [30, 65], //  35
-    [35, 65], //  30
-    [35, 60], //  25
-    [40, 60], //  20
-    [40, 55], //  15
-    [45, 55], //  10
-    [45, 50], //   5
-    [50, 50], //   0 — last resort
-  ];
-
   const [analyzeMode, setAnalyzeMode] = useState<"webgpu" | "webgl" | "cpu">("cpu");
   const analyzeModeRef = useRef<"webgpu" | "webgl" | "cpu">("cpu");
   const [finalAnalyzeMode, setFinalAnalyzeMode] = useState<"webgpu" | "webgl" | "cpu">("cpu");
@@ -2637,41 +2661,31 @@ export default function Scripter() {
     // vtLastScanSpeed is set in the finally block (covers cancel path too).
     setFinalAnalyzeMode(analyzeModeRef.current);
 
-    // Commit all detections at the neutral midpoint — one pos value per trigger.
-    setVtPreviewPoints(triggerTimes.map(time => ({
+    // Sort defensively in case the worker ever emits out-of-order timestamps,
+    // so positions[i] aligns with previewPoints[i].
+    const sortedTriggerTimes = [...triggerTimes].sort((a, b) => a - b);
+
+    // Adaptive per-marker stroke that fits vtMovementLimit across every
+    // 1-second window of the timeline. All triggers preserved; only heights
+    // are scaled. Sparse sections get full 0↔100, dense sections shrink
+    // toward the midpoint with a smooth ramp.
+    const positions = computeAdaptivePositions(sortedTriggerTimes, vtMovementLimit, true);
+
+    // Update the displayed Output Range to the widest stroke actually used,
+    // so the user sees the looser bounds when most of the script isn't dense.
+    let minLo = 50, maxHi = 50;
+    for (const pos of positions) {
+      if (pos < minLo) minLo = pos;
+      if (pos > maxHi) maxHi = pos;
+    }
+    setVtChosenRange([minLo, maxHi]);
+
+    // Commit detections with adaptive heights — one preview point per trigger.
+    setVtPreviewPoints(sortedTriggerTimes.map((time, i) => ({
       id: crypto.randomUUID(),
       time,
-      pos: 50,
+      pos: positions[i] ?? 50,
     })));
-
-    // Pass 2 — find the densest 1-second window.
-    let maxInWindow = 0;
-    for (let i = 0; i < triggerTimes.length; i++) {
-      let count = 1;
-      for (let j = i + 1; j < triggerTimes.length && triggerTimes[j] - triggerTimes[i] < 1000; j++) count++;
-      maxInWindow = Math.max(maxInWindow, count);
-    }
-
-    // Pass 3 — choose the widest range level where (N-1) × strokeSize ≤ vtMovementLimit.
-    //          N markers in a 1s window alternating hi/lo make (N-1) transitions,
-    //          each contributing (hi-lo) units. We reduce stroke (height), not
-    //          marker count — every detection is preserved.
-    let lo = 0, hi = 100;
-    if (maxInWindow > 1) {
-      // (N-1) transitions × stroke ≤ limit; pick widest admissible range.
-      const transitions = maxInWindow - 1;
-      const maxStroke = Math.floor(vtMovementLimit / transitions);
-      const chosen = VT_RANGE_LEVELS.find(([l, h]) => h - l <= maxStroke);
-      if (chosen) { [lo, hi] = chosen; }
-      else { lo = 50; hi = 50; } // limit too tight for any movement
-    }
-    // maxInWindow ≤ 1: no transitions in any 1s window → full [0,100] range OK.
-    setVtChosenRange([lo, hi]);
-
-    // Pass 4 — redistribute: replace every pos=50 placeholder with alternating hi/lo.
-    setVtPreviewPoints(prev =>
-      prev.map((pt, i) => ({ ...pt, pos: i % 2 === 0 ? hi : lo }))
-    );
   };
 
   const commitPreviewPoints = () => {
@@ -3848,7 +3862,7 @@ export default function Scripter() {
                       <span className="text-xs text-muted-foreground ml-2">(auto)</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1">
-                      Alternates hi↔lo. Collapses automatically to keep movement ≤ 400 units/sec.
+                      Widest stroke used. Each marker's height is scaled to its local 1-second density and ramped smoothly between sparse and dense sections.
                     </p>
                   </div>
 
