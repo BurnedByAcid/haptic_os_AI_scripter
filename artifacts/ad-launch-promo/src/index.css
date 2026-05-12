@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-brand-red: #E93D44;
+  --color-brand-cream: #F5F2EB;
+  --color-brand-dark: #0A0A0C;
+
+  --font-display: "Space Grotesk", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root {
+  --color-brand-red: #E93D44;
+  --color-brand-cream: #F5F2EB;
+  --color-brand-dark: #0A0A0C;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+  font-family: var(--font-body);
+  color: var(--color-brand-cream);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

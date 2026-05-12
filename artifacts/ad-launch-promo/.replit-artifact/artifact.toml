@@ -1,0 +1,31 @@
+kind = "video"
+previewPath = "/ad-launch-promo/"
+title = "Ad - Launch Promo (9:16)"
+version = "1.0.0"
+id = "artifacts/ad-launch-promo"
+router = "path"
+
+[[integratedSkills]]
+name = "video-js"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/ad-launch-promo/" ]
+localPort = 21559
+
+[services.development]
+run = "pnpm --filter @workspace/ad-launch-promo run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ad-launch-promo", "run", "build" ]
+publicDir = "artifacts/ad-launch-promo/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21559"
+BASE_PATH = "/ad-launch-promo/"
