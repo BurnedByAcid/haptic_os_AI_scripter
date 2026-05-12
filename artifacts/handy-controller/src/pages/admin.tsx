@@ -241,7 +241,7 @@ export default function Admin() {
     setUploadError(null);
     setUploadSuccess(false);
 
-    const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB — well under the proxy limit
+    const CHUNK_SIZE = 2 * 1024 * 1024; // 2 MB — safely under any proxy limit
     const totalChunks = Math.max(1, Math.ceil(uploadFile.size / CHUNK_SIZE));
     const version = uploadVersion.trim();
 

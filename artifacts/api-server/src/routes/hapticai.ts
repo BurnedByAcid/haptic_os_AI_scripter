@@ -140,28 +140,28 @@ async function adminAuthMiddleware(req: Request, res: Response, next: NextFuncti
 }
 
 /**
- * Multer instance for individual chunks — each chunk is capped at 12 MB so
- * it comfortably clears the Replit reverse-proxy body-size limit.
+ * Multer instance for individual chunks.
+ * Memory storage so we get req.file.buffer directly — no temp-file pipelines.
+ * Cap at 4 MB (chunks are sent as 2 MB slices) to stay well inside any proxy limit.
  */
 const chunkUpload = multer({
-  storage: multer.diskStorage({}),
-  limits: { fileSize: 12 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024 },
 });
 
 /**
  * POST /api/hapticai/upload-chunk
- * Admin-only. Chunked upload endpoint that bypasses the Replit proxy's body-
- * size limit.  The client splits the file into ≤8 MB pieces and POSTs them
- * one at a time.  Each chunk is appended to a shared temp file on disk.
- * When the final chunk arrives the temp file is streamed to GCS and the
- * release is recorded in the database.
+ * Admin-only. Chunked upload endpoint that bypasses the Replit proxy body-size
+ * limit.  The browser splits the file into 2 MB slices and POSTs them one at a
+ * time; each chunk is appended to a stable temp file on disk.  The final chunk
+ * triggers a GCS stream-upload and a DB insert.
  *
  * Body (multipart/form-data):
  *   platform     "windows" | "mac"
  *   version      semver tag, e.g. "v1.2.0"
  *   chunkIndex   0-based index of this chunk
  *   totalChunks  total number of chunks
- *   chunk        the binary slice
+ *   chunk        the binary slice (≤ 2 MB)
  */
 router.post(
   "/hapticai/upload-chunk",
@@ -185,50 +185,46 @@ router.post(
       res.status(400).json({ error: "chunkIndex and totalChunks must be valid integers." });
       return;
     }
-    if (!req.file) {
+    if (!req.file?.buffer?.length) {
       res.status(400).json({ error: "No chunk data received." });
       return;
     }
 
     const { tmpdir } = await import("os");
     const { join } = await import("path");
-    const { createReadStream, createWriteStream, unlink, stat } = await import("fs");
-    const { pipeline } = await import("stream/promises");
+    const { appendFile, writeFile, stat, unlink, createReadStream } = await import("fs/promises");
 
-    // Stable temp file path for this upload session
     const safeVersion = version.replace(/[^a-zA-Z0-9._-]/g, "_");
     const assemblyPath = join(tmpdir(), `hapticai-upload-${platform}-${safeVersion}.bin`);
 
     try {
-      // Append this chunk to the assembly file
-      const chunkStream = createReadStream(req.file.path);
-      const assemblyStream = createWriteStream(assemblyPath, {
-        flags: chunkIndex === 0 ? "w" : "a",
-      });
-      await pipeline(chunkStream, assemblyStream);
+      // First chunk: overwrite; subsequent chunks: append
+      if (chunkIndex === 0) {
+        await writeFile(assemblyPath, req.file.buffer);
+      } else {
+        await appendFile(assemblyPath, req.file.buffer);
+      }
 
-      // Clean up the multer temp file for this chunk
-      unlink(req.file.path, () => {});
+      logger.info(
+        { platform, version, chunkIndex, totalChunks, bytes: req.file.buffer.length },
+        "HapticAI chunk received",
+      );
 
-      // If not the last chunk, acknowledge and wait for the next one
+      // Not the last chunk — just acknowledge
       if (chunkIndex < totalChunks - 1) {
         res.json({ ok: true, received: chunkIndex + 1, totalChunks });
         return;
       }
 
-      // ── Last chunk: stream assembled file to GCS and record in DB ──
+      // ── Final chunk: upload assembled file to GCS, record in DB ──
       const { size: sizeBytes } = await stat(assemblyPath);
       const contentType =
         platform === "windows"
           ? "application/vnd.microsoft.portable-executable"
           : "application/x-apple-diskimage";
 
-      const { storageKey } = await uploadReleaseToGCS(
-        platform,
-        version,
-        createReadStream(assemblyPath),
-        contentType,
-      );
+      const fileStream = createReadStream(assemblyPath);
+      const { storageKey } = await uploadReleaseToGCS(platform, version, fileStream, contentType);
 
       await pool.query(
         `INSERT INTO hapticai_releases (platform, version, size_bytes, storage_key)
@@ -239,12 +235,11 @@ router.post(
       logger.info({ platform, version, sizeBytes, storageKey }, "HapticAI release uploaded (chunked)");
       res.json({ ok: true, platform, version, sizeBytes, storageKey });
     } catch (err) {
-      logger.error({ err }, "Failed to process HapticAI upload chunk");
+      logger.error({ err }, "HapticAI chunk upload failed");
       res.status(500).json({ error: "Chunk upload failed. Check server logs." });
     } finally {
-      // Clean up assembly file after the last chunk (success or failure)
       if (chunkIndex === totalChunks - 1) {
-        unlink(assemblyPath, () => {});
+        unlink(assemblyPath).catch(() => {});
       }
     }
   },
