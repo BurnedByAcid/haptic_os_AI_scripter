@@ -512,7 +512,6 @@ export default function Scripter() {
   const vtToleranceRef = useRef<HTMLDivElement>(null);
   const [vtTolerance, setVtTolerance] = useState(20); // RMS threshold 0-255
   const [vtMinDelay, setVtMinDelay] = useState(200);   // ms cooldown between triggers
-  const [vtFrameDebounce, setVtFrameDebounce] = useState(5); // frame-based debounce 1–5
   const [vtMovementLimit, setVtMovementLimit] = useState(300);
   const [vtChosenRange, setVtChosenRange] = useState<[number, number]>([0, 100]);
   const [vtAnalyzing, setVtAnalyzing] = useState(false);
@@ -2415,8 +2414,7 @@ export default function Scripter() {
         patchW: w, patchH: h,
         startMs, endMs, rangeMs, stepMs,
         tolerance: vtTolerance,
-        minDelay:  vtMinDelay,
-        frameDebounce: vtFrameDebounce,
+        minDelay: vtMinDelay,
         nx, ny, nw, nh,
       });
     });
@@ -3039,6 +3037,14 @@ export default function Scripter() {
                         Load a video in the Player to use video audio
                       </p>
                     )}
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-sm font-medium">Min Trigger Delay</span>
+                        <span className="text-xs font-mono text-primary">{vtMinDelay} ms</span>
+                      </div>
+                      <Slider min={0} max={2000} step={50} value={[vtMinDelay]} onValueChange={v => setVtMinDelay(v[0])} />
+                      <p className="text-[10px] text-muted-foreground mt-1">0 ms is the smallest possible delay — about one frame to the next.</p>
+                    </div>
                   </>
                 )}
               </CardContent>
@@ -3762,16 +3768,7 @@ export default function Scripter() {
                       <span className="text-xs font-mono text-primary">{vtMinDelay} ms</span>
                     </div>
                     <Slider min={0} max={2000} step={50} value={[vtMinDelay]} onValueChange={v => setVtMinDelay(v[0])} />
-                    <p className="text-[10px] text-muted-foreground mt-1">Cooldown between triggers — suppresses duplicate detections on held frames (default 200 ms)</p>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Frame Debounce</span>
-                      <span className="text-xs font-mono text-primary">{vtFrameDebounce} frame{vtFrameDebounce !== 1 ? "s" : ""}</span>
-                    </div>
-                    <Slider min={1} max={5} step={1} value={[vtFrameDebounce]} onValueChange={v => setVtFrameDebounce(v[0])} />
-                    <p className="text-[10px] text-muted-foreground mt-1">Suppress re-trigger for this many consecutive frames after a match (default 5)</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">0 ms is the smallest possible delay — about one frame to the next.</p>
                   </div>
 
                   <div>
