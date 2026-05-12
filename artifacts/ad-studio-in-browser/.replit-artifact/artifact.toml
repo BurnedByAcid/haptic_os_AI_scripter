@@ -1,0 +1,31 @@
+kind = "video"
+previewPath = "/ad-studio-in-browser/"
+title = "Ad - Your Studio in the Browser (1:1)"
+version = "1.0.0"
+id = "artifacts/ad-studio-in-browser"
+router = "path"
+
+[[integratedSkills]]
+name = "video-js"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/ad-studio-in-browser/" ]
+localPort = 19003
+
+[services.development]
+run = "pnpm --filter @workspace/ad-studio-in-browser run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ad-studio-in-browser", "run", "build" ]
+publicDir = "artifacts/ad-studio-in-browser/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19003"
+BASE_PATH = "/ad-studio-in-browser/"

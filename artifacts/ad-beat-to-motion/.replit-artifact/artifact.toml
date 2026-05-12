@@ -1,0 +1,31 @@
+kind = "video"
+previewPath = "/ad-beat-to-motion/"
+title = "Ad - Beat to Motion (9:16)"
+version = "1.0.0"
+id = "artifacts/ad-beat-to-motion"
+router = "path"
+
+[[integratedSkills]]
+name = "video-js"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/ad-beat-to-motion/" ]
+localPort = 23998
+
+[services.development]
+run = "pnpm --filter @workspace/ad-beat-to-motion run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ad-beat-to-motion", "run", "build" ]
+publicDir = "artifacts/ad-beat-to-motion/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23998"
+BASE_PATH = "/ad-beat-to-motion/"
