@@ -1945,6 +1945,7 @@ export default function Scripter() {
       return () => { cancelled = true; };
     }
     // Non-HLS: the <video src={videoUrl}> JSX attribute handles it
+    return;
   }, [videoUrl, getToken]);
 
   // Clean up HLS on unmount
