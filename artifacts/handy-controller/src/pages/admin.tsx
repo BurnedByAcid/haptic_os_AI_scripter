@@ -650,8 +650,9 @@ export default function Admin() {
           </div>
 
           {/* Version + file */}
-          <div className="flex gap-2 items-start flex-wrap">
-            <div className="flex-1 min-w-36">
+          <div className="flex gap-3 items-start flex-wrap">
+            <div className="flex-1 min-w-36 space-y-1">
+              <p className="text-[11px] font-medium text-muted-foreground">Version <span className="text-destructive">*</span></p>
               <Input
                 placeholder="e.g. v1.2.0"
                 value={uploadVersion}
@@ -659,19 +660,29 @@ export default function Admin() {
                 className="h-9 text-sm font-mono"
               />
             </div>
-            <div className="flex-1 min-w-48">
+            <div className="flex-1 min-w-48 space-y-1">
+              <p className="text-[11px] font-medium text-muted-foreground">File <span className="text-destructive">*</span></p>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept={uploadPlatform === "windows" ? ".exe" : ".dmg"}
                 onChange={(e) => { setUploadFile(e.target.files?.[0] ?? null); setUploadError(null); setUploadSuccess(false); setUploadProgress(null); }}
-                className="block w-full text-xs text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-border/60 file:bg-muted/30 file:text-xs file:font-medium file:text-foreground hover:file:bg-muted/60 file:cursor-pointer cursor-pointer"
+                className="block w-full text-xs text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border file:border-border/60 file:bg-muted/30 file:text-xs file:font-medium file:text-foreground hover:file:bg-muted/60 file:cursor-pointer cursor-pointer pt-1.5"
               />
               {uploadFile && (
-                <p className="text-[10px] text-muted-foreground mt-1">{uploadFile.name} · {formatBytes(uploadFile.size)}</p>
+                <p className="text-[10px] text-muted-foreground">{uploadFile.name} · {formatBytes(uploadFile.size)}</p>
               )}
             </div>
           </div>
+          {(!uploadFile || !uploadVersion.trim()) && (
+            <p className="text-[11px] text-muted-foreground">
+              {!uploadVersion.trim() && !uploadFile
+                ? "Enter a version number and choose a file to enable upload."
+                : !uploadVersion.trim()
+                  ? "Enter a version number (e.g. v1.2.0) to enable upload."
+                  : "Choose a file to enable upload."}
+            </p>
+          )}
 
           {/* Progress bar */}
           {uploadProgress !== null && (
