@@ -17,10 +17,10 @@
  *     refPatch: Uint8Array, patchW: number, patchH: number,
  *     startMs: number, endMs: number, rangeMs: number,
  *     stepMs: number,
- *     tolerance: number, minDelay: number, frameDebounce: number,
+ *     tolerance: number, minDelay: number,
  *     nx, ny, nw, nh: number }
  *     Initialise GPU/CPU matchers and all scan parameters.
- *     frameDebounce: suppress re-trigger for N consecutive analyzed frames (1–5).
+ *     minDelay: ms cooldown between triggers (0 = one-frame minimum).
  *     Reply: { type: 'ready', mode: 'webgpu'|'webgl'|'cpu' }
  *
  *   { type: 'frame', bitmap: ImageBitmap, frameMs: number }
@@ -58,10 +58,8 @@ let rangeMs              = 1;
 let stepMs               = 1000 / 30; // 30 fps resolution
 let tolerance            = 0;
 let minDelay             = 0;
-let frameDebounce        = 5; // suppress re-trigger for N analyzed frames after a match
 let lastState            = false;
 let lastTriggerMs        = 0;
-let lastTriggerFrameIdx  = -Infinity; // analyzed-frame index of the last trigger
 let analyzedFrameCount   = 0;         // counts every frame that passes the stepMs gate
 let lastAnalyzedMs       = -Infinity; // frame scheduling: skip frames closer than stepMs
 let triggerTimes: number[] = [];
@@ -135,7 +133,7 @@ async function computeRms(bitmap: ImageBitmap): Promise<number> {
 async function handleInit(msg: {
   refPatch: Uint8Array; patchW: number; patchH: number;
   startMs: number; rangeMs: number; stepMs: number;
-  tolerance: number; minDelay: number; frameDebounce?: number;
+  tolerance: number; minDelay: number;
   nx: number; ny: number; nw: number; nh: number;
 }): Promise<void> {
   refPatch      = msg.refPatch;
@@ -146,7 +144,6 @@ async function handleInit(msg: {
   stepMs        = msg.stepMs;
   tolerance     = msg.tolerance;
   minDelay      = msg.minDelay;
-  frameDebounce = msg.frameDebounce ?? 5;
   cropNx        = msg.nx;
   cropNy        = msg.ny;
   cropNw        = msg.nw;
@@ -155,7 +152,6 @@ async function handleInit(msg: {
   // Reset state machine for this scan
   lastState            = false;
   lastTriggerMs        = msg.startMs - msg.minDelay; // allows trigger at very first frame
-  lastTriggerFrameIdx  = -Infinity;
   analyzedFrameCount   = 0;
   lastAnalyzedMs       = -Infinity;
   triggerTimes         = [];
@@ -215,13 +211,13 @@ async function handleFrame(bitmap: ImageBitmap, frameMs: number): Promise<void> 
     analyzedFrameCount++;
 
     // ── Trigger detection ─────────────────────────────────────────────────
+    // No frame-based debounce: rising-edge gating (matched && !lastState)
+    // already prevents held-frame spam, and minDelay handles ms cooldown.
     const matched = rms < tolerance;
     const msOk    = frameMs - lastTriggerMs >= minDelay;
-    const frameOk = analyzedFrameCount - lastTriggerFrameIdx >= frameDebounce;
-    if (matched && !lastState && msOk && frameOk) {
+    if (matched && !lastState && msOk) {
       triggerTimes.push(frameMs);
-      lastTriggerMs       = frameMs;
-      lastTriggerFrameIdx = analyzedFrameCount;
+      lastTriggerMs = frameMs;
     }
     lastState = matched;
 

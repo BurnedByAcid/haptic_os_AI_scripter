@@ -1588,7 +1588,6 @@ export default function Scripter() {
   const BOUNDS_PATTERN   = [0,65,10,75,20,85,30,95,40,100,40,95,30,85,20,75,10,65];
   const PULSE_PATTERN    = [100,0,100,100,0,100];
   const ALT_PATTERN      = [0,100];
-  const DYNAMIC_PATTERN  = [0,100];
   const SM_TRI_PATTERN   = [0,60];
   const MED_TRI_PATTERN  = [0,80];
 
@@ -1604,6 +1603,48 @@ export default function Scripter() {
       const i = idxMap.get(p.id);
       if (i === undefined) return p;
       return { ...p, pos: values[i % values.length] };
+    }));
+    setShowToolsMenu(false);
+    setShowPresetsPopup(false);
+  };
+
+  /**
+   * Dynamic: alternating hi/lo, but stroke height auto-scaled so that the
+   * total |Δpos| traveled across any 1-second window of the SELECTED markers
+   * stays within `vtMovementLimit` units/sec. All selected markers are kept;
+   * only the heights are reduced — never the marker count.
+   */
+  const applyDynamicPattern = () => {
+    const sel = [...pointsRef.current]
+      .filter(p => selectedIdsRef.current.has(p.id))
+      .sort((a, b) => a.time - b.time);
+    if (sel.length === 0) return;
+
+    // Find the densest 1-second window across the selected markers.
+    let maxInWindow = 1;
+    for (let i = 0; i < sel.length; i++) {
+      let count = 1;
+      for (let j = i + 1; j < sel.length && sel[j].time - sel[i].time < 1000; j++) count++;
+      if (count > maxInWindow) maxInWindow = count;
+    }
+
+    // N markers in a window alternating hi/lo produce (N-1) transitions, each
+    // contributing (hi-lo) units. Solve for max stroke that fits the limit.
+    // With 0 transitions (single marker) there is no movement constraint.
+    const transitions = maxInWindow - 1;
+    let stroke = transitions <= 0 ? 100 : Math.floor(vtMovementLimit / transitions);
+    stroke = Math.max(0, Math.min(100, stroke));
+
+    // Center the stroke around 50, clamped to [0, 100].
+    const half = Math.round(stroke / 2);
+    const lo = Math.max(0, 50 - half);
+    const hi = Math.min(100, 50 + (stroke - half));
+
+    const idxMap = new Map(sel.map((s, i) => [s.id, i]));
+    setPoints(prev => prev.map(p => {
+      const i = idxMap.get(p.id);
+      if (i === undefined) return p;
+      return { ...p, pos: i % 2 === 0 ? lo : hi };
     }));
     setShowToolsMenu(false);
     setShowPresetsPopup(false);
@@ -2597,16 +2638,20 @@ export default function Scripter() {
       maxInWindow = Math.max(maxInWindow, count);
     }
 
-    // Pass 3 — choose the widest range level where maxInWindow × strokeSize ≤ vtMovementLimit.
-    //          Hard floor: never collapse past 20↔80 (stroke = 60).
+    // Pass 3 — choose the widest range level where (N-1) × strokeSize ≤ vtMovementLimit.
+    //          N markers in a 1s window alternating hi/lo make (N-1) transitions,
+    //          each contributing (hi-lo) units. We reduce stroke (height), not
+    //          marker count — every detection is preserved.
     let lo = 0, hi = 100;
-    if (maxInWindow > 0) {
-      const maxStroke = Math.floor(vtMovementLimit / maxInWindow);
-      const chosen = VT_RANGE_LEVELS.filter(([l, h]) => h - l >= 60)
-                                     .find(([l, h]) => h - l <= maxStroke);
+    if (maxInWindow > 1) {
+      // (N-1) transitions × stroke ≤ limit; pick widest admissible range.
+      const transitions = maxInWindow - 1;
+      const maxStroke = Math.floor(vtMovementLimit / transitions);
+      const chosen = VT_RANGE_LEVELS.find(([l, h]) => h - l <= maxStroke);
       if (chosen) { [lo, hi] = chosen; }
-      else { lo = 20; hi = 80; }
+      else { lo = 50; hi = 50; } // limit too tight for any movement
     }
+    // maxInWindow ≤ 1: no transitions in any 1s window → full [0,100] range OK.
     setVtChosenRange([lo, hi]);
 
     // Pass 4 — redistribute: replace every pos=50 placeholder with alternating hi/lo.
@@ -3460,7 +3505,7 @@ export default function Scripter() {
                         <span className="font-medium">Dynamic</span>
                         <span className="ml-1 text-muted-foreground text-[10px]">max travel</span>
                       </div>
-                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={() => applyPattern(DYNAMIC_PATTERN)}>Apply</Button>
+                      <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={applyDynamicPattern}>Apply</Button>
                     </div>
                     <div className="flex gap-0.5 h-6">
                       {[0,100,0,100,0,100,0,100].map((v,i) => (
