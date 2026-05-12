@@ -147,14 +147,64 @@ function useHapticAIRelease(): { release: HapticAIRelease | null; state: Release
   return { release, state };
 }
 
-function HapticAIUpdateBanner({ version, onDismiss }: { version: string; onDismiss: () => void }) {
+function HapticAIUpdateBanner({
+  version,
+  os,
+  release,
+  onDownloaded,
+  onDismiss,
+}: {
+  version: string;
+  os: "windows" | "mac" | "other";
+  release: HapticAIRelease | null;
+  onDownloaded?: (version: string) => void;
+  onDismiss: () => void;
+}) {
+  const platformRelease = os === "windows" ? release?.windows : os === "mac" ? release?.mac : null;
+  const { downloading, progress, downloadError, handleDownload, handleCancel } = useHapticAIDownload({
+    os,
+    release,
+    onDownloaded,
+  });
+
+  const canDownload = (os === "windows" || os === "mac") && !!platformRelease;
+
   return (
     <div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-4 py-2">
       <Download className="h-3.5 w-3.5 text-primary flex-shrink-0" />
       <span className="text-xs text-foreground flex-1">
         <span className="font-medium">HapticAI {version} is available.</span>
-        {" "}Download the latest version to get new features and fixes.
+        {downloadError ? (
+          <span className="ml-1 text-destructive">{downloadError}</span>
+        ) : (
+          <> Download the latest version to get new features and fixes.</>
+        )}
       </span>
+      {canDownload && (
+        downloading ? (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-primary tabular-nums">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {progress !== null ? `${progress}%` : "Downloading…"}
+            </span>
+            <button
+              onClick={handleCancel}
+              className="text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+              aria-label="Cancel download"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleDownload}
+            className="inline-flex items-center gap-1 rounded bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground hover:bg-primary/90 transition-colors flex-shrink-0"
+          >
+            <Download className="h-3 w-3" />
+            Download now
+          </button>
+        )
+      )}
       <button
         onClick={onDismiss}
         className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 ml-2"
@@ -276,13 +326,10 @@ function UnavailableMessage({
   );
 }
 
-function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubState }: {
+function useHapticAIDownload({ os, release, onDownloaded }: {
   os: "windows" | "mac" | "other";
   release: HapticAIRelease | null;
-  state: ReleaseState;
   onDownloaded?: (version: string) => void;
-  githubRelease: GithubRelease | null;
-  githubState: "loading" | "ready" | "error";
 }) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -298,59 +345,20 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
     smoothed: null,
   });
 
-  if (os === "other") {
-    return (
-      <p className="text-xs text-muted-foreground">
-        HapticAI is available for Windows and macOS. Check back soon for Linux support.
-      </p>
-    );
-  }
-
-  const platformRelease = os === "windows" ? release?.windows : release?.mac;
-  const downloadUrl = `${API}/api/hapticai/download/${os}`;
-  const filename = os === "windows"
-    ? `HapticAI-Setup-${release?.version ?? "latest"}.exe`
-    : `HapticAI-${release?.version ?? "latest"}.dmg`;
-  const label = os === "windows" ? "Download HapticAI for Windows (.exe)" : "Download HapticAI for macOS";
-
-  if (state === "loading") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        {label}
-      </span>
-    );
-  }
-
-  const githubFallbackUrl =
-    githubState === "ready" && githubRelease
-      ? os === "windows"
-        ? githubRelease.exeUrl
-        : githubRelease.dmgUrl
-      : null;
-
-  const githubTagForLabel =
-    githubState === "ready" && githubRelease ? githubRelease.tag : null;
-
-  if (state !== "available" || !platformRelease) {
-    return (
-      <UnavailableMessage
-        label={label}
-        githubUrl={githubFallbackUrl}
-        githubTag={githubTagForLabel}
-      />
-    );
-  }
-
   const MAX_RANGE_RETRIES = 3;
 
   const handleCancel = () => {
     abortRef.current?.abort();
   };
 
-  const handleDownload = async (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleDownload = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
     if (downloading) return;
+    if (os === "other") return;
+    const downloadUrl = `${API}/api/hapticai/download/${os}`;
+    const filename = os === "windows"
+      ? `HapticAI-Setup-${release?.version ?? "latest"}.exe`
+      : `HapticAI-${release?.version ?? "latest"}.dmg`;
     const controller = new AbortController();
     abortRef.current = controller;
     setDownloading(true);
@@ -481,14 +489,80 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
     }
   };
 
-  const totalBytes = platformRelease.sizeBytes;
-  const githubDirectUrl =
+  return {
+    downloading,
+    downloadError,
+    upgradeUrl,
+    progress,
+    receivedBytes,
+    downloadSpeed,
+    handleDownload,
+    handleCancel,
+  };
+}
+
+function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubState }: {
+  os: "windows" | "mac" | "other";
+  release: HapticAIRelease | null;
+  state: ReleaseState;
+  onDownloaded?: (version: string) => void;
+  githubRelease: GithubRelease | null;
+  githubState: "loading" | "ready" | "error";
+}) {
+  const {
+    downloading,
+    downloadError,
+    upgradeUrl,
+    progress,
+    receivedBytes,
+    downloadSpeed,
+    handleDownload,
+    handleCancel,
+  } = useHapticAIDownload({ os, release, onDownloaded });
+
+  if (os === "other") {
+    return (
+      <p className="text-xs text-muted-foreground">
+        HapticAI is available for Windows and macOS. Check back soon for Linux support.
+      </p>
+    );
+  }
+
+  const platformRelease = os === "windows" ? release?.windows : release?.mac;
+  const label = os === "windows" ? "Download HapticAI for Windows (.exe)" : "Download HapticAI for macOS";
+
+  if (state === "loading") {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        {label}
+      </span>
+    );
+  }
+
+  const githubFallbackUrl =
     githubState === "ready" && githubRelease
       ? os === "windows"
         ? githubRelease.exeUrl
         : githubRelease.dmgUrl
       : null;
-  const githubTag = githubState === "ready" && githubRelease ? githubRelease.tag : null;
+
+  const githubTagForLabel =
+    githubState === "ready" && githubRelease ? githubRelease.tag : null;
+
+  if (state !== "available" || !platformRelease) {
+    return (
+      <UnavailableMessage
+        label={label}
+        githubUrl={githubFallbackUrl}
+        githubTag={githubTagForLabel}
+      />
+    );
+  }
+
+  const totalBytes = platformRelease.sizeBytes;
+  const githubDirectUrl = githubFallbackUrl;
+  const githubTag = githubTagForLabel;
 
   return (
     <div className="space-y-1.5">
@@ -1093,6 +1167,9 @@ function HapticAIContent() {
       {showUpdateBanner && release?.version && (
         <HapticAIUpdateBanner
           version={release.version}
+          os={os}
+          release={release}
+          onDownloaded={handleDownloaded}
           onDismiss={() => handleDismissUpdate(release!.version!)}
         />
       )}
