@@ -241,44 +241,62 @@ export default function Admin() {
     setUploadError(null);
     setUploadSuccess(false);
 
+    const CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB — well under the proxy limit
+    const totalChunks = Math.max(1, Math.ceil(uploadFile.size / CHUNK_SIZE));
+    const version = uploadVersion.trim();
+
     try {
       const token = await getToken();
-      const formData = new FormData();
-      formData.append("platform", uploadPlatform);
-      formData.append("version", uploadVersion.trim());
-      formData.append("file", uploadFile);
 
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", `${API_BASE}/api/hapticai/upload`);
-        xhr.setRequestHeader("Authorization", `Bearer ${token ?? ""}`);
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, uploadFile.size);
+        const chunkBlob = uploadFile.slice(start, end);
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            setUploadProgress(Math.round((e.loaded / e.total) * 100));
-          }
-        };
+        const formData = new FormData();
+        formData.append("platform", uploadPlatform);
+        formData.append("version", version);
+        formData.append("chunkIndex", String(i));
+        formData.append("totalChunks", String(totalChunks));
+        formData.append("chunk", chunkBlob, uploadFile.name);
 
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            let msg = "Upload failed.";
-            try { msg = (JSON.parse(xhr.responseText) as { error?: string }).error ?? msg; } catch {}
-            reject(new Error(msg));
-          }
-        };
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", `${API_BASE}/api/hapticai/upload-chunk`);
+          xhr.setRequestHeader("Authorization", `Bearer ${token ?? ""}`);
 
-        xhr.onerror = () => reject(new Error("Network error during upload."));
-        xhr.send(formData);
-      });
+          // Show per-chunk byte progress blended with overall chunk progress
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const chunksDone = i * CHUNK_SIZE;
+              const chunkBytes = (e.loaded / e.total) * (end - start);
+              setUploadProgress(Math.round(((chunksDone + chunkBytes) / uploadFile.size) * 100));
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              let msg = `Chunk ${i + 1}/${totalChunks} failed.`;
+              try { msg = (JSON.parse(xhr.responseText) as { error?: string }).error ?? msg; } catch {}
+              reject(new Error(msg));
+            }
+          };
+          xhr.onerror = () => reject(new Error(`Network error on chunk ${i + 1}/${totalChunks}.`));
+          xhr.send(formData);
+        });
+
+        // Update progress between chunks
+        setUploadProgress(Math.round(((i + 1) / totalChunks) * 100));
+      }
 
       setUploadSuccess(true);
       setUploadProgress(100);
       setUploadFile(null);
       setUploadVersion("");
       if (fileInputRef.current) fileInputRef.current.value = "";
-      toast({ title: "Release uploaded", description: `${uploadPlatform} ${uploadVersion.trim()} is now live.` });
+      toast({ title: "Release uploaded", description: `${uploadPlatform} ${version} is now live.` });
       refreshReleases();
     } catch (e) {
       setUploadError(String(e instanceof Error ? e.message : e));

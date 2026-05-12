@@ -140,25 +140,127 @@ async function adminAuthMiddleware(req: Request, res: Response, next: NextFuncti
 }
 
 /**
- * Multer instance used only inside the authenticated upload handler.
- * Streams to disk temp files to avoid large in-memory buffers.
+ * Multer instance for individual chunks — each chunk is capped at 12 MB so
+ * it comfortably clears the Replit reverse-proxy body-size limit.
+ */
+const chunkUpload = multer({
+  storage: multer.diskStorage({}),
+  limits: { fileSize: 12 * 1024 * 1024 },
+});
+
+/**
+ * POST /api/hapticai/upload-chunk
+ * Admin-only. Chunked upload endpoint that bypasses the Replit proxy's body-
+ * size limit.  The client splits the file into ≤8 MB pieces and POSTs them
+ * one at a time.  Each chunk is appended to a shared temp file on disk.
+ * When the final chunk arrives the temp file is streamed to GCS and the
+ * release is recorded in the database.
+ *
+ * Body (multipart/form-data):
+ *   platform     "windows" | "mac"
+ *   version      semver tag, e.g. "v1.2.0"
+ *   chunkIndex   0-based index of this chunk
+ *   totalChunks  total number of chunks
+ *   chunk        the binary slice
+ */
+router.post(
+  "/hapticai/upload-chunk",
+  adminAuthMiddleware,
+  chunkUpload.single("chunk"),
+  async (req: Request, res: Response) => {
+    const { platform, version, chunkIndex: ciRaw, totalChunks: tcRaw } =
+      req.body as { platform?: string; version?: string; chunkIndex?: string; totalChunks?: string };
+
+    if (!platform || !["windows", "mac"].includes(platform)) {
+      res.status(400).json({ error: "platform must be 'windows' or 'mac'." });
+      return;
+    }
+    if (!version || !/^v?\d+\.\d+/.test(version)) {
+      res.status(400).json({ error: "version must be a semver tag (e.g. v1.0.0)." });
+      return;
+    }
+    const chunkIndex = parseInt(ciRaw ?? "", 10);
+    const totalChunks = parseInt(tcRaw ?? "", 10);
+    if (isNaN(chunkIndex) || isNaN(totalChunks) || chunkIndex < 0 || totalChunks < 1) {
+      res.status(400).json({ error: "chunkIndex and totalChunks must be valid integers." });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: "No chunk data received." });
+      return;
+    }
+
+    const { tmpdir } = await import("os");
+    const { join } = await import("path");
+    const { createReadStream, createWriteStream, unlink, stat } = await import("fs");
+    const { pipeline } = await import("stream/promises");
+
+    // Stable temp file path for this upload session
+    const safeVersion = version.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const assemblyPath = join(tmpdir(), `hapticai-upload-${platform}-${safeVersion}.bin`);
+
+    try {
+      // Append this chunk to the assembly file
+      const chunkStream = createReadStream(req.file.path);
+      const assemblyStream = createWriteStream(assemblyPath, {
+        flags: chunkIndex === 0 ? "w" : "a",
+      });
+      await pipeline(chunkStream, assemblyStream);
+
+      // Clean up the multer temp file for this chunk
+      unlink(req.file.path, () => {});
+
+      // If not the last chunk, acknowledge and wait for the next one
+      if (chunkIndex < totalChunks - 1) {
+        res.json({ ok: true, received: chunkIndex + 1, totalChunks });
+        return;
+      }
+
+      // ── Last chunk: stream assembled file to GCS and record in DB ──
+      const { size: sizeBytes } = await stat(assemblyPath);
+      const contentType =
+        platform === "windows"
+          ? "application/vnd.microsoft.portable-executable"
+          : "application/x-apple-diskimage";
+
+      const { storageKey } = await uploadReleaseToGCS(
+        platform,
+        version,
+        createReadStream(assemblyPath),
+        contentType,
+      );
+
+      await pool.query(
+        `INSERT INTO hapticai_releases (platform, version, size_bytes, storage_key)
+         VALUES ($1, $2, $3, $4)`,
+        [platform, version, sizeBytes, storageKey],
+      );
+
+      logger.info({ platform, version, sizeBytes, storageKey }, "HapticAI release uploaded (chunked)");
+      res.json({ ok: true, platform, version, sizeBytes, storageKey });
+    } catch (err) {
+      logger.error({ err }, "Failed to process HapticAI upload chunk");
+      res.status(500).json({ error: "Chunk upload failed. Check server logs." });
+    } finally {
+      // Clean up assembly file after the last chunk (success or failure)
+      if (chunkIndex === totalChunks - 1) {
+        unlink(assemblyPath, () => {});
+      }
+    }
+  },
+);
+
+/**
+ * POST /api/hapticai/upload  (legacy single-request upload — kept for curl/CI)
+ * Admin-only. Accepts a full multipart .exe/.dmg upload in one request.
+ * Only suitable for small files or direct server-to-server calls that don't
+ * pass through the Replit reverse proxy.
  */
 const upload = multer({
   storage: multer.diskStorage({}),
   limits: { fileSize: 600 * 1024 * 1024 },
 });
 
-/**
- * POST /api/hapticai/upload
- * Admin-only. Accepts a multipart .exe upload, stores it in object storage,
- * and records the release in the hapticai_releases table.
- *
- * Requires: Authorization: Bearer $HAPTICAI_ADMIN_TOKEN
- * Body (multipart/form-data): platform (string), version (string), file (binary)
- *
- * Auth middleware runs BEFORE multer so unauthenticated requests are rejected
- * before any body bytes are read.
- */
 router.post(
   "/hapticai/upload",
   adminAuthMiddleware,
@@ -216,7 +318,6 @@ router.post(
       logger.error({ err }, "Failed to upload HapticAI release");
       res.status(500).json({ error: "Upload failed. Check server logs." });
     } finally {
-      // Clean up the temp file multer wrote to disk
       if (req.file?.path) {
         import("fs").then(({ unlink }) => unlink(req.file!.path, () => {})).catch(() => {});
       }
