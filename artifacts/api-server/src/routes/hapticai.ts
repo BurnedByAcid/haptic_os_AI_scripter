@@ -90,7 +90,9 @@ router.get("/hapticai/github-release", async (_req: Request, res: Response) => {
       res.json(githubReleaseCache.data);
       return;
     }
-    res.status(502).json({ error: "Could not fetch release info from GitHub." });
+    // No releases published yet (or repo is private/empty) — return a null
+    // result so clients can handle it gracefully instead of seeing a 502.
+    res.json({ tag: null, exeUrl: null, dmgUrl: null });
   }
 });
 

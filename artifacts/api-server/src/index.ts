@@ -118,6 +118,36 @@ async function migrateHapticAiWarnDismissed(): Promise<void> {
 }
 
 /**
+ * Idempotent migration: create analytics_events table if it does not exist.
+ * Tracks per-user feature usage events (feature is one of the known slugs).
+ * Safe to run on every boot — CREATE TABLE IF NOT EXISTS is a no-op when
+ * the table already exists.
+ */
+async function migrateAnalyticsEvents(): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS analytics_events (
+        id         SERIAL PRIMARY KEY,
+        user_id    TEXT        NOT NULL,
+        feature    TEXT        NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS analytics_events_user_idx
+        ON analytics_events (user_id, created_at DESC)
+    `);
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS analytics_events_feature_idx
+        ON analytics_events (feature, created_at DESC)
+    `);
+  } catch (err) {
+    logger.warn({ err }, "Could not create analytics_events table — continuing");
+  }
+}
+
+/**
  * Idempotent migration: create hapticai_releases table if it does not exist.
  * This table tracks HapticAI binary releases uploaded to object storage.
  * Safe to run on every boot — CREATE TABLE IF NOT EXISTS is a no-op when
@@ -149,6 +179,7 @@ await initStripe();
 await migrateLegacyFunscripts();
 await migrateCommunityUniqueConstraint();
 await migrateHapticAiWarnDismissed();
+await migrateAnalyticsEvents();
 await migrateHapticAiReleases();
 
 app.listen(port, (err) => {
