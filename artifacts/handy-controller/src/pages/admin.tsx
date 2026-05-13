@@ -246,12 +246,13 @@ export default function Admin() {
     const version = uploadVersion.trim();
 
     try {
-      const token = await getToken();
-
       for (let i = 0; i < totalChunks; i++) {
         const start = i * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, uploadFile.size);
         const chunkBlob = uploadFile.slice(start, end);
+
+        // Refresh the token before every chunk so it never expires mid-upload
+        const token = await getToken({ skipCache: true });
 
         const formData = new FormData();
         formData.append("platform", uploadPlatform);
