@@ -192,7 +192,8 @@ router.post(
 
     const { tmpdir } = await import("os");
     const { join } = await import("path");
-    const { appendFile, writeFile, stat, unlink, createReadStream } = await import("fs/promises");
+    const { appendFile, writeFile, stat, unlink } = await import("fs/promises");
+    const { createReadStream } = await import("fs");
 
     const safeVersion = version.replace(/[^a-zA-Z0-9._-]/g, "_");
     const assemblyPath = join(tmpdir(), `hapticai-upload-${platform}-${safeVersion}.bin`);
