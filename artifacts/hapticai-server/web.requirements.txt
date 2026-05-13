@@ -4,6 +4,7 @@
 # flask/flask-socketio added for web server.
 flask
 flask-socketio
+simple-websocket
 flask-cors
 numpy
 ultralytics==8.3.78
