@@ -1,0 +1,112 @@
+2026-05-13 08:22:35.04
+63cba4b2
+User
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+2026-05-13 08:22:38.01
+63cba4b2
+User
+{ autoExpandLists: undefined, stripeApiVersion: undefined } StripeSync initialized
+2026-05-13 08:22:38.05
+63cba4b2
+User
+{ autoExpandLists: undefined, stripeApiVersion: undefined } StripeSync initialized
+2026-05-13 08:22:38.05
+63cba4b2
+User
+{"level":30,"time":1778674958056,"pid":19,"hostname":"localhost","url":"https://hapticos.replit.app/api/billing/webhook","msg":"Setting up managed webhook..."}
+2026-05-13 08:22:38.52
+63cba4b2
+User
+{"level":30,"time":1778674958523,"pid":20,"hostname":"localhost","msg":"Stripe webhook configured"}
+2026-05-13 08:22:38.52
+63cba4b2
+User
+To prepare for this change:
+2026-05-13 08:22:38.52
+63cba4b2
+User
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+2026-05-13 08:22:38.52
+63cba4b2
+User
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+2026-05-13 08:22:38.52
+63cba4b2
+User
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+2026-05-13 08:22:38.52
+63cba4b2
+User
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+2026-05-13 08:22:38.54
+63cba4b2
+User
+{"level":30,"time":1778674958542,"pid":20,"hostname":"localhost","msg":"Stripe data synced"}
+2026-05-13 08:22:38.83
+63cba4b2
+User
+{"level":30,"time":1778674958838,"pid":19,"hostname":"localhost","msg":"Stripe webhook configured"}
+2026-05-13 08:22:38.84
+63cba4b2
+User
+To prepare for this change:
+2026-05-13 08:22:38.84
+63cba4b2
+User
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+2026-05-13 08:22:38.84
+63cba4b2
+User
+(node:19) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+2026-05-13 08:22:38.84
+63cba4b2
+User
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+2026-05-13 08:22:38.84
+63cba4b2
+User
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+2026-05-13 08:22:38.84
+63cba4b2
+User
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+2026-05-13 08:22:38.85
+63cba4b2
+User
+{"level":30,"time":1778674958856,"pid":19,"hostname":"localhost","msg":"Stripe data synced"}
+2026-05-13 08:22:38.86
+63cba4b2
+System
+artifact processes running, waiting for signal or process exit
+2026-05-13 08:22:38.86
+63cba4b2
+System
+all artifact ports detected
+2026-05-13 08:22:38.86
+63cba4b2
+System
+artifact port detected port=8080 detected=1 expected=1
+2026-05-13 08:22:38.86
+63cba4b2
+User
+{"level":30,"time":1778674958869,"pid":20,"hostname":"localhost","port":8080,"msg":"Server listening"}
+2026-05-13 08:22:39.14
+63cba4b2
+System
+all artifact ports detected
+2026-05-13 08:22:39.14
+63cba4b2
+System
+artifact port detected detected=1 expected=1 port=8080
+2026-05-13 08:22:39.14
+63cba4b2
+System
+artifact processes running, waiting for signal or process exit
+2026-05-13 08:22:39.14
+63cba4b2
+User
+{"level":30,"time":1778674959144,"pid":19,"hostname":"localhost","port":8080,"msg":"Server listening"}
+2026-05-13 08:22:39.44
+63cba4b2
+User
+{"level":30,"time":1778674959443,"pid":19,"hostname":"localhost","req":{"id":1,"method":"GET","url":"/api/healthz"},"res":{"statusCode":200},"responseTime":54,"msg":"request completed"}
