@@ -22,18 +22,28 @@ if "%VERSION%"=="" (
     pause & exit /b 1
 )
 
+:: Check NSIS is available
+makensis /VERSION >nul 2>&1
+if errorlevel 1 (
+    echo.
+    echo ERROR: NSIS not found. Install NSIS 3.x from https://nsis.sourceforge.io
+    echo        and make sure makensis.exe is on your PATH.
+    echo.
+    pause & exit /b 1
+)
+
 :: Create and activate venv
-echo [1/5] Creating virtual environment...
+echo [1/6] Creating virtual environment...
 if exist build_venv rmdir /s /q build_venv
 python -m venv build_venv
 call build_venv\Scripts\activate.bat
 
 :: Upgrade pip + install wheel
-echo [2/5] Installing build tools...
+echo [2/6] Installing build tools...
 python -m pip install --upgrade pip wheel pyinstaller
 
 :: Install HapticAI dependencies from official requirements files
-echo [3/5] Installing HapticAI dependencies...
+echo [3/6] Installing HapticAI dependencies...
 
 :: Core requirements (GUI packages install fine on Windows, just not used in web mode)
 pip install -r core.requirements.txt --ignore-requires-python
@@ -47,44 +57,50 @@ pip install -r web.requirements.txt
 :: Override: use headless OpenCV (no window-system dependency for server process)
 pip install opencv-python-headless --upgrade flask-cors
 
-:: Build
-echo [4/5] Running PyInstaller...
+:: Build the app .exe with PyInstaller
+echo [4/6] Running PyInstaller...
 pyinstaller hapticai_windows.spec --clean --noconfirm
 
-:: Check result — PyInstaller outputs dist\HapticAI.exe (name= in spec)
+:: Check PyInstaller result
 if not exist dist\HapticAI.exe (
-    echo ERROR: Build failed. Check output above.
+    echo ERROR: PyInstaller build failed. Check output above.
     call build_venv\Scripts\deactivate.bat
     pause & exit /b 1
 )
 
-:: Rename to the canonical installer name
-rename dist\HapticAI.exe HapticAI-Setup.exe
-
-:: Deactivate
+:: Deactivate venv before NSIS (not needed for makensis)
 call build_venv\Scripts\deactivate.bat
 
-echo [5/5] Done!
+:: Build the installer with NSIS
+echo [5/6] Running NSIS to build installer...
+set HAPTICAI_VERSION=%VERSION%
+makensis /DVERSION=%VERSION% installer.nsi
+
+:: Check NSIS result
+if not exist dist\HapticAI-Setup.exe (
+    echo ERROR: NSIS build failed. Check output above.
+    pause & exit /b 1
+)
+
+echo [6/6] Done!
 echo.
 echo Output: dist\HapticAI-Setup.exe
 echo.
 for %%F in (dist\HapticAI-Setup.exe) do echo Size: %%~zF bytes
 echo.
 echo ============================================================
-echo  Upload to HapticOS
+echo  Upload to GitHub Releases
 echo ============================================================
 echo.
-echo  Set your admin token first:
-echo    set HAPTICAI_ADMIN_TOKEN=^<token from HAPTICAI_ADMIN_TOKEN env var^>
+echo  1. Go to your GitHub repository
+echo  2. Click  Releases ^> Draft a new release
+echo  3. Set the tag to:  %VERSION%
+echo  4. Upload:  dist\HapticAI-Setup.exe
+echo  5. Publish the release
 echo.
-echo  Then run:
-echo    curl.exe -X POST https://hapticos.replit.app/api/hapticai/upload ^
-echo         -H "Authorization: Bearer %HAPTICAI_ADMIN_TOKEN%" ^
-echo         -F "platform=windows" ^
-echo         -F "version=%VERSION%" ^
-echo         -F "file=@dist\HapticAI-Setup.exe"
+echo  The download link on HapticOS will update automatically
+echo  within 1 hour (or immediately after the cache refreshes).
 echo.
-echo  The download will be live at:
-echo    https://hapticos.replit.app/api/hapticai/download/windows
+echo  GitHub repo:  https://github.com/HapticAI/HapticAI-Powered-Funscript-Generator
 echo ============================================================
 pause

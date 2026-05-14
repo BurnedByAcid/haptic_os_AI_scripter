@@ -391,6 +391,21 @@ router.get("/hapticai/download/:platform", async (req: Request, res: Response) =
   }
 
   try {
+    // ── Prefer GitHub release (fast CDN redirect, no storage costs) ──────────
+    try {
+      const ghData = await fetchLatestGithubRelease();
+      const ghUrl = platform === "windows" ? ghData.exeUrl : ghData.dmgUrl;
+      if (ghUrl) {
+        logger.info({ platform, tag: ghData.tag }, "HapticAI download — redirecting to GitHub release");
+        res.redirect(302, ghUrl);
+        return;
+      }
+    } catch (ghErr) {
+      // GitHub unreachable or no release published yet — fall through to GCS
+      logger.warn({ ghErr }, "GitHub release fetch failed, falling back to GCS");
+    }
+
+    // ── Fallback: stream from GCS ─────────────────────────────────────────────
     const { rows } = await pool.query<{ storage_key: string; version: string }>(
       `SELECT storage_key, version FROM hapticai_releases
        WHERE platform = $1
@@ -429,7 +444,6 @@ router.get("/hapticai/download/:platform", async (req: Request, res: Response) =
         endOffset = match[2] ? parseInt(match[2], 10) : -1;
         isRangeRequest = true;
       } else {
-        // Unrecognised range syntax — reject
         res.status(416).setHeader("Content-Range", "bytes */*").end();
         return;
       }
@@ -441,7 +455,6 @@ router.get("/hapticai/download/:platform", async (req: Request, res: Response) =
       endOffset,
     );
 
-    // Validate range against known file size
     if (isRangeRequest && sizeBytes > 0) {
       const isInvalidStart = isNaN(startOffset) || startOffset < 0 || startOffset >= sizeBytes;
       const isInvalidEnd = endOffset >= 0 && (isNaN(endOffset) || endOffset < startOffset);
