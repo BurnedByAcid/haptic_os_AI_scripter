@@ -1424,10 +1424,23 @@ if __name__ == "__main__":
             webbrowser.open(app_url)
 
         def _quit_app(icon, item):
-            if PORT_FILE.exists():
-                PORT_FILE.unlink()
             icon.stop()
-            os.kill(os.getpid(), signal.SIGTERM)
+            # Prefer the graceful HTTP shutdown route; fall back to SIGTERM
+            try:
+                import urllib.request as _urlreq
+                _urlreq.urlopen(
+                    _urlreq.Request(
+                        f"http://127.0.0.1:{port}/api/shutdown",
+                        data=b"",
+                        headers={"Authorization": f"Bearer {_SESSION_TOKEN}"},
+                        method="POST",
+                    ),
+                    timeout=3,
+                )
+            except Exception:
+                if PORT_FILE.exists():
+                    PORT_FILE.unlink()
+                os.kill(os.getpid(), signal.SIGTERM)
 
         _img = _get_tray_icon_image()
         if _img is not None:
@@ -1448,16 +1461,19 @@ if __name__ == "__main__":
     _server_thread = threading.Thread(target=_run_server, daemon=True)
     _server_thread.start()
 
-    # Auto-open the browser once the server is accepting connections
+    # Auto-open the browser only once the server is confirmed accepting connections
     def _wait_and_open():
         import socket as _sock
+        connected = False
         for _ in range(40):
             try:
                 with _sock.create_connection(("127.0.0.1", port), timeout=0.5):
+                    connected = True
                     break
             except OSError:
                 time.sleep(0.25)
-        webbrowser.open(app_url)
+        if connected:
+            webbrowser.open(app_url)
 
     threading.Thread(target=_wait_and_open, daemon=True).start()
 
