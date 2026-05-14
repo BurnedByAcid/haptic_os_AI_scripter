@@ -32,7 +32,7 @@ a = Analysis(
         'flask_socketio',
         'engineio',
         'socketio',
-        'eventlet',
+        'simple_websocket',
         'cv2',
         'numpy',
         'PIL',
