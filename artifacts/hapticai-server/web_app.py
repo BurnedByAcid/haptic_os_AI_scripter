@@ -1480,6 +1480,15 @@ if __name__ == "__main__":
                         "HapticAI is running \u2014 click the tray icon to open",
                         "HapticAI",
                     )
+
+                    def _auto_dismiss():
+                        time.sleep(5)
+                        try:
+                            _tray_icon.remove_notification()
+                        except Exception:
+                            pass
+
+                    threading.Thread(target=_auto_dismiss, daemon=True).start()
                 except Exception as _notify_err:
                     logger.debug(f"Startup notification not shown: {_notify_err}")
 
