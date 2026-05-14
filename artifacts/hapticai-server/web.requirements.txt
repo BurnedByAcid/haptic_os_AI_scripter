@@ -6,6 +6,7 @@ flask
 flask-socketio
 simple-websocket
 flask-cors
+pystray
 numpy
 ultralytics==8.3.78
 imageio~=2.36.1

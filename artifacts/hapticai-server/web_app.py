@@ -1364,7 +1364,35 @@ def on_subscribe(data):
 _server_port = 5000
 
 
+def _get_tray_icon_image():
+    """Load the HapticAI branding icon for the system tray.
+
+    Looks for assets/branding/icon.ico relative to the executable (frozen)
+    or the script directory (dev).  Falls back to a plain 64×64 red square
+    so the tray always gets *something* even if the file is missing.
+    """
+    try:
+        from PIL import Image as _PILImage
+        if getattr(sys, "frozen", False):
+            base = Path(sys._MEIPASS)
+        else:
+            base = Path(__file__).parent
+        ico_path = base / "assets" / "branding" / "icon.ico"
+        if ico_path.exists():
+            return _PILImage.open(ico_path).convert("RGBA")
+    except Exception:
+        pass
+    try:
+        from PIL import Image as _PILImage
+        img = _PILImage.new("RGBA", (64, 64), (233, 61, 68, 255))
+        return img
+    except Exception:
+        return None
+
+
 if __name__ == "__main__":
+    import webbrowser
+
     preferred = int(os.environ.get("PORT", 8000))
     bind_host = os.environ.get("HAPTICAI_HOST", "127.0.0.1")
     port = find_free_port(preferred, bind_host)
@@ -1378,6 +1406,8 @@ if __name__ == "__main__":
 
     logger.info(f"HapticAI (Beta) Web starting on http://{bind_host}:{port}")
 
+    app_url = f"http://127.0.0.1:{port}"
+
     def _cleanup(signum, frame):
         if PORT_FILE.exists():
             PORT_FILE.unlink()
@@ -1385,4 +1415,54 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGTERM, _cleanup)
 
-    socketio.run(app, host=bind_host, port=port, debug=False, allow_unsafe_werkzeug=True)
+    # ── Try to set up a system tray icon (Windows / Linux with pystray) ──
+    _tray_icon = None
+    try:
+        import pystray
+
+        def _open_browser(icon=None, item=None):
+            webbrowser.open(app_url)
+
+        def _quit_app(icon, item):
+            if PORT_FILE.exists():
+                PORT_FILE.unlink()
+            icon.stop()
+            os.kill(os.getpid(), signal.SIGTERM)
+
+        _img = _get_tray_icon_image()
+        if _img is not None:
+            _menu = pystray.Menu(
+                pystray.MenuItem("Open HapticAI", _open_browser, default=True),
+                pystray.Menu.SEPARATOR,
+                pystray.MenuItem("Quit", _quit_app),
+            )
+            _tray_icon = pystray.Icon("HapticAI", _img, "HapticAI", _menu)
+    except Exception as _tray_err:
+        logger.warning(f"System tray not available: {_tray_err}")
+        _tray_icon = None
+
+    # ── Start Flask in a background thread ──────────────────────────────
+    def _run_server():
+        socketio.run(app, host=bind_host, port=port, debug=False, allow_unsafe_werkzeug=True)
+
+    _server_thread = threading.Thread(target=_run_server, daemon=True)
+    _server_thread.start()
+
+    # Auto-open the browser once the server is accepting connections
+    def _wait_and_open():
+        import socket as _sock
+        for _ in range(40):
+            try:
+                with _sock.create_connection(("127.0.0.1", port), timeout=0.5):
+                    break
+            except OSError:
+                time.sleep(0.25)
+        webbrowser.open(app_url)
+
+    threading.Thread(target=_wait_and_open, daemon=True).start()
+
+    # ── Main thread: run tray (blocks) or wait for server thread ────────
+    if _tray_icon is not None:
+        _tray_icon.run()
+    else:
+        _server_thread.join()
