@@ -29,6 +29,7 @@ import Upgrade from "@/pages/upgrade";
 import Admin from "@/pages/admin";
 import MyLibrary from "@/pages/my-library";
 import HapticAI from "@/pages/haptic-ai";
+import HapticAISoon from "@/pages/haptic-ai-soon";
 
 const queryClient = new QueryClient();
 
@@ -118,7 +119,17 @@ const clerkAppearance = {
  * Redirects authenticated but un-onboarded users to /onboarding.
  * Renders nothing while Clerk loads.
  */
-function ProtectedRoute({ component: Component, subscriberOnly = false, adminOnly = false }: { component: React.ComponentType; subscriberOnly?: boolean; adminOnly?: boolean }) {
+function ProtectedRoute({
+  component: Component,
+  subscriberOnly = false,
+  adminOnly = false,
+  adminFallback = "/",
+}: {
+  component: React.ComponentType;
+  subscriberOnly?: boolean;
+  adminOnly?: boolean;
+  adminFallback?: string;
+}) {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user, isLoaded: isUserLoaded } = useUser();
   const { isLoaded: isSubscriptionLoaded, isPro, isAdmin } = useSubscription();
@@ -129,7 +140,7 @@ function ProtectedRoute({ component: Component, subscriberOnly = false, adminOnl
   const onboarded = (user?.publicMetadata as Record<string, unknown>)?.onboarded === true;
   if (!onboarded) return <Redirect to="/onboarding" />;
   if (subscriberOnly && !isPro) return <Redirect to="/upgrade" />;
-  if (adminOnly && !isAdmin) return <Redirect to="/" />;
+  if (adminOnly && !isAdmin) return <Redirect to={adminFallback} />;
 
   return <Component />;
 }
@@ -156,7 +167,8 @@ function Router() {
       <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
       <Route path="/audio-cleaner" component={() => <Redirect to="/beat?tab=cleaner" />} />
       <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
-      <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} subscriberOnly />} />
+      <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} adminOnly adminFallback="/haptic-ai-soon" />} />
+      <Route path="/haptic-ai-soon" component={() => <ProtectedRoute component={HapticAISoon} />} />
       <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
       <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
       <Route path="/admin"        component={() => <ProtectedRoute component={Admin} adminOnly />} />

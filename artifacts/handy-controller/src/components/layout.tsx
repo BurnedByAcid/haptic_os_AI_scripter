@@ -96,7 +96,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/",          label: "Dashboard",      icon: Home,      requiresPro: false },
   { href: "/player",    label: "Player",          icon: PlaySquare, requiresPro: false },
   { href: "/scripter",  label: "Scripter",        icon: Mic,       requiresPro: false },
-  { href: "/haptic-ai", label: "HapticAI",        icon: Sparkles,  requiresPro: true, subscriberOnly: true, badge: "Beta", preNavWarning: true },
+  { href: "/haptic-ai", label: "HapticAI",        icon: Sparkles,  requiresPro: false, badge: "Beta", preNavWarning: true },
   { href: "/library",   label: "My Library",      icon: BookMarked, requiresPro: false },
   { href: "/community", label: "Community",       icon: Users,     requiresPro: false },
   { href: "/control",   label: "Manual Controls", icon: Settings2, requiresPro: false },
@@ -172,12 +172,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [user?.id]);
 
   const handleHapticAiNavClick = useCallback(() => {
+    if (!isAdmin) {
+      navigate("/haptic-ai-soon");
+      return;
+    }
     if (hapticAiWarnDismissed) {
       navigate("/haptic-ai");
     } else {
       setHapticAiConsentOpen(true);
     }
-  }, [hapticAiWarnDismissed, navigate]);
+  }, [isAdmin, hapticAiWarnDismissed, navigate]);
 
   const handleHapticAiConsentConfirm = useCallback(async (dontShowAgain: boolean) => {
     setHapticAiConsentOpen(false);
