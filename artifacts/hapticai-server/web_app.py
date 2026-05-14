@@ -1474,6 +1474,14 @@ if __name__ == "__main__":
                 time.sleep(0.25)
         if connected:
             webbrowser.open(app_url)
+            if _tray_icon is not None and hasattr(_tray_icon, "notify"):
+                try:
+                    _tray_icon.notify(
+                        "HapticAI is running \u2014 click the tray icon to open",
+                        "HapticAI",
+                    )
+                except Exception as _notify_err:
+                    logger.debug(f"Startup notification not shown: {_notify_err}")
 
     threading.Thread(target=_wait_and_open, daemon=True).start()
 
