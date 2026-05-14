@@ -118,10 +118,10 @@ const clerkAppearance = {
  * Redirects authenticated but un-onboarded users to /onboarding.
  * Renders nothing while Clerk loads.
  */
-function ProtectedRoute({ component: Component, subscriberOnly = false }: { component: React.ComponentType; subscriberOnly?: boolean }) {
+function ProtectedRoute({ component: Component, subscriberOnly = false, adminOnly = false }: { component: React.ComponentType; subscriberOnly?: boolean; adminOnly?: boolean }) {
   const { isLoaded: isAuthLoaded, isSignedIn } = useAuth();
   const { user, isLoaded: isUserLoaded } = useUser();
-  const { isLoaded: isSubscriptionLoaded, isPro } = useSubscription();
+  const { isLoaded: isSubscriptionLoaded, isPro, isAdmin } = useSubscription();
 
   if (!isAuthLoaded || !isUserLoaded || !isSubscriptionLoaded) return null;
   if (!isSignedIn) return <Redirect to="/sign-in" />;
@@ -129,6 +129,7 @@ function ProtectedRoute({ component: Component, subscriberOnly = false }: { comp
   const onboarded = (user?.publicMetadata as Record<string, unknown>)?.onboarded === true;
   if (!onboarded) return <Redirect to="/onboarding" />;
   if (subscriberOnly && !isPro) return <Redirect to="/upgrade" />;
+  if (adminOnly && !isAdmin) return <Redirect to="/" />;
 
   return <Component />;
 }
@@ -158,7 +159,7 @@ function Router() {
       <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} subscriberOnly />} />
       <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
       <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
-      <Route path="/admin"        component={() => <ProtectedRoute component={Admin} />} />
+      <Route path="/admin"        component={() => <ProtectedRoute component={Admin} adminOnly />} />
 
       <Route component={NotFound} />
     </Switch>
