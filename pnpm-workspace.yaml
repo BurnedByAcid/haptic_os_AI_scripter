@@ -166,3 +166,7 @@ overrides:
   yaml: "2.8.4"
   "brace-expansion@^2": "2.1.0"
   postcss: "8.5.13"
+  # Security vulnerability fixes for transitive dependencies
+  fast-uri: "3.1.2"
+  ip-address: "10.2.0"
+  "@tootallnate/once": "3.0.1"

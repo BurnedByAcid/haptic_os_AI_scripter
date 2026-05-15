@@ -17,7 +17,7 @@ scipy>=1.15.1
 scikit-learn>=1.0.0
 simplification~=0.7.13
 msgpack~=1.1.0
-pillow~=11.1.0
-orjson~=3.10.15
+pillow>=11.2.1
+orjson>=3.11.0
 send2trash~=1.8.3
 aiosqlite
