@@ -171,6 +171,35 @@ export function Layout({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
+  // ─── BroadcastChannel: receive funscripts from HapticAI (cross-tab) ──────────
+  // The new HapticAI browser app posts:
+  //   { type: "hapticai_funscript", funscript: "<JSON string>", name?: string }
+  // We store it in sessionStorage using the existing hapticai_import key, then
+  // navigate to /scripter where it is picked up automatically on mount.
+  useEffect(() => {
+    if (!("BroadcastChannel" in window)) return;
+    const channel = new BroadcastChannel("hapticos");
+    channel.onmessage = (event: MessageEvent) => {
+      try {
+        const msg = event.data as { type?: string; funscript?: string; name?: string };
+        if (msg?.type !== "hapticai_funscript" || !msg.funscript) return;
+        sessionStorage.setItem(
+          "hapticai_import",
+          JSON.stringify({ funscript: msg.funscript, name: msg.name ?? "HapticAI Script" }),
+        );
+        navigate("/scripter");
+        toast({
+          title: "HapticAI script received",
+          description: "Your generated script has been loaded in the editor.",
+          duration: 4000,
+        });
+      } catch {
+        // Ignore malformed messages
+      }
+    };
+    return () => channel.close();
+  }, [navigate, toast]);
+
   const handleHapticAiNavClick = useCallback(() => {
     if (!isAdmin) {
       navigate("/haptic-ai-soon");
