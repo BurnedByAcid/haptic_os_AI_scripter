@@ -74,7 +74,7 @@ call build_venv\Scripts\deactivate.bat
 :: Build the installer with NSIS
 echo [5/6] Running NSIS to build installer...
 set HAPTICAI_VERSION=%VERSION%
-makensis /DVERSION=%VERSION% installer.nsi
+makensis /DVERSION="%VERSION%" installer.nsi
 
 :: Check NSIS result
 if not exist dist\HapticAI-Setup.exe (
@@ -101,6 +101,6 @@ echo.
 echo  The download link on HapticOS will update automatically
 echo  within 1 hour (or immediately after the cache refreshes).
 echo.
-echo  GitHub repo:  https://github.com/HapticAI/HapticAI-Powered-Funscript-Generator
+echo  GitHub repo:  https://github.com/BurnedByAcid/hapticai-server
 echo ============================================================
 pause
