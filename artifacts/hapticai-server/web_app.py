@@ -180,42 +180,86 @@ UPLOAD_FOLDER.mkdir(exist_ok=True)
 OUTPUT_FOLDER.mkdir(exist_ok=True)
 
 
-def _get_downloads_folder() -> Path:
-    """Return the user's Downloads folder across platforms."""
+# ── User settings (output folder preference) ─────────────────────────────────
+
+def _get_settings_path() -> Path:
+    """Return path to HapticAI settings JSON file."""
     if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA") or (Path.home() / "AppData" / "Roaming"))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config"))
+    d = base / "HapticAI"
+    d.mkdir(parents=True, exist_ok=True)
+    return d / "settings.json"
+
+
+def _load_settings() -> dict:
+    p = _get_settings_path()
+    if p.exists():
         try:
-            import winreg
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders",
-            )
-            val, _ = winreg.QueryValueEx(key, "{374DE290-123F-4565-9164-39C4925E467B}")
-            winreg.CloseKey(key)
-            return Path(val)
+            return json.loads(p.read_text(encoding="utf-8"))
         except Exception:
             pass
-    return Path.home() / "Downloads"
+    return {}
 
 
-def _copy_to_downloads(src: Path) -> None:
-    """Copy *src* to the user's Downloads folder, silently ignoring errors."""
+def _save_settings(data: dict) -> None:
+    _get_settings_path().write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _get_default_output_folder() -> Path:
+    """Return the user's configured output folder, falling back to Documents/Funscripts."""
+    settings = _load_settings()
+    configured = settings.get("output_folder", "")
+    if configured:
+        p = Path(configured)
+        try:
+            p.mkdir(parents=True, exist_ok=True)
+            return p
+        except Exception:
+            pass
+    fallback = Path.home() / "Documents" / "Funscripts"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+
+def _copy_safe(src: Path, dest_dir: Path) -> Path | None:
+    """Copy *src* into *dest_dir* with collision-safe naming. Returns dest path or None."""
+    import shutil
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / src.name
+    if dest.exists():
+        stem, suffix = src.stem, src.suffix
+        for i in range(1, 100):
+            dest = dest_dir / f"{stem} ({i}){suffix}"
+            if not dest.exists():
+                break
+    shutil.copy2(src, dest)
+    return dest
+
+
+def _save_funscript_output(src: Path, job: dict) -> Path | None:
+    """
+    Copy the generated funscript to the appropriate output folder.
+
+    Priority:
+      1. job["source_local_folder"] — same directory as the source video file
+      2. User's configured output folder (settings.json → output_folder)
+      3. ~/Documents/Funscripts (built-in fallback)
+
+    Returns the saved Path, or None on failure.
+    """
     try:
-        import shutil
-        dest_dir = _get_downloads_folder()
-        dest_dir.mkdir(parents=True, exist_ok=True)
-        dest = dest_dir / src.name
-        # Avoid overwriting an existing file with the same name
-        if dest.exists():
-            stem = src.stem
-            suffix = src.suffix
-            for i in range(1, 100):
-                dest = dest_dir / f"{stem} ({i}){suffix}"
-                if not dest.exists():
-                    break
-        shutil.copy2(src, dest)
-        logger.info("Copied funscript to Downloads: %s", dest)
+        source_folder = job.get("source_local_folder")
+        dest_dir = Path(source_folder) if source_folder else _get_default_output_folder()
+        dest = _copy_safe(src, dest_dir)
+        logger.info("Funscript saved to: %s", dest)
+        return dest
     except Exception:
-        logger.debug("Could not copy funscript to Downloads folder", exc_info=True)
+        logger.debug("Could not save funscript to output folder", exc_info=True)
+        return None
 
 def _get_port_file_path() -> Path:
     """
@@ -848,7 +892,7 @@ def _run_generate_job(job_id: str, prompt: str, options: dict) -> None:
 
         out_file = output_dir / f"gen_{job_id}.funscript"
         out_file.write_text(funscript_str)
-        _copy_to_downloads(out_file)
+        _save_funscript_output(out_file, job)
 
         job["funscript"] = funscript_str
         job["funscript_actions"] = processed_actions
@@ -1057,6 +1101,80 @@ def upload_funscript():
     return jsonify({"job_id": job_id, "filename": file.filename, "actions": actions[:50]})
 
 
+@app.route("/api/settings", methods=["GET"])
+def get_settings():
+    err, code = _require_trusted_request()
+    if err is not None:
+        return err, code
+    settings = _load_settings()
+    default_folder = str(Path.home() / "Documents" / "Funscripts")
+    return jsonify({
+        "output_folder": settings.get("output_folder", default_folder),
+    })
+
+
+@app.route("/api/settings", methods=["POST"])
+def update_settings():
+    err, code = _require_trusted_request()
+    if err is not None:
+        return err, code
+    data = request.json or {}
+    settings = _load_settings()
+    if "output_folder" in data:
+        folder = str(data["output_folder"]).strip()
+        if folder:
+            try:
+                p = Path(folder)
+                p.mkdir(parents=True, exist_ok=True)
+                settings["output_folder"] = str(p)
+            except Exception as exc:
+                return jsonify({"error": f"Cannot use that folder: {exc}"}), 400
+        else:
+            settings.pop("output_folder", None)
+    _save_settings(settings)
+    default_folder = str(Path.home() / "Documents" / "Funscripts")
+    return jsonify({"ok": True, "output_folder": settings.get("output_folder", default_folder)})
+
+
+@app.route("/api/import-local", methods=["POST"])
+def import_local_video():
+    """
+    POST /api/import-local  { "path": "C:\\Videos\\myvideo.mp4" }
+    Creates a job from a local file path without uploading.
+    The funscript will be saved to the same folder as the source video.
+    """
+    err, code = _require_trusted_request()
+    if err is not None:
+        return err, code
+    data = request.json or {}
+    path_str = str(data.get("path", "")).strip()
+    if not path_str:
+        return jsonify({"error": "No path provided"}), 400
+    video_path = Path(path_str)
+    if not video_path.exists():
+        return jsonify({"error": f"File not found: {path_str}"}), 404
+    if not video_path.is_file():
+        return jsonify({"error": "Path is not a file"}), 400
+    allowed = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".m4v"}
+    if video_path.suffix.lower() not in allowed:
+        return jsonify({"error": f"Unsupported format. Allowed: {', '.join(sorted(allowed))}"}), 400
+    _cleanup_stale_uploads()
+    job_id = str(uuid.uuid4())[:8]
+    jobs[job_id] = {
+        "id": job_id,
+        "filename": video_path.name,
+        "filepath": str(video_path),
+        "source_local_folder": str(video_path.parent),
+        "status": "uploaded",
+        "progress": 0,
+        "stage": 0,
+        "log": [],
+        "output_files": [],
+        "_created_at": time.time(),
+    }
+    return jsonify({"job_id": job_id, "filename": video_path.name, "size": video_path.stat().st_size})
+
+
 @app.route("/api/process", methods=["POST"])
 def start_processing():
     err, code = _require_trusted_request()
@@ -1150,12 +1268,16 @@ def _collect_funscript_results(job_id, video_path, output_dir):
 
     if funscript_files:
         job["output_files"] = [str(f) for f in funscript_files]
+        saved_paths = []
         for f in funscript_files:
-            _copy_to_downloads(f)
+            dest = _save_funscript_output(f, job)
+            if dest:
+                saved_paths.append(str(dest))
         emit_progress(job_id, 4, 100,
                       f"Complete! Generated {len(funscript_files)} funscript file(s).",
                       status="done")
         jobs[job_id]["status"] = "done"
+        jobs[job_id]["saved_to"] = saved_paths
         actions_preview = []
         try:
             content = json.loads(funscript_files[0].read_text())
@@ -1166,6 +1288,7 @@ def _collect_funscript_results(job_id, video_path, output_dir):
         socketio.emit("complete", {
             "job_id": job_id,
             "files": [f.name for f in funscript_files],
+            "saved_to": saved_paths,
             "actions": actions_preview[:100],
         })
     else:

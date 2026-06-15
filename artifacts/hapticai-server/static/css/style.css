@@ -425,6 +425,54 @@ a:hover { color: var(--accent2); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ---- Input mode tabs (Upload / Local Path) ---- */
+.input-mode-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+.input-tab {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.input-tab.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.input-tab:hover:not(.active) {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ---- Saved-to info (result panel) ---- */
+.saved-to-info {
+  margin: 8px 0 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.saved-to-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+.saved-to-row svg { flex-shrink: 0; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.saved-to-row code { font-size: 11px; color: var(--text); word-break: break-all; background: none; padding: 0; }
+
 /* ---- Scrollbar ---- */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

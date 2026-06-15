@@ -41,7 +41,87 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
   });
 });
 
-// ---- File upload (video) ----
+// ── Load settings on startup ──────────────────────────────────────────────────
+fetch('/api/settings')
+  .then(r => r.ok ? r.json() : null)
+  .then(s => { if (s) document.getElementById('s-output').value = s.output_folder || ''; })
+  .catch(() => {});
+
+// ── Save output folder setting ────────────────────────────────────────────────
+document.getElementById('btn-save-output').addEventListener('click', () => {
+  const folder = document.getElementById('s-output').value.trim();
+  const status = document.getElementById('output-save-status');
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ output_folder: folder }),
+  }).then(r => r.json()).then(res => {
+    if (res.error) {
+      status.style.color = '#ef4444';
+      status.textContent = '✗ ' + res.error;
+    } else {
+      status.style.color = '#22c55e';
+      status.textContent = '✓ Saved';
+      document.getElementById('s-output').value = res.output_folder || folder;
+      setTimeout(() => { status.textContent = ''; }, 3000);
+    }
+  }).catch(() => {
+    status.style.color = '#ef4444';
+    status.textContent = '✗ Failed to save';
+  });
+});
+
+// ── Input mode toggle (Upload / Local Path) ───────────────────────────────────
+document.getElementById('tab-upload-mode').addEventListener('click', () => {
+  document.getElementById('tab-upload-mode').classList.add('active');
+  document.getElementById('tab-local-mode').classList.remove('active');
+  document.getElementById('upload-mode').style.display = 'block';
+  document.getElementById('local-mode').style.display = 'none';
+});
+document.getElementById('tab-local-mode').addEventListener('click', () => {
+  document.getElementById('tab-local-mode').classList.add('active');
+  document.getElementById('tab-upload-mode').classList.remove('active');
+  document.getElementById('local-mode').style.display = 'block';
+  document.getElementById('upload-mode').style.display = 'none';
+});
+
+// ── Local path import ─────────────────────────────────────────────────────────
+function importLocalPath() {
+  const path = document.getElementById('local-path-input').value.trim();
+  const hint = document.getElementById('local-path-hint');
+  if (!path) return;
+  hint.textContent = 'Loading…';
+  hint.style.color = '';
+  fetch('/api/import-local', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path }),
+  }).then(r => r.json()).then(res => {
+    if (res.error) {
+      hint.style.color = '#ef4444';
+      hint.textContent = '✗ ' + res.error;
+      return;
+    }
+    currentJobId = res.job_id;
+    hint.style.color = '#22c55e';
+    hint.textContent = '✓ Loaded — funscript will be saved next to the video';
+    if (selectedMode) document.getElementById('btn-generate').disabled = false;
+    document.getElementById('upload-progress').style.display = 'block';
+    document.getElementById('upload-filename').textContent = res.filename;
+    document.getElementById('upload-size').textContent = formatSize(res.size);
+    document.getElementById('upload-fill').style.width = '100%';
+    showToast('Video loaded: ' + res.filename);
+  }).catch(e => {
+    hint.style.color = '#ef4444';
+    hint.textContent = '✗ ' + e.message;
+  });
+}
+document.getElementById('btn-local-load').addEventListener('click', importLocalPath);
+document.getElementById('local-path-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') importLocalPath();
+});
+
+// ── File upload (video) ───────────────────────────────────────────────────────
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
 
@@ -414,6 +494,28 @@ function onProcessingComplete(data) {
     `;
     dlList.appendChild(a);
   });
+
+  // Show where the file was saved on disk
+  const savedToInfo = document.getElementById('saved-to-info');
+  const savedPaths = data.saved_to || [];
+  if (savedPaths.length) {
+    // Deduplicate folder paths
+    const folders = [...new Set(savedPaths.map(p => {
+      const sep = p.includes('\\') ? '\\' : '/';
+      const parts = p.split(sep);
+      parts.pop();
+      return parts.join(sep) || p;
+    }))];
+    savedToInfo.style.display = 'block';
+    savedToInfo.innerHTML = folders.map(f =>
+      `<span class="saved-to-row">
+        <svg viewBox="0 0 24 24" width="13" height="13"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+        Saved to&nbsp;<code>${f}</code>
+      </span>`
+    ).join('');
+  } else {
+    savedToInfo.style.display = 'none';
+  }
 
   if (data.actions && data.actions.length) {
     funscriptActions = data.actions;

@@ -61,17 +61,36 @@
           <div class="card step" id="step-upload">
             <div class="step-number">1</div>
             <div class="step-body">
-              <h2>Upload Video</h2>
-              <p>Supported formats: MP4, MKV, AVI, MOV, WEBM</p>
-              <div class="drop-zone" id="drop-zone">
-                <div class="drop-icon">
-                  <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                </div>
-                <p class="drop-text">Drag & drop your video here</p>
-                <p class="drop-sub">or</p>
-                <label class="btn btn-outline" for="file-input">Browse Files</label>
-                <input type="file" id="file-input" accept=".mp4,.mkv,.avi,.mov,.wmv,.webm,.m4v" hidden />
+              <h2>Load Video</h2>
+              <div class="input-mode-tabs">
+                <button class="input-tab active" id="tab-upload-mode">Upload File</button>
+                <button class="input-tab" id="tab-local-mode">Local Path</button>
               </div>
+
+              <!-- Upload mode -->
+              <div id="upload-mode">
+                <p>Supported formats: MP4, MKV, AVI, MOV, WEBM</p>
+                <div class="drop-zone" id="drop-zone">
+                  <div class="drop-icon">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  </div>
+                  <p class="drop-text">Drag & drop your video here</p>
+                  <p class="drop-sub">or</p>
+                  <label class="btn btn-outline" for="file-input">Browse Files</label>
+                  <input type="file" id="file-input" accept=".mp4,.mkv,.avi,.mov,.wmv,.webm,.m4v" hidden />
+                </div>
+              </div>
+
+              <!-- Local path mode -->
+              <div id="local-mode" style="display:none">
+                <p>Paste the full path to a video on this computer. The funscript will be saved to the same folder.</p>
+                <div class="field-row" style="margin-top:12px">
+                  <input type="text" class="field-input" id="local-path-input" placeholder="C:\Videos\myvideo.mp4" />
+                  <button class="btn btn-outline" id="btn-local-load">Load</button>
+                </div>
+                <p class="field-hint" id="local-path-hint"></p>
+              </div>
+
               <div class="upload-progress" id="upload-progress" style="display:none">
                 <div class="file-info">
                   <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -206,6 +225,7 @@
               Funscript generated successfully!
             </div>
             <div class="download-list" id="download-list"></div>
+            <div id="saved-to-info" style="display:none" class="saved-to-info"></div>
             <button class="btn btn-outline" id="btn-view-script">View in Script Viewer</button>
           </div>
         </div>
@@ -370,11 +390,16 @@
         <div class="card">
           <h2>Output</h2>
           <div class="settings-group">
-            <label class="field-label">Output Folder</label>
+            <label class="field-label">Default Output Folder</label>
             <div class="field-row">
-              <input type="text" class="field-input" id="s-output" value="output" />
-              <button class="btn btn-sm">Browse</button>
+              <input type="text" class="field-input" id="s-output" placeholder="~/Documents/Funscripts" />
+              <button class="btn btn-sm" id="btn-save-output">Save</button>
             </div>
+            <p class="field-hint">
+              When the source video is a local file the funscript is saved next to it.
+              This folder is used for embedded / uploaded videos.
+              <span id="output-save-status" style="margin-left:6px;font-weight:600"></span>
+            </p>
           </div>
         </div>
 
