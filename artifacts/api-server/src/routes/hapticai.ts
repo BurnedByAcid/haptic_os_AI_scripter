@@ -20,6 +20,7 @@ interface GitHubReleaseCache {
   data: {
     tag: string;
     exeUrl: string | null;
+    exe50Url: string | null;
     dmgUrl: string | null;
   };
   fetchedAt: number;
@@ -48,17 +49,18 @@ async function fetchLatestGithubRelease(): Promise<GitHubReleaseCache["data"]> {
     assets: Array<{ name: string; browser_download_url: string }>;
   };
 
-  // Prefer exact well-known filename first; fall back to extension match so
-  // the endpoint keeps working if the file is ever renamed.
+  // Prefer exact well-known filenames first.
+  const exe50Asset = json.assets.find((a) => a.name === "HapticAI-Setup-50series.exe");
   const exeAsset =
     json.assets.find((a) => a.name === "HapticAI-Setup.exe") ??
-    json.assets.find((a) => a.name.toLowerCase().endsWith(".exe"));
+    json.assets.find((a) => a.name.toLowerCase().endsWith(".exe") && a.name !== "HapticAI-Setup-50series.exe");
   const dmgAsset =
     json.assets.find((a) => a.name.toLowerCase().endsWith(".dmg"));
 
   return {
     tag: json.tag_name,
     exeUrl: exeAsset?.browser_download_url ?? null,
+    exe50Url: exe50Asset?.browser_download_url ?? null,
     dmgUrl: dmgAsset?.browser_download_url ?? null,
   };
 }
@@ -92,7 +94,7 @@ router.get("/hapticai/github-release", async (_req: Request, res: Response) => {
     }
     // No releases published yet (or repo is private/empty) — return a null
     // result so clients can handle it gracefully instead of seeing a 502.
-    res.json({ tag: null, exeUrl: null, dmgUrl: null });
+    res.json({ tag: null, exeUrl: null, exe50Url: null, dmgUrl: null });
   }
 });
 
@@ -384,9 +386,9 @@ router.get("/hapticai/download/:platform", async (req: Request, res: Response) =
     return;
   }
 
-  const { platform } = req.params;
-  if (!["windows", "mac"].includes(platform)) {
-    res.status(400).json({ error: "Unknown platform. Use 'windows' or 'mac'." });
+  const platform = req.params.platform as string;
+  if (!["windows", "windows-50series", "mac"].includes(platform)) {
+    res.status(400).json({ error: "Unknown platform. Use 'windows', 'windows-50series', or 'mac'." });
     return;
   }
 
@@ -394,7 +396,12 @@ router.get("/hapticai/download/:platform", async (req: Request, res: Response) =
     // ── Prefer GitHub release (fast CDN redirect, no storage costs) ──────────
     try {
       const ghData = await fetchLatestGithubRelease();
-      const ghUrl = platform === "windows" ? ghData.exeUrl : ghData.dmgUrl;
+      const ghUrl =
+        platform === "windows-50series"
+          ? ghData.exe50Url
+          : platform === "windows"
+          ? ghData.exeUrl
+          : ghData.dmgUrl;
       if (ghUrl) {
         logger.info({ platform, tag: ghData.tag }, "HapticAI download — redirecting to GitHub release");
         res.redirect(302, ghUrl);

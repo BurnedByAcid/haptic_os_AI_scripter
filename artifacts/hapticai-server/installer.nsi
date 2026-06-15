@@ -23,13 +23,30 @@ SetDatablockOptimize on
 CRCCheck force
 
 ; ── Metadata ───────────────────────────────────────────────────────────────
-!define APP_NAME      "HapticAI"
-!define APP_FULL_NAME "HapticAI (Beta)"
-!define APP_EXE       "HapticAI.exe"
+; GPU_VARIANT is passed in via /DGPU_VARIANT=50series for the 50-series build.
+; If not set, this builds the standard (CUDA 12.8 / RTX 30xx–40xx) installer.
+!ifndef GPU_VARIANT
+  !define GPU_VARIANT "standard"
+!endif
+
+!if "${GPU_VARIANT}" == "50series"
+  !define APP_NAME      "HapticAI-50series"
+  !define APP_FULL_NAME "HapticAI (Beta) — RTX 50 Series"
+  !define APP_EXE       "HapticAI-50series.exe"
+  !define OUTFILE       "dist\HapticAI-Setup-50series.exe"
+  !define REG_KEY       "Software\HapticAI-50series"
+  !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\HapticAI-50series"
+!else
+  !define APP_NAME      "HapticAI"
+  !define APP_FULL_NAME "HapticAI (Beta)"
+  !define APP_EXE       "HapticAI.exe"
+  !define OUTFILE       "dist\HapticAI-Setup.exe"
+  !define REG_KEY       "Software\HapticAI"
+  !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\HapticAI"
+!endif
+
 !define APP_PUBLISHER "HapticOS"
 !define APP_URL       "https://hapticos.org"
-!define REG_KEY       "Software\HapticAI"
-!define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\HapticAI"
 
 ; VERSION is passed in via /DVERSION=v01.01.12 from build_windows.bat
 !ifndef VERSION
@@ -37,7 +54,7 @@ CRCCheck force
 !endif
 
 Name          "${APP_FULL_NAME}"
-OutFile       "dist\HapticAI-Setup.exe"
+OutFile       "${OUTFILE}"
 InstallDir    "$PROGRAMFILES64\HapticAI"
 InstallDirRegKey HKLM "${REG_KEY}" "InstallDir"
 
