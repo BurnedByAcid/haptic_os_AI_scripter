@@ -15,54 +15,68 @@ if "%VERSION%"=="" (
     pause & exit /b 1
 )
 
-:: ── Check Python exists ─────────────────────────────────────────────────────
+:: ── Find a usable Python 3.10 or 3.11 ──────────────────────────────────────
+:: Strategy:
+::   1. Check if `python` on PATH is 3.10 or 3.11 — use it directly.
+::   2. Otherwise try `py -3.11` (Python Launcher for Windows) — use that.
+::   3. Otherwise try `py -3.10` — use that.
+::   4. Otherwise abort with instructions.
+
+set PYTHON_CMD=
+
+:: Try PATH python first
 python --version >nul 2>&1
-if errorlevel 1 (
-    echo.
-    echo ERROR: Python not found.
-    echo        Install Python 3.11 from https://www.python.org/downloads/release/python-3119/
-    echo        and make sure it is added to PATH during install.
-    echo.
-    pause & exit /b 1
+if not errorlevel 1 (
+    for /f "tokens=2" %%V in ('python --version 2^>^&1') do set PYVER=%%V
+    for /f "tokens=1,2 delims=." %%A in ("!PYVER!") do (
+        set PY_MAJOR=%%A
+        set PY_MINOR=%%B
+    )
+    if "!PY_MAJOR!"=="3" (
+        if !PY_MINOR! GEQ 10 if !PY_MINOR! LEQ 11 (
+            set PYTHON_CMD=python
+            echo  Found Python !PYVER! on PATH.
+        )
+    )
 )
 
-:: ── Enforce Python 3.10 or 3.11 ─────────────────────────────────────────────
-:: PyInstaller, PyTorch, NumPy, and Ultralytics do NOT support Python 3.12+
-:: yet. Using 3.14 triggers OverflowError during PyInstaller analysis.
-for /f "tokens=2" %%V in ('python --version 2^>^&1') do set PYVER=%%V
-for /f "tokens=1,2 delims=." %%A in ("%PYVER%") do (
-    set PY_MAJOR=%%A
-    set PY_MINOR=%%B
+:: Try py launcher for 3.11 if PATH python didn't qualify
+if "!PYTHON_CMD!"=="" (
+    py -3.11 --version >nul 2>&1
+    if not errorlevel 1 (
+        set PYTHON_CMD=py -3.11
+        for /f "tokens=2" %%V in ('py -3.11 --version 2^>^&1') do set PYVER=%%V
+        echo  Found Python !PYVER! via py launcher ^(py -3.11^).
+    )
 )
 
-if "%PY_MAJOR%" NEQ "3" (
-    echo.
-    echo ERROR: Python 3.11 is required. You have Python %PYVER%.
-    echo        Download: https://www.python.org/downloads/release/python-3119/
-    echo.
-    pause & exit /b 1
-)
-if %PY_MINOR% LSS 10 (
-    echo.
-    echo ERROR: Python 3.10 or 3.11 is required. You have Python %PYVER%.
-    echo        Download: https://www.python.org/downloads/release/python-3119/
-    echo.
-    pause & exit /b 1
-)
-if %PY_MINOR% GTR 11 (
-    echo.
-    echo ERROR: Python %PYVER% is NOT supported.
-    echo        PyInstaller, PyTorch and NumPy require Python 3.10 or 3.11.
-    echo.
-    echo        If py.exe launcher is installed you can run a specific version:
-    echo          py -3.11 -m pip install ...
-    echo        Otherwise install Python 3.11 from:
-    echo          https://www.python.org/downloads/release/python-3119/
-    echo.
-    pause & exit /b 1
+:: Try py launcher for 3.10 as last resort
+if "!PYTHON_CMD!"=="" (
+    py -3.10 --version >nul 2>&1
+    if not errorlevel 1 (
+        set PYTHON_CMD=py -3.10
+        for /f "tokens=2" %%V in ('py -3.10 --version 2^>^&1') do set PYVER=%%V
+        echo  Found Python !PYVER! via py launcher ^(py -3.10^).
+    )
 )
 
-echo  Python %PYVER% OK.
+:: Nothing worked
+if "!PYTHON_CMD!"=="" (
+    echo.
+    echo ERROR: Python 3.10 or 3.11 not found.
+    echo.
+    echo   Your PATH python is too new ^(3.12+^) and the py launcher
+    echo   could not find 3.10 or 3.11 either.
+    echo.
+    echo   Fix options:
+    echo     A) Install Python 3.11: https://www.python.org/downloads/release/python-3119/
+    echo        Tick "Add Python to PATH" during install, then re-run this script.
+    echo     B) If Python 3.11 is already installed but not on PATH:
+    echo        Open this script in Notepad and set PYTHON_CMD manually at the top,
+    echo        e.g.  set PYTHON_CMD=C:\Python311\python.exe
+    echo.
+    pause & exit /b 1
+)
 
 :: ── Check NSIS ──────────────────────────────────────────────────────────────
 makensis /VERSION >nul 2>&1
@@ -76,14 +90,14 @@ if errorlevel 1 (
 
 :: ── [1/6] Virtual environment ───────────────────────────────────────────────
 echo.
-echo [1/6] Creating virtual environment...
+echo [1/6] Creating virtual environment using !PYTHON_CMD!...
 if exist build_venv rmdir /s /q build_venv
-python -m venv build_venv
+!PYTHON_CMD! -m venv build_venv
 call build_venv\Scripts\activate.bat
 
 :: ── [2/6] Build tools ───────────────────────────────────────────────────────
 echo [2/6] Installing build tools...
-python -m pip install --upgrade pip wheel "pyinstaller<7"
+!PYTHON_CMD! -m pip install --upgrade pip wheel "pyinstaller<7"
 
 :: ── [3/6] Dependencies ──────────────────────────────────────────────────────
 echo [3/6] Installing HapticAI dependencies...
