@@ -35,6 +35,8 @@ _LOOPBACK_ORIGIN_RE = _re.compile(r"^https?://(?:localhost|127\.\d+\.\d+\.\d+|\[
 def _build_allowed_origins():
     raw = os.environ.get("CORS_ALLOWED_ORIGINS", "")
     strings = [o.strip() for o in raw.split(",") if o.strip()] if raw.strip() else [
+        "https://hapticos.org",
+        "https://www.hapticos.org",
         "https://hapticos.replit.app",
         "http://localhost",
     ]
@@ -1392,110 +1394,120 @@ def _get_tray_icon_image():
 
 if __name__ == "__main__":
     import webbrowser
+    import traceback
 
-    preferred = int(os.environ.get("PORT", 8000))
-    bind_host = os.environ.get("HAPTICAI_HOST", "127.0.0.1")
-    port = find_free_port(preferred, bind_host)
-    _server_port = port
+    # Write crash log to %APPDATA%\HapticAI\error.log so silent failures are visible
+    _log_dir = Path(os.environ.get("APPDATA", str(Path.home()))) / "HapticAI"
+    _log_dir.mkdir(parents=True, exist_ok=True)
+    _error_log = _log_dir / "error.log"
 
-    PORT_FILE.write_text(str(port))
-
-    print(f"HAPTICAI_PORT={port}", flush=True)
-    print(f"HAPTICAI_URL=http://127.0.0.1:{port}", flush=True)
-    print(f"HAPTICAI_PORT_FILE={PORT_FILE}", flush=True)
-
-    logger.info(f"HapticAI (Beta) Web starting on http://{bind_host}:{port}")
-
-    app_url = f"http://127.0.0.1:{port}"
-
-    def _cleanup(signum, frame):
-        if PORT_FILE.exists():
-            PORT_FILE.unlink()
-        sys.exit(0)
-
-    signal.signal(signal.SIGTERM, _cleanup)
-
-    # ── Try to set up a system tray icon (Windows / Linux with pystray) ──
-    _tray_icon = None
     try:
-        import pystray
+        preferred = int(os.environ.get("PORT", 8000))
+        bind_host = os.environ.get("HAPTICAI_HOST", "127.0.0.1")
+        port = find_free_port(preferred, bind_host)
+        _server_port = port
 
-        def _open_browser(icon=None, item=None):
-            webbrowser.open(app_url)
+        PORT_FILE.write_text(str(port))
 
-        def _quit_app(icon, item):
-            icon.stop()
-            # Prefer the graceful HTTP shutdown route; fall back to SIGTERM
-            try:
-                import urllib.request as _urlreq
-                _urlreq.urlopen(
-                    _urlreq.Request(
-                        f"http://127.0.0.1:{port}/api/shutdown",
-                        data=b"",
-                        headers={"Authorization": f"Bearer {_SESSION_TOKEN}"},
-                        method="POST",
-                    ),
-                    timeout=3,
-                )
-            except Exception:
-                if PORT_FILE.exists():
-                    PORT_FILE.unlink()
-                os.kill(os.getpid(), signal.SIGTERM)
+        print(f"HAPTICAI_PORT={port}", flush=True)
+        print(f"HAPTICAI_URL=http://127.0.0.1:{port}", flush=True)
+        print(f"HAPTICAI_PORT_FILE={PORT_FILE}", flush=True)
 
-        _img = _get_tray_icon_image()
-        if _img is not None:
-            _menu = pystray.Menu(
-                pystray.MenuItem("Open HapticAI", _open_browser, default=True),
-                pystray.Menu.SEPARATOR,
-                pystray.MenuItem("Quit", _quit_app),
-            )
-            _tray_icon = pystray.Icon("HapticAI", _img, "HapticAI", _menu)
-    except Exception as _tray_err:
-        logger.warning(f"System tray not available: {_tray_err}")
+        logger.info(f"HapticAI (Beta) Web starting on http://{bind_host}:{port}")
+
+        app_url = f"http://127.0.0.1:{port}"
+
+        def _cleanup(signum, frame):
+            if PORT_FILE.exists():
+                PORT_FILE.unlink()
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, _cleanup)
+
+        # ── Try to set up a system tray icon (Windows / Linux with pystray) ──
         _tray_icon = None
+        try:
+            import pystray
 
-    # ── Start Flask in a background thread ──────────────────────────────
-    def _run_server():
-        socketio.run(app, host=bind_host, port=port, debug=False, allow_unsafe_werkzeug=True)
+            def _open_browser(icon=None, item=None):
+                webbrowser.open(app_url)
 
-    _server_thread = threading.Thread(target=_run_server, daemon=True)
-    _server_thread.start()
-
-    # Auto-open the browser only once the server is confirmed accepting connections
-    def _wait_and_open():
-        import socket as _sock
-        connected = False
-        for _ in range(40):
-            try:
-                with _sock.create_connection(("127.0.0.1", port), timeout=0.5):
-                    connected = True
-                    break
-            except OSError:
-                time.sleep(0.25)
-        if connected:
-            webbrowser.open(app_url)
-            if _tray_icon is not None and hasattr(_tray_icon, "notify"):
+            def _quit_app(icon, item):
+                icon.stop()
                 try:
-                    _tray_icon.notify(
-                        "HapticAI is running \u2014 click the tray icon to open",
-                        "HapticAI",
+                    import urllib.request as _urlreq
+                    _urlreq.urlopen(
+                        _urlreq.Request(
+                            f"http://127.0.0.1:{port}/api/shutdown",
+                            data=b"",
+                            headers={"Authorization": f"Bearer {_SESSION_TOKEN}"},
+                            method="POST",
+                        ),
+                        timeout=3,
                     )
+                except Exception:
+                    if PORT_FILE.exists():
+                        PORT_FILE.unlink()
+                    os.kill(os.getpid(), signal.SIGTERM)
 
-                    def _auto_dismiss():
-                        time.sleep(5)
-                        try:
-                            _tray_icon.remove_notification()
-                        except Exception:
-                            pass
+            _img = _get_tray_icon_image()
+            if _img is not None:
+                _menu = pystray.Menu(
+                    pystray.MenuItem("Open HapticAI", _open_browser, default=True),
+                    pystray.Menu.SEPARATOR,
+                    pystray.MenuItem("Quit", _quit_app),
+                )
+                _tray_icon = pystray.Icon("HapticAI", _img, "HapticAI", _menu)
+        except Exception as _tray_err:
+            logger.warning(f"System tray not available: {_tray_err}")
+            _tray_icon = None
 
-                    threading.Thread(target=_auto_dismiss, daemon=True).start()
-                except Exception as _notify_err:
-                    logger.debug(f"Startup notification not shown: {_notify_err}")
+        # ── Start Flask in a background thread ──────────────────────────────
+        def _run_server():
+            socketio.run(app, host=bind_host, port=port, debug=False, allow_unsafe_werkzeug=True)
 
-    threading.Thread(target=_wait_and_open, daemon=True).start()
+        _server_thread = threading.Thread(target=_run_server, daemon=True)
+        _server_thread.start()
 
-    # ── Main thread: run tray (blocks) or wait for server thread ────────
-    if _tray_icon is not None:
-        _tray_icon.run()
-    else:
-        _server_thread.join()
+        # Auto-open the browser only once the server is confirmed accepting connections
+        def _wait_and_open():
+            import socket as _sock
+            connected = False
+            for _ in range(40):
+                try:
+                    with _sock.create_connection(("127.0.0.1", port), timeout=0.5):
+                        connected = True
+                        break
+                except OSError:
+                    time.sleep(0.25)
+            if connected:
+                webbrowser.open(app_url)
+                if _tray_icon is not None and hasattr(_tray_icon, "notify"):
+                    try:
+                        _tray_icon.notify(
+                            "HapticAI is running \u2014 click the tray icon to open",
+                            "HapticAI",
+                        )
+
+                        def _auto_dismiss():
+                            time.sleep(5)
+                            try:
+                                _tray_icon.remove_notification()
+                            except Exception:
+                                pass
+
+                        threading.Thread(target=_auto_dismiss, daemon=True).start()
+                    except Exception as _notify_err:
+                        logger.debug(f"Startup notification not shown: {_notify_err}")
+
+        threading.Thread(target=_wait_and_open, daemon=True).start()
+
+        # ── Main thread: run tray (blocks) or wait for server thread ────────
+        if _tray_icon is not None:
+            _tray_icon.run()
+        else:
+            _server_thread.join()
+
+    except Exception:
+        _error_log.write_text(traceback.format_exc())
+        raise
