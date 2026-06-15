@@ -1,0 +1,161 @@
+      creating build\temp.win-amd64-cpython-314\Release\imgui
+      "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\HostX86\x64\cl.exe" /c /nologo /O2 /W3 /GL /DNDEBUG /MD -DPYIMGUI_CUSTOM_EXCEPTION -Iimgui-cpp -Iansifeed-cpp -I.\imgui -Iimgui -Iconfig-cpp -IC:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\include -IC:\Python314\include -IC:\Python314\Include "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\ATLMFC\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\VS\include" "-IC:\Program Files (x86)\Windows Kits\10\include\10.0.26100.0\ucrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\um" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\shared" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\winrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\cppwinrt" "-IC:\Program Files (x86)\Windows Kits\NETFXSDK\4.8.1\include\um" /EHsc /Tpconfig-cpp/py_imconfig.cpp /Fobuild\temp.win-amd64-cpython-314\Release\config-cpp\py_imconfig.obj /FIpy_imconfig.h
+      py_imconfig.cpp
+      "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\HostX86\x64\cl.exe" /c /nologo /O2 /W3 /GL /DNDEBUG /MD -DPYIMGUI_CUSTOM_EXCEPTION -Iimgui-cpp -Iansifeed-cpp -I.\imgui -Iimgui -Iconfig-cpp -IC:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\include -IC:\Python314\include -IC:\Python314\Include "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\ATLMFC\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\VS\include" "-IC:\Program Files (x86)\Windows Kits\10\include\10.0.26100.0\ucrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\um" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\shared" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\winrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\cppwinrt" "-IC:\Program Files (x86)\Windows Kits\NETFXSDK\4.8.1\include\um" /EHsc /Tpimgui-cpp/imgui.cpp /Fobuild\temp.win-amd64-cpython-314\Release\imgui-cpp\imgui.obj /FIpy_imconfig.h
+      imgui.cpp
+      "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\HostX86\x64\cl.exe" /c /nologo /O2 /W3 /GL /DNDEBUG /MD -DPYIMGUI_CUSTOM_EXCEPTION -Iimgui-cpp -Iansifeed-cpp -I.\imgui -Iimgui -Iconfig-cpp -IC:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\include -IC:\Python314\include -IC:\Python314\Include "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\ATLMFC\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\VS\include" "-IC:\Program Files (x86)\Windows Kits\10\include\10.0.26100.0\ucrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\um" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\shared" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\winrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\cppwinrt" "-IC:\Program Files (x86)\Windows Kits\NETFXSDK\4.8.1\include\um" /EHsc /Tpimgui-cpp/imgui_demo.cpp /Fobuild\temp.win-amd64-cpython-314\Release\imgui-cpp\imgui_demo.obj /FIpy_imconfig.h
+      imgui_demo.cpp
+      "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\HostX86\x64\cl.exe" /c /nologo /O2 /W3 /GL /DNDEBUG /MD -DPYIMGUI_CUSTOM_EXCEPTION -Iimgui-cpp -Iansifeed-cpp -I.\imgui -Iimgui -Iconfig-cpp -IC:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\include -IC:\Python314\include -IC:\Python314\Include "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\ATLMFC\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\VS\include" "-IC:\Program Files (x86)\Windows Kits\10\include\10.0.26100.0\ucrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\um" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\shared" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\winrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\cppwinrt" "-IC:\Program Files (x86)\Windows Kits\NETFXSDK\4.8.1\include\um" /EHsc /Tpimgui-cpp/imgui_draw.cpp /Fobuild\temp.win-amd64-cpython-314\Release\imgui-cpp\imgui_draw.obj /FIpy_imconfig.h
+      imgui_draw.cpp
+      "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\HostX86\x64\cl.exe" /c /nologo /O2 /W3 /GL /DNDEBUG /MD -DPYIMGUI_CUSTOM_EXCEPTION -Iimgui-cpp -Iansifeed-cpp -I.\imgui -Iimgui -Iconfig-cpp -IC:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\include -IC:\Python314\include -IC:\Python314\Include "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\ATLMFC\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\VS\include" "-IC:\Program Files (x86)\Windows Kits\10\include\10.0.26100.0\ucrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\um" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\shared" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\winrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\cppwinrt" "-IC:\Program Files (x86)\Windows Kits\NETFXSDK\4.8.1\include\um" /EHsc /Tpimgui-cpp/imgui_tables.cpp /Fobuild\temp.win-amd64-cpython-314\Release\imgui-cpp\imgui_tables.obj /FIpy_imconfig.h
+      imgui_tables.cpp
+      "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\HostX86\x64\cl.exe" /c /nologo /O2 /W3 /GL /DNDEBUG /MD -DPYIMGUI_CUSTOM_EXCEPTION -Iimgui-cpp -Iansifeed-cpp -I.\imgui -Iimgui -Iconfig-cpp -IC:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\include -IC:\Python314\include -IC:\Python314\Include "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\ATLMFC\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\VS\include" "-IC:\Program Files (x86)\Windows Kits\10\include\10.0.26100.0\ucrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\um" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\shared" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\winrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\cppwinrt" "-IC:\Program Files (x86)\Windows Kits\NETFXSDK\4.8.1\include\um" /EHsc /Tpimgui-cpp/imgui_widgets.cpp /Fobuild\temp.win-amd64-cpython-314\Release\imgui-cpp\imgui_widgets.obj /FIpy_imconfig.h
+      imgui_widgets.cpp
+      "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\bin\HostX86\x64\cl.exe" /c /nologo /O2 /W3 /GL /DNDEBUG /MD -DPYIMGUI_CUSTOM_EXCEPTION -Iimgui-cpp -Iansifeed-cpp -I.\imgui -Iimgui -Iconfig-cpp -IC:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\include -IC:\Python314\include -IC:\Python314\Include "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\MSVC\14.51.36231\ATLMFC\include" "-IC:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\VS\include" "-IC:\Program Files (x86)\Windows Kits\10\include\10.0.26100.0\ucrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\um" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\shared" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\winrt" "-IC:\Program Files (x86)\Windows Kits\10\\include\10.0.26100.0\\cppwinrt" "-IC:\Program Files (x86)\Windows Kits\NETFXSDK\4.8.1\include\um" /EHsc /Tpimgui/core.cpp /Fobuild\temp.win-amd64-cpython-314\Release\imgui\core.obj /FIpy_imconfig.h
+      core.cpp
+      imgui/core.cpp(898): warning C4996: 'Py_UNICODE': deprecated in 3.13
+      imgui/core.cpp(899): warning C4996: 'Py_UNICODE': deprecated in 3.13
+      imgui/core.cpp(2651): error C3861: '_PyInterpreterState_GetConfig': identifier not found
+      imgui/core.cpp(2916): error C3861: '_PyList_Extend': identifier not found
+      imgui/core.cpp(43012): warning C4244: '=': conversion from 'Py_ssize_t' to 'int', possible loss of data
+      imgui/core.cpp(76079): warning C4244: '=': conversion from 'Py_ssize_t' to 'int', possible loss of data
+      imgui/core.cpp(76325): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+      imgui/core.cpp(76655): warning C4244: '=': conversion from 'Py_ssize_t' to 'int', possible loss of data
+      imgui/core.cpp(76910): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+      imgui/core.cpp(77220): warning C4244: '=': conversion from 'Py_ssize_t' to 'int', possible loss of data
+      imgui/core.cpp(77474): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+      imgui/core.cpp(151081): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(151081): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(151277): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(151277): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(151473): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(151473): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(151669): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(151669): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(151865): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(151865): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(152061): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(152061): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(152257): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(152257): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(152453): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(152453): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(152649): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(152649): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(152845): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(152845): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(153041): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(153041): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(153237): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(153237): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(153433): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(153433): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(153629): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(153629): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(153901): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(153901): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(154097): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(154097): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(154293): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(154293): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(154489): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(154489): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(154685): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(154685): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(154881): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(154881): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(155077): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(155077): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(155273): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(155273): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(155469): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(155469): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(155665): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(155665): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(155861): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(155861): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(156057): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(156057): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(156253): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(156253): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(156449): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(156449): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(156645): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(156645): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(156841): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(156841): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(157037): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(157037): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(157233): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(157233): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(157429): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(157429): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(157625): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(157625): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(157821): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(157821): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(158131): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(158131): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(158555): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(158555): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(158827): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(158827): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(159353): error C2660: '_PyLong_AsByteArray': function does not take 5 arguments
+      C:\Python314\include\cpython/longobject.h(84): note: see declaration of '_PyLong_AsByteArray'
+      imgui/core.cpp(159353): note: while trying to match the argument list '(PyLongObject *, unsigned char *, size_t, int, bool)'
+      imgui/core.cpp(159636): error C3861: '_PyGen_SetStopIterationValue': identifier not found
+      error: command 'C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX86\\x64\\cl.exe' failed with exit code 2
+      [end of output]
+
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+  ERROR: Failed building wheel for imgui
+  Building wheel for glcontext (pyproject.toml) ... done
+  Created wheel for glcontext: filename=glcontext-3.0.0-cp314-cp314-win_amd64.whl size=12785 sha256=396e6ea396e99f037b8d6420cb3e5ab10b4ba8a5dd806da1e141a9e212fa1264
+  Stored in directory: c:\users\james\appdata\local\pip\cache\wheels\30\c2\09\a42f2605cc96193b38e494f4e05550ad395b3101fcd9254c94
+Successfully built numpy moderngl glcontext
+Failed to build imgui
+error: failed-wheel-build-for-install
+
+× Failed to build installable wheels for some pyproject.toml based projects
+╰─> imgui
+Looking in indexes: https://download.pytorch.org/whl/cpu
+Collecting torch>=2.9.0 (from -r cpu.requirements.txt (line 1))
+  Downloading torch-2.12.0%2Bcpu-cp314-cp314-win_amd64.whl.metadata (32 kB)
