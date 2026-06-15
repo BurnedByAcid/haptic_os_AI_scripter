@@ -1,0 +1,684 @@
+[4/6] Running PyInstaller...
+158 INFO: PyInstaller: 6.21.0, contrib hooks: 2026.6
+159 INFO: Python: 3.14.4
+182 INFO: Platform: Windows-11-10.0.26200-SP0
+182 INFO: Python environment: C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv
+184 INFO: Removing temporary files and cleaning cache in C:\Users\james\AppData\Local\pyinstaller
+186 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Scripts\\pyinstaller.exe',
+ 'C:\\Python314\\python314.zip',
+ 'C:\\Python314\\DLLs',
+ 'C:\\Python314\\Lib',
+ 'C:\\Python314',
+ 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv',
+ 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages',
+ 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server']
+298 WARNING: discover_hook_directories: Failed to process hook entry point 'EntryPoint(name='hook-dirs', value='numpy:_pyinstaller_hooks_dir', group='pyinstaller40')': OverflowError: cannot convert longdouble infinity to integer
+648 INFO: Appending 'datas' from .spec
+658 INFO: checking Analysis
+658 INFO: Building Analysis because Analysis-00.toc is non existent
+658 INFO: Looking for Python shared library...
+658 INFO: Using Python shared library: C:\Python314\python314.dll
+658 INFO: Running Analysis Analysis-00.toc
+659 INFO: Target bytecode optimization level: 0
+659 INFO: Initializing module dependency graph...
+660 INFO: Initializing module graph hook caches...
+687 INFO: Analyzing modules for base_library.zip ...
+1715 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+2549 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+2986 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5683 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5701 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7106 INFO: Caching module dependency graph...
+7130 INFO: Analyzing C:\Users\james\Downloads\hapticai-server\hapticai-server\web_app.py
+7249 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7303 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7318 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7651 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+7653 INFO: SetuptoolsInfo: initializing cached setuptools info...
+8494 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+8612 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+9968 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+10468 INFO: Processing standard module hook 'hook-jinja2.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+11292 INFO: Processing pre-safe-import-module hook 'hook-importlib_metadata.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+11380 INFO: Processing standard module hook 'hook-urllib3.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+11475 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+11830 INFO: Processing standard module hook 'hook-certifi.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+11874 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+12683 INFO: Processing standard module hook 'hook-torch.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+875 WARNING: Failed to collect submodules for 'torch' because importing 'torch' raised: OverflowError: cannot convert longdouble infinity to integer
+18894 INFO: hook-torch: this torch build does not depend on MKL...
+19404 INFO: Processing standard module hook 'hook-numpy.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+20450 INFO: Processing standard module hook 'hook-psutil.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+22547 INFO: Processing standard module hook 'hook-matplotlib.py' from 'C:\\Users\\james\\Downloads\\hapticai-server\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Scripts\pyinstaller.exe\__main__.py", line 5, in <module>
+    sys.exit(_console_script_run())
+             ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\__main__.py", line 231, in _console_script_run
+    run()
+    ~~~^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\__main__.py", line 215, in run
+    run_build(pyi_config, spec_file, **vars(args))
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\__main__.py", line 70, in run_build
+    PyInstaller.building.build_main.main(pyi_config, spec_file, **kwargs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py", line 1275, in main
+    build(specfile, distpath, workpath, clean_build)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py", line 1213, in build
+    exec(code, spec_namespace)
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "hapticai_windows.spec", line 14, in <module>
+    a = Analysis(
+        [str(ROOT / 'web_app.py')],
+    ...<40 lines>...
+        noarchive=False,
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py", line 584, in __init__
+    self.__postinit__()
+    ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\datastruct.py", line 184, in __postinit__
+    self.assemble()
+    ~~~~~~~~~~~~~^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py", line 716, in assemble
+    program_scripts.append(self.graph.add_script(script))
+                           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 283, in add_script
+    self._top_script_node = super().add_script(pathname)
+                            ~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1194, in add_script
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1266, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1445, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1266, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1445, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1266, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1445, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1279, in import_hook
+    submodule = self._safe_import_module(head, mname, submodule)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1279, in import_hook
+    submodule = self._safe_import_module(head, mname, submodule)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1279, in import_hook
+    submodule = self._safe_import_module(head, mname, submodule)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1279, in import_hook
+    submodule = self._safe_import_module(head, mname, submodule)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1279, in import_hook
+    submodule = self._safe_import_module(head, mname, submodule)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2312, in _safe_import_hook
+    self.import_hook(
+    ~~~~~~~~~~~~~~~~^
+        target_module_partname, source_module,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        target_attr_names=[target_submodule_partname],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        level=level,
+        ^^^^^^^^^^^^
+        edge_attr=edge_attr)
+        ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1305, in import_hook
+    for target_submodule in self._import_importable_package_submodules(
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        target_module, target_attr_names):
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1554, in _import_importable_package_submodules
+    submodule = self._safe_import_module(
+        attr_name, submodule_name, package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1279, in import_hook
+    submodule = self._safe_import_module(head, mname, submodule)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2312, in _safe_import_hook
+    self.import_hook(
+    ~~~~~~~~~~~~~~~~^
+        target_module_partname, source_module,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        target_attr_names=[target_submodule_partname],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        level=level,
+        ^^^^^^^^^^^^
+        edge_attr=edge_attr)
+        ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1305, in import_hook
+    for target_submodule in self._import_importable_package_submodules(
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        target_module, target_attr_names):
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1554, in _import_importable_package_submodules
+    submodule = self._safe_import_module(
+        attr_name, submodule_name, package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1279, in import_hook
+    submodule = self._safe_import_module(head, mname, submodule)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2312, in _safe_import_hook
+    self.import_hook(
+    ~~~~~~~~~~~~~~~~^
+        target_module_partname, source_module,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        target_attr_names=[target_submodule_partname],
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        level=level,
+        ^^^^^^^^^^^^
+        edge_attr=edge_attr)
+        ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1305, in import_hook
+    for target_submodule in self._import_importable_package_submodules(
+                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        target_module, target_attr_names):
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1554, in _import_importable_package_submodules
+    submodule = self._safe_import_module(
+        attr_name, submodule_name, package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1279, in import_hook
+    submodule = self._safe_import_module(head, mname, submodule)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1279, in import_hook
+    submodule = self._safe_import_module(head, mname, submodule)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1266, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1445, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1279, in import_hook
+    submodule = self._safe_import_module(head, mname, submodule)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1266, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1445, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1266, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1445, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1266, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1445, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1266, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1445, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1266, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1445, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1266, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1445, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 477, in _safe_import_hook
+    ret_modules = super()._safe_import_hook(
+        target_module_partname, source_module, target_attr_names, level, edge_attr
+    )
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2103, in _safe_import_hook
+    target_modules = self.import_hook(
+        target_module_partname, source_module,
+        target_attr_names=None, level=level, edge_attr=edge_attr)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1266, in import_hook
+    target_package, target_module_partname = self._find_head_package(
+                                             ~~~~~~~~~~~~~~~~~~~~~~~^
+        source_package, target_module_partname, level)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1445, in _find_head_package
+    target_package = self._safe_import_module(
+        target_module_headname, target_package_name, source_package)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 539, in _safe_import_module
+    return super()._safe_import_module(module_basename, module_name, parent_package)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 1826, in _safe_import_module
+    self._process_imports(n)
+    ~~~~~~~~~~~~~~~~~~~~~^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\lib\modulegraph\modulegraph.py", line 2686, in _process_imports
+    target_modules = self._safe_import_hook(*import_info, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 385, in _safe_import_hook
+    excluded_imports = self._find_all_excluded_imports(source_module.identifier)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\analysis.py", line 373, in _find_all_excluded_imports
+    excluded_imports.update(module_hook.excludedimports)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\imphook.py", line 343, in __getattr__
+    self._load_hook_module()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\depend\imphook.py", line 422, in _load_hook_module
+    self._hook_module = importlib_load_source(self.hook_module_name, self.hook_filename)
+                        ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\compat.py", line 567, in importlib_load_source
+    mod_loader.exec_module(mod)
+    ~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "<frozen importlib._bootstrap_external>", line 759, in exec_module
+  File "<frozen importlib._bootstrap>", line 491, in _call_with_frames_removed
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\hooks\hook-matplotlib.py", line 24, in <module>
+    (mpl_data_dir(), "matplotlib/mpl-data"),
+     ~~~~~~~~~~~~^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\isolated\_parent.py", line 435, in wrapped
+    return call(function, *args, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\isolated\_parent.py", line 404, in call
+    return isolated.call(function, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\isolated\_parent.py", line 334, in call
+    raise RuntimeError(f"Child process call to {function.__name__}() failed with:\n" + output)
+RuntimeError: Child process call to mpl_data_dir() failed with:
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\isolated\_child.py", line 63, in run_next_command
+    output = function(*args, **kwargs)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\PyInstaller\hooks\hook-matplotlib.py", line 19, in mpl_data_dir
+    import matplotlib
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\matplotlib\__init__.py", line 161, in <module>
+    from . import _api, _version, cbook, rcsetup
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\matplotlib\cbook.py", line 24, in <module>
+    import numpy as np
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\numpy\__init__.py", line 298, in <module>
+    _core.getlimits._register_known_types()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\numpy\_core\getlimits.py", line 234, in _register_known_types
+    float128_ma = MachArLike(ld,
+                             machep=-112,
+    ...<10 lines>...
+                             huge=huge_f128,
+                             tiny=tiny_f128)
+  File "C:\Users\james\Downloads\hapticai-server\hapticai-server\build_venv\Lib\site-packages\numpy\_core\getlimits.py", line 52, in __init__
+    self.precision = int(-log10(self.eps))
+                     ~~~^^^^^^^^^^^^^^^^^^
+OverflowError: cannot convert longdouble infinity to integer
+ERROR: PyInstaller build failed. Check output above.
+Press any key to continue . . .
