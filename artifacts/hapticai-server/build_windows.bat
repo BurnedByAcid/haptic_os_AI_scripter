@@ -2,6 +2,9 @@
 setlocal EnableDelayedExpansion
 title HapticAI (Beta) Windows Build
 
+:: Always run from the directory containing this script, regardless of how it was launched
+cd /d "%~dp0"
+
 echo ============================================================
 echo  HapticAI (Beta) Windows Build Script
 echo  Builds TWO installers:

@@ -179,6 +179,44 @@ OUTPUT_FOLDER = Path("output")
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 OUTPUT_FOLDER.mkdir(exist_ok=True)
 
+
+def _get_downloads_folder() -> Path:
+    """Return the user's Downloads folder across platforms."""
+    if sys.platform == "win32":
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders",
+            )
+            val, _ = winreg.QueryValueEx(key, "{374DE290-123F-4565-9164-39C4925E467B}")
+            winreg.CloseKey(key)
+            return Path(val)
+        except Exception:
+            pass
+    return Path.home() / "Downloads"
+
+
+def _copy_to_downloads(src: Path) -> None:
+    """Copy *src* to the user's Downloads folder, silently ignoring errors."""
+    try:
+        import shutil
+        dest_dir = _get_downloads_folder()
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / src.name
+        # Avoid overwriting an existing file with the same name
+        if dest.exists():
+            stem = src.stem
+            suffix = src.suffix
+            for i in range(1, 100):
+                dest = dest_dir / f"{stem} ({i}){suffix}"
+                if not dest.exists():
+                    break
+        shutil.copy2(src, dest)
+        logger.info("Copied funscript to Downloads: %s", dest)
+    except Exception:
+        logger.debug("Could not copy funscript to Downloads folder", exc_info=True)
+
 def _get_port_file_path() -> Path:
     """
     Return the path for hapticai_port.txt.
@@ -810,6 +848,7 @@ def _run_generate_job(job_id: str, prompt: str, options: dict) -> None:
 
         out_file = output_dir / f"gen_{job_id}.funscript"
         out_file.write_text(funscript_str)
+        _copy_to_downloads(out_file)
 
         job["funscript"] = funscript_str
         job["funscript_actions"] = processed_actions
@@ -1111,6 +1150,8 @@ def _collect_funscript_results(job_id, video_path, output_dir):
 
     if funscript_files:
         job["output_files"] = [str(f) for f in funscript_files]
+        for f in funscript_files:
+            _copy_to_downloads(f)
         emit_progress(job_id, 4, 100,
                       f"Complete! Generated {len(funscript_files)} funscript file(s).",
                       status="done")
