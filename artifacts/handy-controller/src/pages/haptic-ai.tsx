@@ -550,8 +550,21 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
   if (os === "other") {
     return (
       <p className="text-xs text-muted-foreground">
-        HapticAI is available for Windows and macOS. Check back soon for Linux support.
+        HapticAI is available for Windows. Check back soon for other platforms.
       </p>
+    );
+  }
+
+  if (os === "mac") {
+    return (
+      <div className="inline-flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground line-through">
+          Download HapticAI for macOS
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
+          Coming Soon
+        </span>
+      </div>
     );
   }
 
