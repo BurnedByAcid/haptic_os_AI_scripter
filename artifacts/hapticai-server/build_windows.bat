@@ -107,14 +107,14 @@ if "!PYTHON_CMD!"=="" (
 
 :: ── Find makensis ────────────────────────────────────────────────────────────
 :: Try PATH first, then the default NSIS install location.
-set MAKENSIS=makensis
+set "MAKENSIS=makensis"
 makensis /VERSION >nul 2>&1
 if errorlevel 1 (
     if exist "C:\Program Files (x86)\NSIS\makensis.exe" (
-        set MAKENSIS=C:\Program Files (x86)\NSIS\makensis.exe
+        set "MAKENSIS=C:\Program Files (x86)\NSIS\makensis.exe"
         echo  Found NSIS at default install path.
     ) else if exist "C:\Program Files\NSIS\makensis.exe" (
-        set MAKENSIS=C:\Program Files\NSIS\makensis.exe
+        set "MAKENSIS=C:\Program Files\NSIS\makensis.exe"
         echo  Found NSIS at default install path ^(64-bit^).
     ) else (
         echo.
