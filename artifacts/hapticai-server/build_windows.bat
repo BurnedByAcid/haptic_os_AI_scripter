@@ -85,14 +85,23 @@ if "!PYTHON_CMD!"=="" (
     pause & exit /b 1
 )
 
-:: ── Check NSIS ──────────────────────────────────────────────────────────────
+:: ── Find makensis ────────────────────────────────────────────────────────────
+:: Try PATH first, then the default NSIS install location.
+set MAKENSIS=makensis
 makensis /VERSION >nul 2>&1
 if errorlevel 1 (
-    echo.
-    echo ERROR: NSIS not found. Install NSIS 3.x from https://nsis.sourceforge.io
-    echo        and make sure makensis.exe is on your PATH.
-    echo.
-    pause & exit /b 1
+    if exist "C:\Program Files (x86)\NSIS\makensis.exe" (
+        set MAKENSIS=C:\Program Files (x86)\NSIS\makensis.exe
+        echo  Found NSIS at default install path.
+    ) else if exist "C:\Program Files\NSIS\makensis.exe" (
+        set MAKENSIS=C:\Program Files\NSIS\makensis.exe
+        echo  Found NSIS at default install path ^(64-bit^).
+    ) else (
+        echo.
+        echo ERROR: NSIS not found. Install NSIS 3.x from https://nsis.sourceforge.io
+        echo.
+        pause & exit /b 1
+    )
 )
 
 :: ── [1/11] Virtual environment ──────────────────────────────────────────────
@@ -126,7 +135,7 @@ if not exist dist\HapticAI.exe (
 
 :: ── [5/11] NSIS — standard installer ────────────────────────────────────────
 echo [5/11] Building standard installer ^(NSIS^)...
-makensis /DVERSION="%VERSION%" installer.nsi
+"!MAKENSIS!" /DVERSION="%VERSION%" installer.nsi
 
 if not exist dist\HapticAI-Setup.exe (
     echo.
@@ -156,7 +165,7 @@ if not exist dist\HapticAI-50series.exe (
 
 :: ── [8/11] NSIS — 50-series installer ───────────────────────────────────────
 echo [8/11] Building 50-series installer ^(NSIS^)...
-makensis /DVERSION="%VERSION%" /DGPU_VARIANT=50series installer.nsi
+"!MAKENSIS!" /DVERSION="%VERSION%" /DGPU_VARIANT=50series installer.nsi
 
 if not exist dist\HapticAI-Setup-50series.exe (
     echo.
@@ -186,7 +195,7 @@ if not exist dist\HapticAI-CPU.exe (
 
 :: ── [11/11] NSIS — CPU installer ────────────────────────────────────────────
 echo [11/11] Building CPU installer ^(NSIS^)...
-makensis /DVERSION="%VERSION%" /DGPU_VARIANT=cpu installer.nsi
+"!MAKENSIS!" /DVERSION="%VERSION%" /DGPU_VARIANT=cpu installer.nsi
 
 if not exist dist\HapticAI-Setup-CPU.exe (
     echo.
