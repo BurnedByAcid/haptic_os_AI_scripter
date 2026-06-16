@@ -57,6 +57,16 @@ if "!PYTHON_CMD!"=="" (
     )
 )
 
+:: Try modern -V: syntax (py -V:3.11) as fallback
+if "!PYTHON_CMD!"=="" (
+    py -V:3.11 --version >nul 2>&1
+    if not errorlevel 1 (
+        set PYTHON_CMD=py -V:3.11
+        for /f "tokens=2" %%V in ('py -V:3.11 --version 2^>^&1') do set PYVER=%%V
+        echo  Found Python !PYVER! via py launcher ^(py -V:3.11^).
+    )
+)
+
 :: Try py launcher for 3.10 as last resort
 if "!PYTHON_CMD!"=="" (
     py -3.10 --version >nul 2>&1
@@ -64,6 +74,16 @@ if "!PYTHON_CMD!"=="" (
         set PYTHON_CMD=py -3.10
         for /f "tokens=2" %%V in ('py -3.10 --version 2^>^&1') do set PYVER=%%V
         echo  Found Python !PYVER! via py launcher ^(py -3.10^).
+    )
+)
+
+:: Try modern -V: syntax for 3.10
+if "!PYTHON_CMD!"=="" (
+    py -V:3.10 --version >nul 2>&1
+    if not errorlevel 1 (
+        set PYTHON_CMD=py -V:3.10
+        for /f "tokens=2" %%V in ('py -V:3.10 --version 2^>^&1') do set PYVER=%%V
+        echo  Found Python !PYVER! via py launcher ^(py -V:3.10^).
     )
 )
 
