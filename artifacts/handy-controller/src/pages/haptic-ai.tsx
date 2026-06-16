@@ -220,6 +220,7 @@ interface GithubRelease {
   tag: string;
   exeUrl: string | null;
   exe50Url: string | null;
+  exeCpuUrl: string | null;
   dmgUrl: string | null;
 }
 
@@ -328,7 +329,7 @@ function UnavailableMessage({
 }
 
 function useHapticAIDownload({ os, release, onDownloaded }: {
-  os: "windows" | "windows-50series" | "mac" | "other";
+  os: "windows" | "windows-50series" | "windows-cpu" | "mac" | "other";
   release: HapticAIRelease | null;
   onDownloaded?: (version: string) => void;
 }) {
@@ -535,6 +536,17 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
     handleCancel: handleCancel50,
   } = useHapticAIDownload({ os: os === "windows" ? "windows-50series" : "other", release, onDownloaded });
 
+  const {
+    downloading: downloadingCpu,
+    downloadError: downloadErrorCpu,
+    upgradeUrl: upgradeUrlCpu,
+    progress: progressCpu,
+    receivedBytes: receivedBytesCpu,
+    downloadSpeed: downloadSpeedCpu,
+    handleDownload: handleDownloadCpu,
+    handleCancel: handleCancelCpu,
+  } = useHapticAIDownload({ os: os === "windows" ? "windows-cpu" : "other", release, onDownloaded });
+
   if (os === "other") {
     return (
       <p className="text-xs text-muted-foreground">
@@ -545,7 +557,8 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
 
   const platformRelease = os === "windows" ? release?.windows : release?.mac;
   const label = os === "windows" ? "Download for Windows — RTX 30/40 Series" : "Download HapticAI for macOS";
-  const label50 = "Download for Windows — RTX 50 Series";
+  const label50  = "Download for Windows — RTX 50 Series";
+  const labelCpu = "Download for Windows — CPU Only (no GPU needed)";
 
   if (state === "loading") {
     return (
@@ -555,10 +568,16 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
           {label}
         </span>
         {os === "windows" && (
-          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            {label50}
-          </span>
+          <>
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {label50}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {labelCpu}
+            </span>
+          </>
         )}
       </div>
     );
@@ -574,6 +593,9 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
   const github50FallbackUrl =
     githubState === "ready" && githubRelease ? githubRelease.exe50Url : null;
 
+  const githubCpuFallbackUrl =
+    githubState === "ready" && githubRelease ? githubRelease.exeCpuUrl : null;
+
   const githubTagForLabel =
     githubState === "ready" && githubRelease ? githubRelease.tag : null;
 
@@ -586,11 +608,18 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
           githubTag={githubTagForLabel}
         />
         {os === "windows" && (
-          <UnavailableMessage
-            label={label50}
-            githubUrl={github50FallbackUrl}
-            githubTag={githubTagForLabel}
-          />
+          <>
+            <UnavailableMessage
+              label={label50}
+              githubUrl={github50FallbackUrl}
+              githubTag={githubTagForLabel}
+            />
+            <UnavailableMessage
+              label={labelCpu}
+              githubUrl={githubCpuFallbackUrl}
+              githubTag={githubTagForLabel}
+            />
+          </>
         )}
       </div>
     );
@@ -790,6 +819,105 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
               or{" "}
               <a
                 href={github50FallbackUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-foreground transition-colors"
+              >
+                download directly from GitHub
+              </a>
+            </p>
+          )}
+        </div>
+      )}
+
+      {os === "windows" && (
+        <div className="space-y-1 pt-0.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleDownloadCpu}
+              disabled={downloadingCpu}
+              className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {downloadingCpu
+                ? <Loader2 className="h-3 w-3 animate-spin" />
+                : <Download className="h-3 w-3" />
+              }
+              {downloadingCpu ? "Downloading…" : labelCpu}
+              {!downloadingCpu && (
+                <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
+                  {formatBytes(platformRelease.sizeBytes)}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {downloadingCpu && (
+            <div className="space-y-1 pt-0.5">
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 w-full max-w-[220px] rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-150"
+                    style={{ width: progressCpu !== null ? `${progressCpu}%` : "0%" }}
+                  />
+                </div>
+                <button
+                  onClick={handleCancelCpu}
+                  className="text-[10px] text-muted-foreground hover:text-destructive transition-colors leading-none flex-shrink-0"
+                  aria-label="Cancel download"
+                >
+                  Cancel
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground tabular-nums">
+                {progressCpu !== null
+                  ? `${formatBytes(receivedBytesCpu)} of ${formatBytes(totalBytes)} — ${progressCpu}%`
+                  : `${formatBytes(receivedBytesCpu)} received…`}
+                {downloadSpeedCpu !== null && (
+                  <span className="ml-2 text-muted-foreground/70">{downloadSpeedCpu.toFixed(1)} MB/s</span>
+                )}
+              </p>
+            </div>
+          )}
+
+          {downloadErrorCpu && (
+            <p className="text-[11px] text-destructive">
+              {downloadErrorCpu}{" "}
+              {upgradeUrlCpu ? (
+                <a
+                  href={upgradeUrlCpu}
+                  className="underline underline-offset-2 hover:text-destructive/80 transition-colors"
+                >
+                  Upgrade now
+                </a>
+              ) : (
+                <a
+                  href="mailto:support@hapticos.app"
+                  className="underline underline-offset-2 hover:text-destructive/80 transition-colors"
+                >
+                  Contact support
+                </a>
+              )}
+              {githubCpuFallbackUrl && (
+                <>
+                  {" "}or{" "}
+                  <a
+                    href={githubCpuFallbackUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2 hover:text-destructive/80 transition-colors"
+                  >
+                    download directly from GitHub
+                  </a>
+                </>
+              )}
+            </p>
+          )}
+
+          {!downloadingCpu && !downloadErrorCpu && githubCpuFallbackUrl && (
+            <p className="text-[10px] text-muted-foreground">
+              or{" "}
+              <a
+                href={githubCpuFallbackUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline underline-offset-2 hover:text-foreground transition-colors"

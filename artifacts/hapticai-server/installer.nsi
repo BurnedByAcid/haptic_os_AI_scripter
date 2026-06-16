@@ -23,7 +23,7 @@ SetDatablockOptimize on
 CRCCheck force
 
 ; ── Metadata ───────────────────────────────────────────────────────────────
-; GPU_VARIANT is passed in via /DGPU_VARIANT=50series for the 50-series build.
+; GPU_VARIANT is passed in via /DGPU_VARIANT=50series or /DGPU_VARIANT=cpu.
 ; If not set, this builds the standard (CUDA 12.8 / RTX 30xx–40xx) installer.
 !ifndef GPU_VARIANT
   !define GPU_VARIANT "standard"
@@ -36,6 +36,13 @@ CRCCheck force
   !define OUTFILE       "dist\HapticAI-Setup-50series.exe"
   !define REG_KEY       "Software\HapticAI-50series"
   !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\HapticAI-50series"
+!else if "${GPU_VARIANT}" == "cpu"
+  !define APP_NAME      "HapticAI-CPU"
+  !define APP_FULL_NAME "HapticAI (Beta) — CPU"
+  !define APP_EXE       "HapticAI-CPU.exe"
+  !define OUTFILE       "dist\HapticAI-Setup-CPU.exe"
+  !define REG_KEY       "Software\HapticAI-CPU"
+  !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\HapticAI-CPU"
 !else
   !define APP_NAME      "HapticAI"
   !define APP_FULL_NAME "HapticAI (Beta)"

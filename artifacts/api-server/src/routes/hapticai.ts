@@ -21,6 +21,7 @@ interface GitHubReleaseCache {
     tag: string;
     exeUrl: string | null;
     exe50Url: string | null;
+    exeCpuUrl: string | null;
     dmgUrl: string | null;
   };
   fetchedAt: number;
@@ -50,18 +51,23 @@ async function fetchLatestGithubRelease(): Promise<GitHubReleaseCache["data"]> {
   };
 
   // Prefer exact well-known filenames first.
-  const exe50Asset = json.assets.find((a) => a.name === "HapticAI-Setup-50series.exe");
+  const exe50Asset  = json.assets.find((a) => a.name === "HapticAI-Setup-50series.exe");
+  const exeCpuAsset = json.assets.find((a) => a.name === "HapticAI-Setup-CPU.exe");
   const exeAsset =
     json.assets.find((a) => a.name === "HapticAI-Setup.exe") ??
-    json.assets.find((a) => a.name.toLowerCase().endsWith(".exe") && a.name !== "HapticAI-Setup-50series.exe");
-  const dmgAsset =
-    json.assets.find((a) => a.name.toLowerCase().endsWith(".dmg"));
+    json.assets.find((a) =>
+      a.name.toLowerCase().endsWith(".exe") &&
+      a.name !== "HapticAI-Setup-50series.exe" &&
+      a.name !== "HapticAI-Setup-CPU.exe"
+    );
+  const dmgAsset = json.assets.find((a) => a.name.toLowerCase().endsWith(".dmg"));
 
   return {
     tag: json.tag_name,
-    exeUrl: exeAsset?.browser_download_url ?? null,
-    exe50Url: exe50Asset?.browser_download_url ?? null,
-    dmgUrl: dmgAsset?.browser_download_url ?? null,
+    exeUrl:    exeAsset?.browser_download_url    ?? null,
+    exe50Url:  exe50Asset?.browser_download_url  ?? null,
+    exeCpuUrl: exeCpuAsset?.browser_download_url ?? null,
+    dmgUrl:    dmgAsset?.browser_download_url    ?? null,
   };
 }
 
@@ -94,7 +100,7 @@ router.get("/hapticai/github-release", async (_req: Request, res: Response) => {
     }
     // No releases published yet (or repo is private/empty) — return a null
     // result so clients can handle it gracefully instead of seeing a 502.
-    res.json({ tag: null, exeUrl: null, exe50Url: null, dmgUrl: null });
+    res.json({ tag: null, exeUrl: null, exe50Url: null, exeCpuUrl: null, dmgUrl: null });
   }
 });
 
@@ -387,8 +393,8 @@ router.get("/hapticai/download/:platform", async (req: Request, res: Response) =
   }
 
   const platform = req.params.platform as string;
-  if (!["windows", "windows-50series", "mac"].includes(platform)) {
-    res.status(400).json({ error: "Unknown platform. Use 'windows', 'windows-50series', or 'mac'." });
+  if (!["windows", "windows-50series", "windows-cpu", "mac"].includes(platform)) {
+    res.status(400).json({ error: "Unknown platform. Use 'windows', 'windows-50series', 'windows-cpu', or 'mac'." });
     return;
   }
 
@@ -399,6 +405,8 @@ router.get("/hapticai/download/:platform", async (req: Request, res: Response) =
       const ghUrl =
         platform === "windows-50series"
           ? ghData.exe50Url
+          : platform === "windows-cpu"
+          ? ghData.exeCpuUrl
           : platform === "windows"
           ? ghData.exeUrl
           : ghData.dmgUrl;
