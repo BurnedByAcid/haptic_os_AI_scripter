@@ -23,106 +23,81 @@ if "%VERSION%"=="" (
 )
 
 :: ── Find a usable Python 3.10 or 3.11 ──────────────────────────────────────
-:: Strategy:
-::   1. Check if `python` on PATH is 3.10 or 3.11 — use it directly.
-::   2. Otherwise try `py -3.11` (Python Launcher for Windows) — use that.
-::   3. Otherwise try `py -3.10` — use that.
-::   4. Otherwise abort with instructions.
+set "PYTHON_CMD="
 
-set PYTHON_CMD=
-
-:: Try PATH python first
 python --version >nul 2>&1
-if not errorlevel 1 (
-    for /f "tokens=2" %%V in ('python --version 2^>^&1') do set PYVER=%%V
-    for /f "tokens=1,2 delims=." %%A in ("!PYVER!") do (
-        set PY_MAJOR=%%A
-        set PY_MINOR=%%B
-    )
-    if "!PY_MAJOR!"=="3" (
-        if !PY_MINOR! GEQ 10 if !PY_MINOR! LEQ 11 (
-            set PYTHON_CMD=python
-            echo  Found Python !PYVER! on PATH.
-        )
-    )
-)
+if errorlevel 1 goto :try_py311
+for /f "tokens=2" %%V in ('python --version 2^>^&1') do set "PYVER=%%V"
+for /f "tokens=1,2 delims=." %%A in ("!PYVER!") do set "PY_MAJOR=%%A" & set "PY_MINOR=%%B"
+if not "!PY_MAJOR!"=="3" goto :try_py311
+if !PY_MINOR! LSS 10 goto :try_py311
+if !PY_MINOR! GTR 11 goto :try_py311
+set "PYTHON_CMD=python"
+echo  Found Python !PYVER! on PATH.
+goto :python_found
 
-:: Try py launcher for 3.11 if PATH python didn't qualify
-if "!PYTHON_CMD!"=="" (
-    py -3.11 --version >nul 2>&1
-    if not errorlevel 1 (
-        set PYTHON_CMD=py -3.11
-        for /f "tokens=2" %%V in ('py -3.11 --version 2^>^&1') do set PYVER=%%V
-        echo  Found Python !PYVER! via py launcher ^(py -3.11^).
-    )
-)
+:try_py311
+py -3.11 --version >nul 2>&1
+if errorlevel 1 goto :try_py311v
+set "PYTHON_CMD=py -3.11"
+for /f "tokens=2" %%V in ('py -3.11 --version 2^>^&1') do echo  Found Python %%V via py launcher.
+goto :python_found
 
-:: Try modern -V: syntax (py -V:3.11) as fallback
-if "!PYTHON_CMD!"=="" (
-    py -V:3.11 --version >nul 2>&1
-    if not errorlevel 1 (
-        set PYTHON_CMD=py -V:3.11
-        for /f "tokens=2" %%V in ('py -V:3.11 --version 2^>^&1') do set PYVER=%%V
-        echo  Found Python !PYVER! via py launcher ^(py -V:3.11^).
-    )
-)
+:try_py311v
+py -V:3.11 --version >nul 2>&1
+if errorlevel 1 goto :try_py310
+set "PYTHON_CMD=py -V:3.11"
+for /f "tokens=2" %%V in ('py -V:3.11 --version 2^>^&1') do echo  Found Python %%V via py launcher.
+goto :python_found
 
-:: Try py launcher for 3.10 as last resort
-if "!PYTHON_CMD!"=="" (
-    py -3.10 --version >nul 2>&1
-    if not errorlevel 1 (
-        set PYTHON_CMD=py -3.10
-        for /f "tokens=2" %%V in ('py -3.10 --version 2^>^&1') do set PYVER=%%V
-        echo  Found Python !PYVER! via py launcher ^(py -3.10^).
-    )
-)
+:try_py310
+py -3.10 --version >nul 2>&1
+if errorlevel 1 goto :try_py310v
+set "PYTHON_CMD=py -3.10"
+for /f "tokens=2" %%V in ('py -3.10 --version 2^>^&1') do echo  Found Python %%V via py launcher.
+goto :python_found
 
-:: Try modern -V: syntax for 3.10
-if "!PYTHON_CMD!"=="" (
-    py -V:3.10 --version >nul 2>&1
-    if not errorlevel 1 (
-        set PYTHON_CMD=py -V:3.10
-        for /f "tokens=2" %%V in ('py -V:3.10 --version 2^>^&1') do set PYVER=%%V
-        echo  Found Python !PYVER! via py launcher ^(py -V:3.10^).
-    )
-)
+:try_py310v
+py -V:3.10 --version >nul 2>&1
+if errorlevel 1 goto :no_python
+set "PYTHON_CMD=py -V:3.10"
+for /f "tokens=2" %%V in ('py -V:3.10 --version 2^>^&1') do echo  Found Python %%V via py launcher.
+goto :python_found
 
-:: Nothing worked
-if "!PYTHON_CMD!"=="" (
-    echo.
-    echo ERROR: Python 3.10 or 3.11 not found.
-    echo.
-    echo   Your PATH python is too new ^(3.12+^) and the py launcher
-    echo   could not find 3.10 or 3.11 either.
-    echo.
-    echo   Fix options:
-    echo     A) Install Python 3.11: https://www.python.org/downloads/release/python-3119/
-    echo        Tick "Add Python to PATH" during install, then re-run this script.
-    echo     B) If Python 3.11 is already installed but not on PATH:
-    echo        Open this script in Notepad and set PYTHON_CMD manually at the top,
-    echo        e.g.  set PYTHON_CMD=C:\Python311\python.exe
-    echo.
-    pause & exit /b 1
-)
+:no_python
+echo.
+echo ERROR: Python 3.10 or 3.11 not found.
+echo.
+echo   The py launcher could not find 3.10 or 3.11.
+echo.
+echo   Install Python 3.11 from https://www.python.org/downloads/release/python-3119/
+echo   Tick "Add Python to PATH" during install, then re-run this script.
+echo.
+pause & exit /b 1
+
+:python_found
 
 :: ── Find makensis ────────────────────────────────────────────────────────────
-:: Try PATH first, then the default NSIS install location.
 set "MAKENSIS=makensis"
 makensis /VERSION >nul 2>&1
-if errorlevel 1 (
-    if exist "C:\Program Files (x86)\NSIS\makensis.exe" (
-        set "MAKENSIS=C:\Program Files (x86)\NSIS\makensis.exe"
-        echo  Found NSIS at default install path.
-    ) else if exist "C:\Program Files\NSIS\makensis.exe" (
-        set "MAKENSIS=C:\Program Files\NSIS\makensis.exe"
-        echo  Found NSIS at default install path ^(64-bit^).
-    ) else (
-        echo.
-        echo ERROR: NSIS not found. Install NSIS 3.x from https://nsis.sourceforge.io
-        echo.
-        pause & exit /b 1
-    )
-)
+if not errorlevel 1 goto :nsis_found
+if exist "C:\Program Files (x86)\NSIS\makensis.exe" goto :nsis_x86
+if exist "C:\Program Files\NSIS\makensis.exe" goto :nsis_x64
+echo.
+echo ERROR: NSIS not found. Install NSIS 3.x from https://nsis.sourceforge.io
+echo.
+pause & exit /b 1
+
+:nsis_x86
+set "MAKENSIS=C:\Program Files (x86)\NSIS\makensis.exe"
+echo  Found NSIS at Program Files ^(x86^).
+goto :nsis_found
+
+:nsis_x64
+set "MAKENSIS=C:\Program Files\NSIS\makensis.exe"
+echo  Found NSIS at Program Files.
+
+:nsis_found
 
 :: ── [1/11] Virtual environment ──────────────────────────────────────────────
 echo.
