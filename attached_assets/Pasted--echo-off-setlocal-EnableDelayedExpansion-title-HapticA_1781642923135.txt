@@ -22,9 +22,60 @@ if "%VERSION%"=="" (
     pause & exit /b 1
 )
 
-:: ── Python ───────────────────────────────────────────────────────────────────
+:: ── Find a usable Python 3.10 or 3.11 ──────────────────────────────────────
+set "PYTHON_CMD="
+
+python --version >nul 2>&1
+if errorlevel 1 goto :try_py311
+for /f "tokens=2" %%V in ('python --version 2^>^&1') do set "PYVER=%%V"
+for /f "tokens=1,2 delims=." %%A in ("!PYVER!") do set "PY_MAJOR=%%A" & set "PY_MINOR=%%B"
+if not "!PY_MAJOR!"=="3" goto :try_py311
+if !PY_MINOR! LSS 10 goto :try_py311
+if !PY_MINOR! GTR 11 goto :try_py311
+set "PYTHON_CMD=python"
+echo  Found Python !PYVER! on PATH.
+goto :python_found
+
+:try_py311
+py -3.11 --version >nul 2>&1
+if errorlevel 1 goto :try_py311v
 set "PYTHON_CMD=py -3.11"
-for /f "tokens=2" %%V in ('py -3.11 --version 2^>^&1') do echo  Using Python %%V ^(py -3.11^).
+for /f "tokens=2" %%V in ('py -3.11 --version 2^>^&1') do echo  Found Python %%V via py launcher.
+goto :python_found
+
+:try_py311v
+py -V:3.11 --version >nul 2>&1
+if errorlevel 1 goto :try_py310
+set "PYTHON_CMD=py -V:3.11"
+for /f "tokens=2" %%V in ('py -V:3.11 --version 2^>^&1') do echo  Found Python %%V via py launcher.
+goto :python_found
+
+:try_py310
+py -3.10 --version >nul 2>&1
+if errorlevel 1 goto :try_py310v
+set "PYTHON_CMD=py -3.10"
+for /f "tokens=2" %%V in ('py -3.10 --version 2^>^&1') do echo  Found Python %%V via py launcher.
+goto :python_found
+
+:try_py310v
+py -V:3.10 --version >nul 2>&1
+if errorlevel 1 goto :no_python
+set "PYTHON_CMD=py -V:3.10"
+for /f "tokens=2" %%V in ('py -V:3.10 --version 2^>^&1') do echo  Found Python %%V via py launcher.
+goto :python_found
+
+:no_python
+echo.
+echo ERROR: Python 3.10 or 3.11 not found.
+echo.
+echo   The py launcher could not find 3.10 or 3.11.
+echo.
+echo   Install Python 3.11 from https://www.python.org/downloads/release/python-3119/
+echo   Tick "Add Python to PATH" during install, then re-run this script.
+echo.
+pause & exit /b 1
+
+:python_found
 
 :: ── Find makensis ────────────────────────────────────────────────────────────
 set "MAKENSIS=makensis"
