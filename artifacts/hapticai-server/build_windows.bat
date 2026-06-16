@@ -24,7 +24,7 @@ if "%VERSION%"=="" (
 
 :: ── Python ───────────────────────────────────────────────────────────────────
 set "PYTHON_CMD=py -3.11"
-for /f "tokens=2" %%V in ('py -3.11 --version 2^>^&1') do echo  Using Python %%V ^(py -3.11^).
+for /f "tokens=2" %%V in ('py -3.11 --version 2^>^&1') do echo  Using Python %%V.
 
 :: ── Find makensis ────────────────────────────────────────────────────────────
 set "MAKENSIS=makensis"
