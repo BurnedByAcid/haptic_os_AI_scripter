@@ -1,0 +1,1105 @@
+
+PS C:\Users\james> & "C:\Users\james\hapticai-server\build_windows.bat" v01.01.12
+============================================================
+ HapticAI (Beta) Windows Build Script
+ Builds THREE installers:
+   HapticAI-Setup.exe         (RTX 30xx / 40xx, CUDA 12.8)
+   HapticAI-Setup-50series.exe   (RTX 50xx, CUDA 12.9)
+   HapticAI-Setup-CPU.exe        (No GPU required, CPU-only)
+============================================================
+ Using Python 3.11.9.
+ Found NSIS at Program Files (x86).
+
+[1/11] Creating virtual environment using py -3.11...
+[2/11] Installing build tools...
+Requirement already satisfied: pip in c:\users\james\hapticai-server\build_venv\lib\site-packages (24.0)
+Collecting pip
+  Using cached pip-26.1.2-py3-none-any.whl.metadata (4.6 kB)
+Collecting wheel
+  Using cached wheel-0.47.0-py3-none-any.whl.metadata (2.3 kB)
+Collecting pyinstaller<7
+  Using cached pyinstaller-6.21.0-py3-none-win_amd64.whl.metadata (8.5 kB)
+Collecting packaging>=24.0 (from wheel)
+  Using cached packaging-26.2-py3-none-any.whl.metadata (3.5 kB)
+Collecting altgraph (from pyinstaller<7)
+  Using cached altgraph-0.17.5-py2.py3-none-any.whl.metadata (7.5 kB)
+Collecting pefile>=2022.5.30 (from pyinstaller<7)
+  Using cached pefile-2024.8.26-py3-none-any.whl.metadata (1.4 kB)
+Collecting pyinstaller-hooks-contrib>=2026.6 (from pyinstaller<7)
+  Using cached pyinstaller_hooks_contrib-2026.6-py3-none-any.whl.metadata (16 kB)
+Collecting pywin32-ctypes>=0.2.1 (from pyinstaller<7)
+  Using cached pywin32_ctypes-0.2.3-py3-none-any.whl.metadata (3.9 kB)
+Requirement already satisfied: setuptools>=42.0.0 in c:\users\james\hapticai-server\build_venv\lib\site-packages (from pyinstaller<7) (65.5.0)
+Using cached pip-26.1.2-py3-none-any.whl (1.8 MB)
+Using cached wheel-0.47.0-py3-none-any.whl (32 kB)
+Using cached pyinstaller-6.21.0-py3-none-win_amd64.whl (1.4 MB)
+Using cached packaging-26.2-py3-none-any.whl (100 kB)
+Using cached pefile-2024.8.26-py3-none-any.whl (74 kB)
+Using cached pyinstaller_hooks_contrib-2026.6-py3-none-any.whl (457 kB)
+Using cached pywin32_ctypes-0.2.3-py3-none-any.whl (30 kB)
+Using cached altgraph-0.17.5-py2.py3-none-any.whl (21 kB)
+Installing collected packages: altgraph, pywin32-ctypes, pip, pefile, packaging, wheel, pyinstaller-hooks-contrib, pyinstaller
+  Attempting uninstall: pip
+    Found existing installation: pip 24.0
+    Uninstalling pip-24.0:
+      Successfully uninstalled pip-24.0
+Successfully installed altgraph-0.17.5 packaging-26.2 pefile-2024.8.26 pip-26.1.2 pyinstaller-6.21.0 pyinstaller-hooks-contrib-2026.6 pywin32-ctypes-0.2.3 wheel-0.47.0
+[3/11] Installing standard deps (CUDA 12.8 for RTX 30xx/40xx)...
+Collecting numpy (from -r core.requirements.txt (line 1))
+  Using cached numpy-2.4.6-cp311-cp311-win_amd64.whl.metadata (6.6 kB)
+Collecting imgui (from -r core.requirements.txt (line 2))
+  Using cached imgui-2.0.0-cp311-cp311-win_amd64.whl.metadata (6.2 kB)
+Collecting ultralytics==8.3.78 (from -r core.requirements.txt (line 3))
+  Using cached ultralytics-8.3.78-py3-none-any.whl.metadata (35 kB)
+Collecting glfw~=2.8.0 (from -r core.requirements.txt (line 4))
+  Using cached glfw-2.8.0-py2.py27.py3.py30.py31.py32.py33.py34.py35.py36.py37.py38.p39.p310.p311.p312.p313-none-win_amd64.whl.metadata (5.4 kB)
+Collecting pyopengl~=3.1.7 (from -r core.requirements.txt (line 5))
+  Using cached pyopengl-3.1.10-py3-none-any.whl.metadata (3.3 kB)
+Collecting moderngl~=5.11.1 (from -r core.requirements.txt (line 6))
+  Using cached moderngl-5.11.1-cp311-cp311-win_amd64.whl.metadata (5.5 kB)
+Collecting imageio~=2.36.1 (from -r core.requirements.txt (line 7))
+  Using cached imageio-2.36.1-py3-none-any.whl.metadata (5.2 kB)
+Collecting tqdm~=4.67.1 (from -r core.requirements.txt (line 8))
+  Using cached tqdm-4.67.3-py3-none-any.whl.metadata (57 kB)
+Collecting colorama~=0.4.6 (from -r core.requirements.txt (line 9))
+  Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+Collecting opencv-python~=4.10.0.84 (from -r core.requirements.txt (line 10))
+  Using cached opencv_python-4.10.0.84-cp37-abi3-win_amd64.whl.metadata (20 kB)
+Collecting scipy>=1.15.1 (from -r core.requirements.txt (line 11))
+  Using cached scipy-1.17.1-cp311-cp311-win_amd64.whl.metadata (60 kB)
+Collecting scikit-learn>=1.0.0 (from -r core.requirements.txt (line 12))
+  Using cached scikit_learn-1.9.0-cp311-cp311-win_amd64.whl.metadata (11 kB)
+Collecting simplification~=0.7.13 (from -r core.requirements.txt (line 13))
+  Using cached simplification-0.7.16-cp311-cp311-win_amd64.whl.metadata (6.8 kB)
+Collecting msgpack~=1.1.0 (from -r core.requirements.txt (line 14))
+  Using cached msgpack-1.1.2-cp311-cp311-win_amd64.whl.metadata (8.4 kB)
+Collecting pillow>=11.2.1 (from -r core.requirements.txt (line 15))
+  Using cached pillow-12.2.0-cp311-cp311-win_amd64.whl.metadata (9.0 kB)
+Collecting orjson>=3.11.0 (from -r core.requirements.txt (line 16))
+  Using cached orjson-3.11.9-cp311-cp311-win_amd64.whl.metadata (43 kB)
+Collecting send2trash~=1.8.3 (from -r core.requirements.txt (line 17))
+  Using cached Send2Trash-1.8.3-py3-none-any.whl.metadata (4.0 kB)
+Collecting aiosqlite (from -r core.requirements.txt (line 18))
+  Using cached aiosqlite-0.22.1-py3-none-any.whl.metadata (4.3 kB)
+Collecting numpy (from -r core.requirements.txt (line 1))
+  Using cached numpy-2.1.1-cp311-cp311-win_amd64.whl.metadata (59 kB)
+Collecting matplotlib>=3.3.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached matplotlib-3.11.0-cp311-cp311-win_amd64.whl.metadata (80 kB)
+Collecting pyyaml>=5.3.1 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached pyyaml-6.0.3-cp311-cp311-win_amd64.whl.metadata (2.4 kB)
+Collecting requests>=2.23.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+Collecting torch>=1.8.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached torch-2.12.0-cp311-cp311-win_amd64.whl.metadata (31 kB)
+Collecting torchvision>=0.9.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached torchvision-0.27.0-cp311-cp311-win_amd64.whl.metadata (5.5 kB)
+Collecting psutil (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached psutil-7.2.2-cp37-abi3-win_amd64.whl.metadata (22 kB)
+Collecting py-cpuinfo (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached py_cpuinfo-9.0.0-py3-none-any.whl.metadata (794 bytes)
+Collecting pandas>=1.1.4 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached pandas-3.0.3-cp311-cp311-win_amd64.whl.metadata (19 kB)
+Collecting seaborn>=0.11.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached seaborn-0.13.2-py3-none-any.whl.metadata (5.4 kB)
+Collecting ultralytics-thop>=2.0.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached ultralytics_thop-2.0.20-py3-none-any.whl.metadata (14 kB)
+Collecting glcontext>=3.0.0 (from moderngl~=5.11.1->-r core.requirements.txt (line 6))
+  Using cached glcontext-3.0.0-cp311-cp311-win_amd64.whl.metadata (6.2 kB)
+Collecting joblib>=1.4.0 (from scikit-learn>=1.0.0->-r core.requirements.txt (line 12))
+  Using cached joblib-1.5.3-py3-none-any.whl.metadata (5.5 kB)
+Collecting narwhals>=2.0.1 (from scikit-learn>=1.0.0->-r core.requirements.txt (line 12))
+  Using cached narwhals-2.22.1-py3-none-any.whl.metadata (15 kB)
+Collecting threadpoolctl>=3.5.0 (from scikit-learn>=1.0.0->-r core.requirements.txt (line 12))
+  Using cached threadpoolctl-3.6.0-py3-none-any.whl.metadata (13 kB)
+Collecting contourpy>=1.0.1 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached contourpy-1.3.3-cp311-cp311-win_amd64.whl.metadata (5.5 kB)
+Collecting cycler>=0.10 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+Collecting fonttools>=4.22.0 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached fonttools-4.63.0-cp311-cp311-win_amd64.whl.metadata (121 kB)
+Collecting kiwisolver>=1.3.1 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached kiwisolver-1.5.0-cp311-cp311-win_amd64.whl.metadata (5.2 kB)
+Requirement already satisfied: packaging>=20.0 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3)) (26.2)
+Collecting pyparsing>=3 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached pyparsing-3.3.2-py3-none-any.whl.metadata (5.8 kB)
+Collecting python-dateutil>=2.7 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+Collecting tzdata (from pandas>=1.1.4->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached tzdata-2026.2-py2.py3-none-any.whl.metadata (1.4 kB)
+Collecting six>=1.5 (from python-dateutil>=2.7->matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+Collecting charset_normalizer<4,>=2 (from requests>=2.23.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached charset_normalizer-3.4.7-cp311-cp311-win_amd64.whl.metadata (41 kB)
+Collecting idna<4,>=2.5 (from requests>=2.23.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached idna-3.18-py3-none-any.whl.metadata (6.1 kB)
+Collecting urllib3<3,>=1.26 (from requests>=2.23.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+Collecting certifi>=2023.5.7 (from requests>=2.23.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached certifi-2026.6.17-py3-none-any.whl.metadata (2.5 kB)
+Collecting filelock (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached filelock-3.29.4-py3-none-any.whl.metadata (2.0 kB)
+Collecting typing-extensions>=4.10.0 (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+Requirement already satisfied: setuptools<82 in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3)) (65.5.0)
+Collecting sympy>=1.13.3 (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached sympy-1.14.0-py3-none-any.whl.metadata (12 kB)
+Collecting networkx>=2.5.1 (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached networkx-3.6.1-py3-none-any.whl.metadata (6.8 kB)
+Collecting jinja2 (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+Collecting fsspec>=0.8.5 (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached fsspec-2026.6.0-py3-none-any.whl.metadata (10 kB)
+Collecting mpmath<1.4,>=1.1.0 (from sympy>=1.13.3->torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)
+Collecting MarkupSafe>=2.0 (from jinja2->torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached markupsafe-3.0.3-cp311-cp311-win_amd64.whl.metadata (2.8 kB)
+Using cached ultralytics-8.3.78-py3-none-any.whl (921 kB)
+Using cached numpy-2.1.1-cp311-cp311-win_amd64.whl (12.9 MB)
+Using cached glfw-2.8.0-py2.py27.py3.py30.py31.py32.py33.py34.py35.py36.py37.py38.p39.p310.p311.p312.p313-none-win_amd64.whl (559 kB)
+Using cached pyopengl-3.1.10-py3-none-any.whl (3.2 MB)
+Using cached moderngl-5.11.1-cp311-cp311-win_amd64.whl (103 kB)
+Using cached imageio-2.36.1-py3-none-any.whl (315 kB)
+Using cached tqdm-4.67.3-py3-none-any.whl (78 kB)
+Using cached colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+Using cached opencv_python-4.10.0.84-cp37-abi3-win_amd64.whl (38.8 MB)
+Using cached simplification-0.7.16-cp311-cp311-win_amd64.whl (341 kB)
+Using cached msgpack-1.1.2-cp311-cp311-win_amd64.whl (71 kB)
+Using cached Send2Trash-1.8.3-py3-none-any.whl (18 kB)
+Using cached imgui-2.0.0-cp311-cp311-win_amd64.whl (1.7 MB)
+Using cached scipy-1.17.1-cp311-cp311-win_amd64.whl (36.6 MB)
+Using cached scikit_learn-1.9.0-cp311-cp311-win_amd64.whl (8.3 MB)
+Using cached pillow-12.2.0-cp311-cp311-win_amd64.whl (7.1 MB)
+Using cached orjson-3.11.9-cp311-cp311-win_amd64.whl (127 kB)
+Using cached aiosqlite-0.22.1-py3-none-any.whl (17 kB)
+Using cached glcontext-3.0.0-cp311-cp311-win_amd64.whl (12 kB)
+Using cached joblib-1.5.3-py3-none-any.whl (309 kB)
+Using cached matplotlib-3.11.0-cp311-cp311-win_amd64.whl (9.3 MB)
+Using cached contourpy-1.3.3-cp311-cp311-win_amd64.whl (225 kB)
+Using cached cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Using cached fonttools-4.63.0-cp311-cp311-win_amd64.whl (2.4 MB)
+Using cached kiwisolver-1.5.0-cp311-cp311-win_amd64.whl (73 kB)
+Using cached narwhals-2.22.1-py3-none-any.whl (454 kB)
+Using cached pandas-3.0.3-cp311-cp311-win_amd64.whl (9.9 MB)
+Using cached pyparsing-3.3.2-py3-none-any.whl (122 kB)
+Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Using cached pyyaml-6.0.3-cp311-cp311-win_amd64.whl (158 kB)
+Using cached requests-2.34.2-py3-none-any.whl (73 kB)
+Using cached charset_normalizer-3.4.7-cp311-cp311-win_amd64.whl (159 kB)
+Using cached idna-3.18-py3-none-any.whl (65 kB)
+Using cached urllib3-2.7.0-py3-none-any.whl (131 kB)
+Using cached certifi-2026.6.17-py3-none-any.whl (133 kB)
+Using cached seaborn-0.13.2-py3-none-any.whl (294 kB)
+Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+Using cached threadpoolctl-3.6.0-py3-none-any.whl (18 kB)
+Using cached torch-2.12.0-cp311-cp311-win_amd64.whl (123.0 MB)
+Using cached fsspec-2026.6.0-py3-none-any.whl (203 kB)
+Using cached networkx-3.6.1-py3-none-any.whl (2.1 MB)
+Using cached sympy-1.14.0-py3-none-any.whl (6.3 MB)
+Using cached mpmath-1.3.0-py3-none-any.whl (536 kB)
+Using cached torchvision-0.27.0-cp311-cp311-win_amd64.whl (3.7 MB)
+Using cached typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+Using cached ultralytics_thop-2.0.20-py3-none-any.whl (28 kB)
+Using cached filelock-3.29.4-py3-none-any.whl (42 kB)
+Using cached jinja2-3.1.6-py3-none-any.whl (134 kB)
+Using cached markupsafe-3.0.3-cp311-cp311-win_amd64.whl (15 kB)
+Using cached psutil-7.2.2-cp37-abi3-win_amd64.whl (137 kB)
+Using cached py_cpuinfo-9.0.0-py3-none-any.whl (22 kB)
+Using cached tzdata-2026.2-py2.py3-none-any.whl (349 kB)
+Installing collected packages: urllib3, tzdata, typing-extensions, threadpoolctl, six, send2trash, pyyaml, pyparsing, pyopengl, py-cpuinfo, psutil, pillow, orjson, numpy, networkx, narwhals, msgpack, mpmath, MarkupSafe, kiwisolver, joblib, imgui, idna, glfw, glcontext, fsspec, fonttools, filelock, cycler, colorama, charset_normalizer, certifi, aiosqlite, tqdm, sympy, simplification, scipy, requests, python-dateutil, opencv-python, moderngl, jinja2, imageio, contourpy, torch, scikit-learn, pandas, matplotlib, ultralytics-thop, torchvision, seaborn, ultralytics
+Successfully installed MarkupSafe-3.0.3 aiosqlite-0.22.1 certifi-2026.6.17 charset_normalizer-3.4.7 colorama-0.4.6 contourpy-1.3.3 cycler-0.12.1 filelock-3.29.4 fonttools-4.63.0 fsspec-2026.6.0 glcontext-3.0.0 glfw-2.8.0 idna-3.18 imageio-2.36.1 imgui-2.0.0 jinja2-3.1.6 joblib-1.5.3 kiwisolver-1.5.0 matplotlib-3.11.0 moderngl-5.11.1 mpmath-1.3.0 msgpack-1.1.2 narwhals-2.22.1 networkx-3.6.1 numpy-2.1.1 opencv-python-4.10.0.84 orjson-3.11.9 pandas-3.0.3 pillow-12.2.0 psutil-7.2.2 py-cpuinfo-9.0.0 pyopengl-3.1.10 pyparsing-3.3.2 python-dateutil-2.9.0.post0 pyyaml-6.0.3 requests-2.34.2 scikit-learn-1.9.0 scipy-1.17.1 seaborn-0.13.2 send2trash-1.8.3 simplification-0.7.16 six-1.17.0 sympy-1.14.0 threadpoolctl-3.6.0 torch-2.12.0 torchvision-0.27.0 tqdm-4.67.3 typing-extensions-4.15.0 tzdata-2026.2 ultralytics-8.3.78 ultralytics-thop-2.0.20 urllib3-2.7.0
+Looking in indexes: https://download.pytorch.org/whl/cu128
+Collecting torch==2.8.0+cu128 (from -r cuda.requirements.txt (line 2))
+  Using cached torch-2.8.0%2Bcu128-cp311-cp311-win_amd64.whl.metadata (29 kB)
+Collecting torchvision==0.23.0+cu128 (from -r cuda.requirements.txt (line 3))
+  Using cached torchvision-0.23.0%2Bcu128-cp311-cp311-win_amd64.whl.metadata (6.3 kB)
+Collecting torchaudio==2.8.0+cu128 (from -r cuda.requirements.txt (line 4))
+  Using cached torchaudio-2.8.0%2Bcu128-cp311-cp311-win_amd64.whl.metadata (7.4 kB)
+Requirement already satisfied: sympy>=1.13.3 in .\build_venv\Lib\site-packages (from -r cuda.requirements.txt (line 6)) (1.14.0)
+Requirement already satisfied: filelock in .\build_venv\Lib\site-packages (from torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (3.29.4)
+Requirement already satisfied: typing-extensions>=4.10.0 in .\build_venv\Lib\site-packages (from torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (4.15.0)
+Requirement already satisfied: networkx in .\build_venv\Lib\site-packages (from torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (3.6.1)
+Requirement already satisfied: jinja2 in .\build_venv\Lib\site-packages (from torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (3.1.6)
+Requirement already satisfied: fsspec in .\build_venv\Lib\site-packages (from torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (2026.6.0)
+Requirement already satisfied: numpy in .\build_venv\Lib\site-packages (from torchvision==0.23.0+cu128->-r cuda.requirements.txt (line 3)) (2.1.1)
+Requirement already satisfied: pillow!=8.3.*,>=5.3.0 in .\build_venv\Lib\site-packages (from torchvision==0.23.0+cu128->-r cuda.requirements.txt (line 3)) (12.2.0)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in .\build_venv\Lib\site-packages (from sympy>=1.13.3->-r cuda.requirements.txt (line 6)) (1.3.0)
+Requirement already satisfied: MarkupSafe>=2.0 in .\build_venv\Lib\site-packages (from jinja2->torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (3.0.3)
+Using cached torch-2.8.0%2Bcu128-cp311-cp311-win_amd64.whl (3461.4 MB)
+Using cached torchvision-0.23.0%2Bcu128-cp311-cp311-win_amd64.whl (7.5 MB)
+Using cached torchaudio-2.8.0%2Bcu128-cp311-cp311-win_amd64.whl (4.7 MB)
+Installing collected packages: torch, torchvision, torchaudio
+  Attempting uninstall: torch
+    Found existing installation: torch 2.12.0
+    Uninstalling torch-2.12.0:
+      Successfully uninstalled torch-2.12.0
+  Attempting uninstall: torchvision
+    Found existing installation: torchvision 0.27.0
+    Uninstalling torchvision-0.27.0:
+      Successfully uninstalled torchvision-0.27.0
+Successfully installed torch-2.8.0+cu128 torchaudio-2.8.0+cu128 torchvision-0.23.0+cu128
+Collecting flask (from -r web.requirements.txt (line 5))
+  Using cached flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+Collecting flask-socketio (from -r web.requirements.txt (line 6))
+  Using cached flask_socketio-5.6.1-py3-none-any.whl.metadata (2.6 kB)
+Collecting simple-websocket (from -r web.requirements.txt (line 7))
+  Using cached simple_websocket-1.1.0-py3-none-any.whl.metadata (1.5 kB)
+Collecting flask-cors (from -r web.requirements.txt (line 8))
+  Using cached flask_cors-6.0.5-py3-none-any.whl.metadata (5.4 kB)
+Collecting pystray (from -r web.requirements.txt (line 9))
+  Using cached pystray-0.19.5-py2.py3-none-any.whl.metadata (9.4 kB)
+Requirement already satisfied: numpy in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 10)) (2.1.1)
+Requirement already satisfied: ultralytics==8.3.78 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 11)) (8.3.78)
+Requirement already satisfied: imageio~=2.36.1 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 12)) (2.36.1)
+Requirement already satisfied: tqdm~=4.67.1 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 13)) (4.67.3)
+Requirement already satisfied: colorama~=0.4.6 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 14)) (0.4.6)
+Collecting opencv-python-headless (from -r web.requirements.txt (line 15))
+  Using cached opencv_python_headless-4.13.0.92-cp37-abi3-win_amd64.whl.metadata (20 kB)
+Requirement already satisfied: scipy>=1.15.1 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 16)) (1.17.1)
+Requirement already satisfied: scikit-learn>=1.0.0 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 17)) (1.9.0)
+Requirement already satisfied: simplification~=0.7.13 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 18)) (0.7.16)
+Requirement already satisfied: msgpack~=1.1.0 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 19)) (1.1.2)
+Requirement already satisfied: pillow>=11.2.1 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 20)) (12.2.0)
+Requirement already satisfied: orjson>=3.11.0 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 21)) (3.11.9)
+Requirement already satisfied: send2trash~=1.8.3 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 22)) (1.8.3)
+Requirement already satisfied: aiosqlite in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 23)) (0.22.1)
+Requirement already satisfied: matplotlib>=3.3.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.11.0)
+Requirement already satisfied: opencv-python>=4.6.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (4.10.0.84)
+Requirement already satisfied: pyyaml>=5.3.1 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (6.0.3)
+Requirement already satisfied: requests>=2.23.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2.34.2)
+Requirement already satisfied: torch>=1.8.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2.8.0+cu128)
+Requirement already satisfied: torchvision>=0.9.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (0.23.0+cu128)
+Requirement already satisfied: psutil in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (7.2.2)
+Requirement already satisfied: py-cpuinfo in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (9.0.0)
+Requirement already satisfied: pandas>=1.1.4 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.0.3)
+Requirement already satisfied: seaborn>=0.11.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (0.13.2)
+Requirement already satisfied: ultralytics-thop>=2.0.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2.0.20)
+Collecting blinker>=1.9.0 (from flask->-r web.requirements.txt (line 5))
+  Using cached blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+Collecting click>=8.1.3 (from flask->-r web.requirements.txt (line 5))
+  Using cached click-8.4.1-py3-none-any.whl.metadata (2.6 kB)
+Collecting itsdangerous>=2.2.0 (from flask->-r web.requirements.txt (line 5))
+  Using cached itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+Requirement already satisfied: jinja2>=3.1.2 in .\build_venv\Lib\site-packages (from flask->-r web.requirements.txt (line 5)) (3.1.6)
+Requirement already satisfied: markupsafe>=2.1.1 in .\build_venv\Lib\site-packages (from flask->-r web.requirements.txt (line 5)) (3.0.3)
+Collecting werkzeug>=3.1.0 (from flask->-r web.requirements.txt (line 5))
+  Using cached werkzeug-3.1.8-py3-none-any.whl.metadata (4.0 kB)
+Collecting python-socketio>=5.12.0 (from flask-socketio->-r web.requirements.txt (line 6))
+  Using cached python_socketio-5.16.3-py3-none-any.whl.metadata (3.3 kB)
+Collecting wsproto (from simple-websocket->-r web.requirements.txt (line 7))
+  Using cached wsproto-1.3.2-py3-none-any.whl.metadata (5.2 kB)
+Requirement already satisfied: six in .\build_venv\Lib\site-packages (from pystray->-r web.requirements.txt (line 9)) (1.17.0)
+Requirement already satisfied: joblib>=1.4.0 in .\build_venv\Lib\site-packages (from scikit-learn>=1.0.0->-r web.requirements.txt (line 17)) (1.5.3)
+Requirement already satisfied: narwhals>=2.0.1 in .\build_venv\Lib\site-packages (from scikit-learn>=1.0.0->-r web.requirements.txt (line 17)) (2.22.1)
+Requirement already satisfied: threadpoolctl>=3.5.0 in .\build_venv\Lib\site-packages (from scikit-learn>=1.0.0->-r web.requirements.txt (line 17)) (3.6.0)
+Requirement already satisfied: contourpy>=1.0.1 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (1.3.3)
+Requirement already satisfied: cycler>=0.10 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (0.12.1)
+Requirement already satisfied: fonttools>=4.22.0 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (4.63.0)
+Requirement already satisfied: kiwisolver>=1.3.1 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (1.5.0)
+Requirement already satisfied: packaging>=20.0 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (26.2)
+Requirement already satisfied: pyparsing>=3 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.3.2)
+Requirement already satisfied: python-dateutil>=2.7 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2.9.0.post0)
+Requirement already satisfied: tzdata in .\build_venv\Lib\site-packages (from pandas>=1.1.4->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2026.2)
+Collecting bidict>=0.21.0 (from python-socketio>=5.12.0->flask-socketio->-r web.requirements.txt (line 6))
+  Using cached bidict-0.23.1-py3-none-any.whl.metadata (8.7 kB)
+Collecting python-engineio>=4.13.2 (from python-socketio>=5.12.0->flask-socketio->-r web.requirements.txt (line 6))
+  Using cached python_engineio-4.13.2-py3-none-any.whl.metadata (2.3 kB)
+Requirement already satisfied: charset_normalizer<4,>=2 in .\build_venv\Lib\site-packages (from requests>=2.23.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.4.7)
+Requirement already satisfied: idna<4,>=2.5 in .\build_venv\Lib\site-packages (from requests>=2.23.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.18)
+Requirement already satisfied: urllib3<3,>=1.26 in .\build_venv\Lib\site-packages (from requests>=2.23.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2.7.0)
+Requirement already satisfied: certifi>=2023.5.7 in .\build_venv\Lib\site-packages (from requests>=2.23.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2026.6.17)
+Requirement already satisfied: filelock in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.29.4)
+Requirement already satisfied: typing-extensions>=4.10.0 in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (4.15.0)
+Requirement already satisfied: sympy>=1.13.3 in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (1.14.0)
+Requirement already satisfied: networkx in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.6.1)
+Requirement already satisfied: fsspec in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2026.6.0)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in .\build_venv\Lib\site-packages (from sympy>=1.13.3->torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (1.3.0)
+Collecting h11<1,>=0.16.0 (from wsproto->simple-websocket->-r web.requirements.txt (line 7))
+  Using cached h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Using cached flask-3.1.3-py3-none-any.whl (103 kB)
+Using cached flask_socketio-5.6.1-py3-none-any.whl (18 kB)
+Using cached simple_websocket-1.1.0-py3-none-any.whl (13 kB)
+Using cached flask_cors-6.0.5-py3-none-any.whl (16 kB)
+Using cached pystray-0.19.5-py2.py3-none-any.whl (49 kB)
+Using cached opencv_python_headless-4.13.0.92-cp37-abi3-win_amd64.whl (40.1 MB)
+Using cached blinker-1.9.0-py3-none-any.whl (8.5 kB)
+Using cached click-8.4.1-py3-none-any.whl (116 kB)
+Using cached itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+Using cached python_socketio-5.16.3-py3-none-any.whl (82 kB)
+Using cached bidict-0.23.1-py3-none-any.whl (32 kB)
+Using cached python_engineio-4.13.2-py3-none-any.whl (59 kB)
+Using cached werkzeug-3.1.8-py3-none-any.whl (226 kB)
+Using cached wsproto-1.3.2-py3-none-any.whl (24 kB)
+Using cached h11-0.16.0-py3-none-any.whl (37 kB)
+Installing collected packages: werkzeug, pystray, opencv-python-headless, itsdangerous, h11, click, blinker, bidict, wsproto, flask, simple-websocket, flask-cors, python-engineio, python-socketio, flask-socketio
+Successfully installed bidict-0.23.1 blinker-1.9.0 click-8.4.1 flask-3.1.3 flask-cors-6.0.5 flask-socketio-5.6.1 h11-0.16.0 itsdangerous-2.2.0 opencv-python-headless-4.13.0.92 pystray-0.19.5 python-engineio-4.13.2 python-socketio-5.16.3 simple-websocket-1.1.0 werkzeug-3.1.8 wsproto-1.3.2
+Requirement already satisfied: opencv-python-headless in .\build_venv\Lib\site-packages (4.13.0.92)
+Requirement already satisfied: flask-cors in .\build_venv\Lib\site-packages (6.0.5)
+Requirement already satisfied: numpy>=2 in .\build_venv\Lib\site-packages (from opencv-python-headless) (2.1.1)
+Requirement already satisfied: flask>=0.9 in .\build_venv\Lib\site-packages (from flask-cors) (3.1.3)
+Requirement already satisfied: Werkzeug>=0.7 in .\build_venv\Lib\site-packages (from flask-cors) (3.1.8)
+Requirement already satisfied: blinker>=1.9.0 in .\build_venv\Lib\site-packages (from flask>=0.9->flask-cors) (1.9.0)
+Requirement already satisfied: click>=8.1.3 in .\build_venv\Lib\site-packages (from flask>=0.9->flask-cors) (8.4.1)
+Requirement already satisfied: itsdangerous>=2.2.0 in .\build_venv\Lib\site-packages (from flask>=0.9->flask-cors) (2.2.0)
+Requirement already satisfied: jinja2>=3.1.2 in .\build_venv\Lib\site-packages (from flask>=0.9->flask-cors) (3.1.6)
+Requirement already satisfied: markupsafe>=2.1.1 in .\build_venv\Lib\site-packages (from flask>=0.9->flask-cors) (3.0.3)
+Requirement already satisfied: colorama in .\build_venv\Lib\site-packages (from click>=8.1.3->flask>=0.9->flask-cors) (0.4.6)
+[4/11] Running PyInstaller (standard)...
+114 INFO: PyInstaller: 6.21.0, contrib hooks: 2026.6
+114 INFO: Python: 3.11.9
+127 INFO: Platform: Windows-10-10.0.26200-SP0
+128 INFO: Python environment: C:\Users\james\hapticai-server\build_venv
+130 INFO: Removing temporary files and cleaning cache in C:\Users\james\AppData\Local\pyinstaller
+137 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\james\\hapticai-server\\build_venv\\Scripts\\pyinstaller.exe',
+ 'C:\\Users\\james\\AppData\\Local\\Programs\\Python\\Python311\\python311.zip',
+ 'C:\\Users\\james\\AppData\\Local\\Programs\\Python\\Python311\\DLLs',
+ 'C:\\Users\\james\\AppData\\Local\\Programs\\Python\\Python311\\Lib',
+ 'C:\\Users\\james\\AppData\\Local\\Programs\\Python\\Python311',
+ 'C:\\Users\\james\\hapticai-server\\build_venv',
+ 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages',
+ 'C:\\Users\\james\\hapticai-server']
+967 INFO: Appending 'datas' from .spec
+987 INFO: checking Analysis
+988 INFO: Building Analysis because Analysis-00.toc is non existent
+988 INFO: Looking for Python shared library...
+988 INFO: Using Python shared library: C:\Users\james\AppData\Local\Programs\Python\Python311\python311.dll
+988 INFO: Running Analysis Analysis-00.toc
+989 INFO: Target bytecode optimization level: 0
+989 INFO: Initializing module dependency graph...
+990 INFO: Initializing module graph hook caches...
+1017 INFO: Analyzing modules for base_library.zip ...
+1831 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+1883 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+2655 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+2940 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4012 INFO: Caching module dependency graph...
+4039 INFO: Analyzing C:\Users\james\hapticai-server\web_app.py
+4124 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4359 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+4361 INFO: SetuptoolsInfo: initializing cached setuptools info...
+4940 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5021 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5173 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5766 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5813 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+6056 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+6246 INFO: Processing standard module hook 'hook-jinja2.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+6703 INFO: Processing pre-safe-import-module hook 'hook-importlib_metadata.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+6759 INFO: Processing standard module hook 'hook-urllib3.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+6816 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+7273 INFO: Processing standard module hook 'hook-certifi.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+7302 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+7890 INFO: Processing standard module hook 'hook-torch.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+4086 WARNING: Failed to collect submodules for 'torch.utils.tensorboard' because importing 'torch.utils.tensorboard' raised: ModuleNotFoundError: No module named 'tensorboard'
+W0617 16:58:06.293000 17520 Lib\site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects are currently not supported in Windows or MacOs.
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._sharding_spec` will be deprecated, use `torch.distributed._shard.sharding_spec` instead
+  __import__(name)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._sharded_tensor` will be deprecated, use `torch.distributed._shard.sharded_tensor` instead
+  __import__(name)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._shard.checkpoint` will be deprecated, use `torch.distributed.checkpoint` instead
+  __import__(name)
+22944 INFO: hook-torch: this torch build does not depend on MKL...
+23186 INFO: Processing standard module hook 'hook-numpy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+24077 INFO: Processing standard module hook 'hook-psutil.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+26001 INFO: Processing standard module hook 'hook-matplotlib.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+26395 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+26735 INFO: Processing standard module hook 'hook-matplotlib.backend_bases.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+26823 INFO: Processing standard module hook 'hook-PIL.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+26976 INFO: Processing standard module hook 'hook-PIL.Image.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+27276 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+27459 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+28102 INFO: Processing standard module hook 'hook-matplotlib.backends.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+28149 INFO: Processing standard module hook 'hook-matplotlib.pyplot.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+28833 INFO: Processing standard module hook 'hook-dateutil.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+28883 INFO: Processing pre-safe-import-module hook 'hook-six.moves.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+30136 INFO: Processing standard module hook 'hook-pandas.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+31785 INFO: Processing standard module hook 'hook-zoneinfo.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+31909 INFO: Processing standard module hook 'hook-scipy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+40526 INFO: Processing standard module hook 'hook-scipy.linalg.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+40614 INFO: Processing standard module hook 'hook-scipy.special._ufuncs.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+40716 INFO: Processing standard module hook 'hook-scipy.special._ellip_harm_2.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+42169 INFO: Processing standard module hook 'hook-scipy.spatial._ckdtree.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+42486 INFO: Processing standard module hook 'hook-scipy.spatial.transform.rotation.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+43470 INFO: Processing standard module hook 'hook-scipy.stats._stats.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+43746 INFO: Processing standard module hook 'hook-scipy.sparse.csgraph.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+45609 INFO: Processing standard module hook 'hook-xml.dom.domreg.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+47559 INFO: Processing standard module hook 'hook-setuptools.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+47564 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+47565 INFO: Processing pre-find-module-path hook 'hook-distutils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+48038 INFO: Processing standard module hook 'hook-distutils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+48088 INFO: Processing standard module hook 'hook-distutils.util.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+48110 INFO: Processing standard module hook 'hook-_osx_support.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+48218 INFO: Processing standard module hook 'hook-pkg_resources.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+49313 INFO: Processing pre-safe-import-module hook 'hook-win32com.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\pre_safe_import_module'
+49925 INFO: Processing standard module hook 'hook-sqlite3.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+51923 INFO: Processing standard module hook 'hook-pandas.io.formats.style.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+54172 INFO: Processing standard module hook 'hook-pandas.plotting.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+55932 INFO: Processing standard module hook 'hook-pandas.io.clipboard.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+56019 INFO: Processing standard module hook 'hook-fsspec.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+56441 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+66586 INFO: Processing standard module hook 'hook-torchvision.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+66627 INFO: Processing standard module hook 'hook-torchvision.io.image.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+68138 INFO: Processing standard module hook 'hook-torchaudio.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+71895 INFO: Processing standard module hook 'hook-scipy.io.matlab.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+73445 INFO: Processing pre-safe-import-module hook 'hook-gi.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+74152 INFO: Processing standard module hook 'hook-cv2.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+75218 INFO: Processing standard module hook 'hook-orjson.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+76146 INFO: Processing standard module hook 'hook-sklearn.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+76738 INFO: Processing standard module hook 'hook-sklearn.utils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+77080 INFO: Processing standard module hook 'hook-narwhals.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+78380 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.numpy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+78402 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.cupy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+78410 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.torch.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+78428 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.dask.array.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+78710 INFO: Processing standard module hook 'hook-sklearn.metrics.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+84817 INFO: Processing standard module hook 'hook-sklearn.metrics.cluster.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+84862 INFO: Processing standard module hook 'hook-sklearn.metrics.pairwise.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+84952 INFO: Processing standard module hook 'hook-sklearn.cluster.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+85046 INFO: Processing standard module hook 'hook-sklearn.neighbors.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+85104 INFO: Processing standard module hook 'hook-sklearn.linear_model.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+86185 INFO: Processing standard module hook 'hook-sklearn.tree.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+86521 INFO: Processing standard module hook 'hook-ultralytics.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+87927 INFO: Processing pre-safe-import-module hook 'hook-tensorflow.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\pre_safe_import_module'
+89810 INFO: Processing standard module hook 'hook-pystray.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+90056 INFO: Analyzing hidden import 'engineio.async_threading'
+90056 ERROR: Hidden import 'engineio.async_threading' not found
+90056 INFO: Analyzing hidden import 'socketio.async_threading'
+90057 ERROR: Hidden import 'socketio.async_threading' not found
+90057 INFO: Processing module hooks (post-graph stage)...
+95686 INFO: Processing standard module hook 'hook-matplotlib.backends.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+95687 INFO: Matplotlib backend selection method: automatic discovery of used backends
+95728 INFO: Discovered Matplotlib backend(s) via `matplotlib.use()` call in module 'sympy.testing.runtests': ['Agg', 'Agg']
+95814 INFO: The following Matplotlib backends were discovered by scanning for `matplotlib.use()` calls: ['Agg']. If your backend of choice is not in this list, either add a `matplotlib.use()` call to your code, or configure the backend collection via hook options (see: https://pyinstaller.org/en/stable/hooks-config.html#matplotlib-hooks).
+95814 INFO: Selected matplotlib backends: ['Agg']
+96145 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+96583 WARNING: Hidden import "scipy.special._cdflib" not found!
+96620 INFO: Processing standard module hook 'hook-setuptools._vendor.importlib_metadata.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+96787 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+97304 INFO: Processing standard module hook 'hook-tzdata.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+97727 INFO: Performing binary vs. data reclassification (1566 entries)
+102833 INFO: Looking for ctypes DLLs
+103061 WARNING: Library nvrtc64_120_0.dll required via ctypes not found
+103126 WARNING: Ignoring /usr/lib64/libgomp.so.1 imported from C:\Users\james\hapticai-server\build_venv\Lib\site-packages\torch\_inductor\codecache.py - only basenames are supported with ctypes imports!
+103476 INFO: Analyzing run-time hooks ...
+103498 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+103499 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+103500 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+103502 INFO: Including run-time hook 'pyi_rth_mplconfig.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+103502 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+103503 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+103508 INFO: Including run-time hook 'pyi_rth_pkgres.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+103510 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+103606 INFO: Creating base_library.zip...
+103621 INFO: Looking for dynamic libraries
+W0617 16:59:32.916000 24604 Lib\site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects are currently not supported in Windows or MacOs.
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharding_spec` will be deprecated, use `torch.distributed._shard.sharding_spec` instead
+  __import__(package)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharded_tensor` will be deprecated, use `torch.distributed._shard.sharded_tensor` instead
+  __import__(package)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._shard.checkpoint` will be deprecated, use `torch.distributed.checkpoint` instead
+  __import__(package)
+requirements: Ultralytics requirement ['lap>=0.5.12'] not found, attempting AutoUpdate...
+Collecting lap>=0.5.12
+  Downloading lap-0.5.13-cp311-cp311-win_amd64.whl.metadata (6.8 kB)
+Requirement already satisfied: numpy>=1.21.6 in .\build_venv\Lib\site-packages (from lap>=0.5.12) (2.1.1)
+Downloading lap-0.5.13-cp311-cp311-win_amd64.whl (1.5 MB)
+   ---------------------------------------- 1.5/1.5 MB 3.5 MB/s  0:00:00
+Installing collected packages: lap
+Successfully installed lap-0.5.13
+
+requirements: AutoUpdate success ✅ 2.8s, installed 1 package: ['lap>=0.5.12']
+requirements: ⚠️ Restart runtime or rerun command for updates to take effect
+
+115403 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torch\\lib', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\numpy.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\pandas.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\scipy.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\cv2\\../../x64/vc17/bin']
+115403 INFO: Extra DLL search directories (PATH): ['C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\cv2\\../../x64/vc17/bin']
+119033 INFO: Warnings written to C:\Users\james\hapticai-server\build\hapticai_windows\warn-hapticai_windows.txt
+119438 INFO: Graph cross-reference written to C:\Users\james\hapticai-server\build\hapticai_windows\xref-hapticai_windows.html
+119574 INFO: checking PYZ
+119574 INFO: Building PYZ because PYZ-00.toc is non existent
+119574 INFO: Building PYZ (ZlibArchive) C:\Users\james\hapticai-server\build\hapticai_windows\PYZ-00.pyz
+123242 INFO: Building PYZ (ZlibArchive) C:\Users\james\hapticai-server\build\hapticai_windows\PYZ-00.pyz completed successfully.
+123310 INFO: checking PKG
+123310 INFO: Building PKG because PKG-00.toc is non existent
+123310 INFO: Building PKG (CArchive) HapticAI.pkg
+123368 INFO: Building PKG (CArchive) HapticAI.pkg completed successfully.
+123369 INFO: Bootloader C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+123369 INFO: checking EXE
+123369 INFO: Building EXE because EXE-00.toc is non existent
+123370 INFO: Building EXE from EXE-00.toc
+123370 INFO: Copying bootloader EXE to C:\Users\james\hapticai-server\dist\HapticAI.exe
+123437 INFO: Copying icon to EXE
+123471 INFO: Copying 0 resources to EXE
+123471 INFO: Embedding manifest in EXE
+123498 INFO: Appending PKG archive to EXE
+123567 INFO: Fixing EXE headers
+123872 INFO: Building EXE from EXE-00.toc completed successfully.
+123897 INFO: checking COLLECT
+123897 INFO: Building COLLECT because COLLECT-00.toc is non existent
+123897 INFO: Removing dir C:\Users\james\hapticai-server\dist\HapticAI
+124767 INFO: Building COLLECT COLLECT-00.toc
+129821 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+129877 INFO: Build complete! The results are available in: C:\Users\james\hapticai-server\dist
+[5/11] Building standard installer (NSIS)...
+Command line defined: "VERSION=v01.01.12"
+Processing config: C:\Program Files (x86)\NSIS\nsisconf.nsh
+Processing script file: "installer.nsi" (ACP)
+
+Internal compiler error #12345: error mmapping file (2077184526, 33554432) is out of range.
+
+Note: you may have one or two (large) stale temporary file(s) left in your temporary directory (Generally this only happens on Windows 9x).
+
+ERROR: NSIS standard build failed. Check output above.
+Press any key to continue . . .
+PS C:\Users\james> & "C:\Users\james\hapticai-server\build_windows.bat" v01.01.12
+============================================================
+ HapticAI (Beta) Windows Build Script
+ Builds THREE installers:
+   HapticAI-Setup.exe         (RTX 30xx / 40xx, CUDA 12.8)
+   HapticAI-Setup-50series.exe   (RTX 50xx, CUDA 12.9)
+   HapticAI-Setup-CPU.exe        (No GPU required, CPU-only)
+============================================================
+ Using Python 3.11.9.
+ Found NSIS at Program Files (x86).
+
+[1/11] Creating virtual environment using py -3.11...
+[2/11] Installing build tools...
+Requirement already satisfied: pip in c:\users\james\hapticai-server\build_venv\lib\site-packages (24.0)
+Collecting pip
+  Using cached pip-26.1.2-py3-none-any.whl.metadata (4.6 kB)
+Collecting wheel
+  Using cached wheel-0.47.0-py3-none-any.whl.metadata (2.3 kB)
+Collecting pyinstaller<7
+  Using cached pyinstaller-6.21.0-py3-none-win_amd64.whl.metadata (8.5 kB)
+Collecting packaging>=24.0 (from wheel)
+  Using cached packaging-26.2-py3-none-any.whl.metadata (3.5 kB)
+Collecting altgraph (from pyinstaller<7)
+  Using cached altgraph-0.17.5-py2.py3-none-any.whl.metadata (7.5 kB)
+Collecting pefile>=2022.5.30 (from pyinstaller<7)
+  Using cached pefile-2024.8.26-py3-none-any.whl.metadata (1.4 kB)
+Collecting pyinstaller-hooks-contrib>=2026.6 (from pyinstaller<7)
+  Using cached pyinstaller_hooks_contrib-2026.6-py3-none-any.whl.metadata (16 kB)
+Collecting pywin32-ctypes>=0.2.1 (from pyinstaller<7)
+  Using cached pywin32_ctypes-0.2.3-py3-none-any.whl.metadata (3.9 kB)
+Requirement already satisfied: setuptools>=42.0.0 in c:\users\james\hapticai-server\build_venv\lib\site-packages (from pyinstaller<7) (65.5.0)
+Using cached pip-26.1.2-py3-none-any.whl (1.8 MB)
+Using cached wheel-0.47.0-py3-none-any.whl (32 kB)
+Using cached pyinstaller-6.21.0-py3-none-win_amd64.whl (1.4 MB)
+Using cached packaging-26.2-py3-none-any.whl (100 kB)
+Using cached pefile-2024.8.26-py3-none-any.whl (74 kB)
+Using cached pyinstaller_hooks_contrib-2026.6-py3-none-any.whl (457 kB)
+Using cached pywin32_ctypes-0.2.3-py3-none-any.whl (30 kB)
+Using cached altgraph-0.17.5-py2.py3-none-any.whl (21 kB)
+Installing collected packages: altgraph, pywin32-ctypes, pip, pefile, packaging, wheel, pyinstaller-hooks-contrib, pyinstaller
+  Attempting uninstall: pip
+    Found existing installation: pip 24.0
+    Uninstalling pip-24.0:
+      Successfully uninstalled pip-24.0
+Successfully installed altgraph-0.17.5 packaging-26.2 pefile-2024.8.26 pip-26.1.2 pyinstaller-6.21.0 pyinstaller-hooks-contrib-2026.6 pywin32-ctypes-0.2.3 wheel-0.47.0
+[3/11] Installing standard deps (CUDA 12.8 for RTX 30xx/40xx)...
+Collecting numpy (from -r core.requirements.txt (line 1))
+  Using cached numpy-2.4.6-cp311-cp311-win_amd64.whl.metadata (6.6 kB)
+Collecting imgui (from -r core.requirements.txt (line 2))
+  Using cached imgui-2.0.0-cp311-cp311-win_amd64.whl.metadata (6.2 kB)
+Collecting ultralytics==8.3.78 (from -r core.requirements.txt (line 3))
+  Using cached ultralytics-8.3.78-py3-none-any.whl.metadata (35 kB)
+Collecting glfw~=2.8.0 (from -r core.requirements.txt (line 4))
+  Using cached glfw-2.8.0-py2.py27.py3.py30.py31.py32.py33.py34.py35.py36.py37.py38.p39.p310.p311.p312.p313-none-win_amd64.whl.metadata (5.4 kB)
+Collecting pyopengl~=3.1.7 (from -r core.requirements.txt (line 5))
+  Using cached pyopengl-3.1.10-py3-none-any.whl.metadata (3.3 kB)
+Collecting moderngl~=5.11.1 (from -r core.requirements.txt (line 6))
+  Using cached moderngl-5.11.1-cp311-cp311-win_amd64.whl.metadata (5.5 kB)
+Collecting imageio~=2.36.1 (from -r core.requirements.txt (line 7))
+  Using cached imageio-2.36.1-py3-none-any.whl.metadata (5.2 kB)
+Collecting tqdm~=4.67.1 (from -r core.requirements.txt (line 8))
+  Using cached tqdm-4.67.3-py3-none-any.whl.metadata (57 kB)
+Collecting colorama~=0.4.6 (from -r core.requirements.txt (line 9))
+  Using cached colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+Collecting opencv-python~=4.10.0.84 (from -r core.requirements.txt (line 10))
+  Using cached opencv_python-4.10.0.84-cp37-abi3-win_amd64.whl.metadata (20 kB)
+Collecting scipy>=1.15.1 (from -r core.requirements.txt (line 11))
+  Using cached scipy-1.17.1-cp311-cp311-win_amd64.whl.metadata (60 kB)
+Collecting scikit-learn>=1.0.0 (from -r core.requirements.txt (line 12))
+  Using cached scikit_learn-1.9.0-cp311-cp311-win_amd64.whl.metadata (11 kB)
+Collecting simplification~=0.7.13 (from -r core.requirements.txt (line 13))
+  Using cached simplification-0.7.16-cp311-cp311-win_amd64.whl.metadata (6.8 kB)
+Collecting msgpack~=1.1.0 (from -r core.requirements.txt (line 14))
+  Using cached msgpack-1.1.2-cp311-cp311-win_amd64.whl.metadata (8.4 kB)
+Collecting pillow>=11.2.1 (from -r core.requirements.txt (line 15))
+  Using cached pillow-12.2.0-cp311-cp311-win_amd64.whl.metadata (9.0 kB)
+Collecting orjson>=3.11.0 (from -r core.requirements.txt (line 16))
+  Using cached orjson-3.11.9-cp311-cp311-win_amd64.whl.metadata (43 kB)
+Collecting send2trash~=1.8.3 (from -r core.requirements.txt (line 17))
+  Using cached Send2Trash-1.8.3-py3-none-any.whl.metadata (4.0 kB)
+Collecting aiosqlite (from -r core.requirements.txt (line 18))
+  Using cached aiosqlite-0.22.1-py3-none-any.whl.metadata (4.3 kB)
+Collecting numpy (from -r core.requirements.txt (line 1))
+  Using cached numpy-2.1.1-cp311-cp311-win_amd64.whl.metadata (59 kB)
+Collecting matplotlib>=3.3.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached matplotlib-3.11.0-cp311-cp311-win_amd64.whl.metadata (80 kB)
+Collecting pyyaml>=5.3.1 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached pyyaml-6.0.3-cp311-cp311-win_amd64.whl.metadata (2.4 kB)
+Collecting requests>=2.23.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+Collecting torch>=1.8.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Downloading torch-2.12.1-cp311-cp311-win_amd64.whl.metadata (31 kB)
+Collecting torchvision>=0.9.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Downloading torchvision-0.27.1-cp311-cp311-win_amd64.whl.metadata (5.5 kB)
+Collecting psutil (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached psutil-7.2.2-cp37-abi3-win_amd64.whl.metadata (22 kB)
+Collecting py-cpuinfo (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached py_cpuinfo-9.0.0-py3-none-any.whl.metadata (794 bytes)
+Collecting pandas>=1.1.4 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached pandas-3.0.3-cp311-cp311-win_amd64.whl.metadata (19 kB)
+Collecting seaborn>=0.11.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached seaborn-0.13.2-py3-none-any.whl.metadata (5.4 kB)
+Collecting ultralytics-thop>=2.0.0 (from ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached ultralytics_thop-2.0.20-py3-none-any.whl.metadata (14 kB)
+Collecting glcontext>=3.0.0 (from moderngl~=5.11.1->-r core.requirements.txt (line 6))
+  Using cached glcontext-3.0.0-cp311-cp311-win_amd64.whl.metadata (6.2 kB)
+Collecting joblib>=1.4.0 (from scikit-learn>=1.0.0->-r core.requirements.txt (line 12))
+  Using cached joblib-1.5.3-py3-none-any.whl.metadata (5.5 kB)
+Collecting narwhals>=2.0.1 (from scikit-learn>=1.0.0->-r core.requirements.txt (line 12))
+  Using cached narwhals-2.22.1-py3-none-any.whl.metadata (15 kB)
+Collecting threadpoolctl>=3.5.0 (from scikit-learn>=1.0.0->-r core.requirements.txt (line 12))
+  Using cached threadpoolctl-3.6.0-py3-none-any.whl.metadata (13 kB)
+Collecting contourpy>=1.0.1 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached contourpy-1.3.3-cp311-cp311-win_amd64.whl.metadata (5.5 kB)
+Collecting cycler>=0.10 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+Collecting fonttools>=4.22.0 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached fonttools-4.63.0-cp311-cp311-win_amd64.whl.metadata (121 kB)
+Collecting kiwisolver>=1.3.1 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached kiwisolver-1.5.0-cp311-cp311-win_amd64.whl.metadata (5.2 kB)
+Requirement already satisfied: packaging>=20.0 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3)) (26.2)
+Collecting pyparsing>=3 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached pyparsing-3.3.2-py3-none-any.whl.metadata (5.8 kB)
+Collecting python-dateutil>=2.7 (from matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+Collecting tzdata (from pandas>=1.1.4->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached tzdata-2026.2-py2.py3-none-any.whl.metadata (1.4 kB)
+Collecting six>=1.5 (from python-dateutil>=2.7->matplotlib>=3.3.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+Collecting charset_normalizer<4,>=2 (from requests>=2.23.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached charset_normalizer-3.4.7-cp311-cp311-win_amd64.whl.metadata (41 kB)
+Collecting idna<4,>=2.5 (from requests>=2.23.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached idna-3.18-py3-none-any.whl.metadata (6.1 kB)
+Collecting urllib3<3,>=1.26 (from requests>=2.23.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+Collecting certifi>=2023.5.7 (from requests>=2.23.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached certifi-2026.6.17-py3-none-any.whl.metadata (2.5 kB)
+Collecting filelock (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached filelock-3.29.4-py3-none-any.whl.metadata (2.0 kB)
+Collecting typing-extensions>=4.10.0 (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+Requirement already satisfied: setuptools<82 in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3)) (65.5.0)
+Collecting sympy>=1.13.3 (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached sympy-1.14.0-py3-none-any.whl.metadata (12 kB)
+Collecting networkx>=2.5.1 (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached networkx-3.6.1-py3-none-any.whl.metadata (6.8 kB)
+Collecting jinja2 (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+Collecting fsspec>=0.8.5 (from torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached fsspec-2026.6.0-py3-none-any.whl.metadata (10 kB)
+Collecting mpmath<1.4,>=1.1.0 (from sympy>=1.13.3->torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached mpmath-1.3.0-py3-none-any.whl.metadata (8.6 kB)
+Collecting MarkupSafe>=2.0 (from jinja2->torch>=1.8.0->ultralytics==8.3.78->-r core.requirements.txt (line 3))
+  Using cached markupsafe-3.0.3-cp311-cp311-win_amd64.whl.metadata (2.8 kB)
+Using cached ultralytics-8.3.78-py3-none-any.whl (921 kB)
+Using cached numpy-2.1.1-cp311-cp311-win_amd64.whl (12.9 MB)
+Using cached glfw-2.8.0-py2.py27.py3.py30.py31.py32.py33.py34.py35.py36.py37.py38.p39.p310.p311.p312.p313-none-win_amd64.whl (559 kB)
+Using cached pyopengl-3.1.10-py3-none-any.whl (3.2 MB)
+Using cached moderngl-5.11.1-cp311-cp311-win_amd64.whl (103 kB)
+Using cached imageio-2.36.1-py3-none-any.whl (315 kB)
+Using cached tqdm-4.67.3-py3-none-any.whl (78 kB)
+Using cached colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+Using cached opencv_python-4.10.0.84-cp37-abi3-win_amd64.whl (38.8 MB)
+Using cached simplification-0.7.16-cp311-cp311-win_amd64.whl (341 kB)
+Using cached msgpack-1.1.2-cp311-cp311-win_amd64.whl (71 kB)
+Using cached Send2Trash-1.8.3-py3-none-any.whl (18 kB)
+Using cached imgui-2.0.0-cp311-cp311-win_amd64.whl (1.7 MB)
+Using cached scipy-1.17.1-cp311-cp311-win_amd64.whl (36.6 MB)
+Using cached scikit_learn-1.9.0-cp311-cp311-win_amd64.whl (8.3 MB)
+Using cached pillow-12.2.0-cp311-cp311-win_amd64.whl (7.1 MB)
+Using cached orjson-3.11.9-cp311-cp311-win_amd64.whl (127 kB)
+Using cached aiosqlite-0.22.1-py3-none-any.whl (17 kB)
+Using cached glcontext-3.0.0-cp311-cp311-win_amd64.whl (12 kB)
+Using cached joblib-1.5.3-py3-none-any.whl (309 kB)
+Using cached matplotlib-3.11.0-cp311-cp311-win_amd64.whl (9.3 MB)
+Using cached contourpy-1.3.3-cp311-cp311-win_amd64.whl (225 kB)
+Using cached cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Using cached fonttools-4.63.0-cp311-cp311-win_amd64.whl (2.4 MB)
+Using cached kiwisolver-1.5.0-cp311-cp311-win_amd64.whl (73 kB)
+Using cached narwhals-2.22.1-py3-none-any.whl (454 kB)
+Using cached pandas-3.0.3-cp311-cp311-win_amd64.whl (9.9 MB)
+Using cached pyparsing-3.3.2-py3-none-any.whl (122 kB)
+Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Using cached pyyaml-6.0.3-cp311-cp311-win_amd64.whl (158 kB)
+Using cached requests-2.34.2-py3-none-any.whl (73 kB)
+Using cached charset_normalizer-3.4.7-cp311-cp311-win_amd64.whl (159 kB)
+Using cached idna-3.18-py3-none-any.whl (65 kB)
+Using cached urllib3-2.7.0-py3-none-any.whl (131 kB)
+Using cached certifi-2026.6.17-py3-none-any.whl (133 kB)
+Using cached seaborn-0.13.2-py3-none-any.whl (294 kB)
+Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+Using cached threadpoolctl-3.6.0-py3-none-any.whl (18 kB)
+Downloading torch-2.12.1-cp311-cp311-win_amd64.whl (123.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 123.0/123.0 MB 726.3 kB/s  0:03:11
+Using cached fsspec-2026.6.0-py3-none-any.whl (203 kB)
+Using cached networkx-3.6.1-py3-none-any.whl (2.1 MB)
+Using cached sympy-1.14.0-py3-none-any.whl (6.3 MB)
+Using cached mpmath-1.3.0-py3-none-any.whl (536 kB)
+Downloading torchvision-0.27.1-cp311-cp311-win_amd64.whl (3.8 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.8/3.8 MB 414.8 kB/s  0:00:08
+Using cached typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+Using cached ultralytics_thop-2.0.20-py3-none-any.whl (28 kB)
+Using cached filelock-3.29.4-py3-none-any.whl (42 kB)
+Using cached jinja2-3.1.6-py3-none-any.whl (134 kB)
+Using cached markupsafe-3.0.3-cp311-cp311-win_amd64.whl (15 kB)
+Using cached psutil-7.2.2-cp37-abi3-win_amd64.whl (137 kB)
+Using cached py_cpuinfo-9.0.0-py3-none-any.whl (22 kB)
+Using cached tzdata-2026.2-py2.py3-none-any.whl (349 kB)
+Installing collected packages: urllib3, tzdata, typing-extensions, threadpoolctl, six, send2trash, pyyaml, pyparsing, pyopengl, py-cpuinfo, psutil, pillow, orjson, numpy, networkx, narwhals, msgpack, mpmath, MarkupSafe, kiwisolver, joblib, imgui, idna, glfw, glcontext, fsspec, fonttools, filelock, cycler, colorama, charset_normalizer, certifi, aiosqlite, tqdm, sympy, simplification, scipy, requests, python-dateutil, opencv-python, moderngl, jinja2, imageio, contourpy, torch, scikit-learn, pandas, matplotlib, ultralytics-thop, torchvision, seaborn, ultralytics
+Successfully installed MarkupSafe-3.0.3 aiosqlite-0.22.1 certifi-2026.6.17 charset_normalizer-3.4.7 colorama-0.4.6 contourpy-1.3.3 cycler-0.12.1 filelock-3.29.4 fonttools-4.63.0 fsspec-2026.6.0 glcontext-3.0.0 glfw-2.8.0 idna-3.18 imageio-2.36.1 imgui-2.0.0 jinja2-3.1.6 joblib-1.5.3 kiwisolver-1.5.0 matplotlib-3.11.0 moderngl-5.11.1 mpmath-1.3.0 msgpack-1.1.2 narwhals-2.22.1 networkx-3.6.1 numpy-2.1.1 opencv-python-4.10.0.84 orjson-3.11.9 pandas-3.0.3 pillow-12.2.0 psutil-7.2.2 py-cpuinfo-9.0.0 pyopengl-3.1.10 pyparsing-3.3.2 python-dateutil-2.9.0.post0 pyyaml-6.0.3 requests-2.34.2 scikit-learn-1.9.0 scipy-1.17.1 seaborn-0.13.2 send2trash-1.8.3 simplification-0.7.16 six-1.17.0 sympy-1.14.0 threadpoolctl-3.6.0 torch-2.12.1 torchvision-0.27.1 tqdm-4.67.3 typing-extensions-4.15.0 tzdata-2026.2 ultralytics-8.3.78 ultralytics-thop-2.0.20 urllib3-2.7.0
+Looking in indexes: https://download.pytorch.org/whl/cu128
+Collecting torch==2.8.0+cu128 (from -r cuda.requirements.txt (line 2))
+  Using cached torch-2.8.0%2Bcu128-cp311-cp311-win_amd64.whl.metadata (29 kB)
+Collecting torchvision==0.23.0+cu128 (from -r cuda.requirements.txt (line 3))
+  Using cached torchvision-0.23.0%2Bcu128-cp311-cp311-win_amd64.whl.metadata (6.3 kB)
+Collecting torchaudio==2.8.0+cu128 (from -r cuda.requirements.txt (line 4))
+  Using cached torchaudio-2.8.0%2Bcu128-cp311-cp311-win_amd64.whl.metadata (7.4 kB)
+Requirement already satisfied: sympy>=1.13.3 in .\build_venv\Lib\site-packages (from -r cuda.requirements.txt (line 6)) (1.14.0)
+Requirement already satisfied: filelock in .\build_venv\Lib\site-packages (from torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (3.29.4)
+Requirement already satisfied: typing-extensions>=4.10.0 in .\build_venv\Lib\site-packages (from torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (4.15.0)
+Requirement already satisfied: networkx in .\build_venv\Lib\site-packages (from torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (3.6.1)
+Requirement already satisfied: jinja2 in .\build_venv\Lib\site-packages (from torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (3.1.6)
+Requirement already satisfied: fsspec in .\build_venv\Lib\site-packages (from torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (2026.6.0)
+Requirement already satisfied: numpy in .\build_venv\Lib\site-packages (from torchvision==0.23.0+cu128->-r cuda.requirements.txt (line 3)) (2.1.1)
+Requirement already satisfied: pillow!=8.3.*,>=5.3.0 in .\build_venv\Lib\site-packages (from torchvision==0.23.0+cu128->-r cuda.requirements.txt (line 3)) (12.2.0)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in .\build_venv\Lib\site-packages (from sympy>=1.13.3->-r cuda.requirements.txt (line 6)) (1.3.0)
+Requirement already satisfied: MarkupSafe>=2.0 in .\build_venv\Lib\site-packages (from jinja2->torch==2.8.0+cu128->-r cuda.requirements.txt (line 2)) (3.0.3)
+Using cached torch-2.8.0%2Bcu128-cp311-cp311-win_amd64.whl (3461.4 MB)
+Using cached torchvision-0.23.0%2Bcu128-cp311-cp311-win_amd64.whl (7.5 MB)
+Using cached torchaudio-2.8.0%2Bcu128-cp311-cp311-win_amd64.whl (4.7 MB)
+Installing collected packages: torch, torchvision, torchaudio
+  Attempting uninstall: torch
+    Found existing installation: torch 2.12.1
+    Uninstalling torch-2.12.1:
+      Successfully uninstalled torch-2.12.1
+  Attempting uninstall: torchvision
+    Found existing installation: torchvision 0.27.1
+    Uninstalling torchvision-0.27.1:
+      Successfully uninstalled torchvision-0.27.1
+Successfully installed torch-2.8.0+cu128 torchaudio-2.8.0+cu128 torchvision-0.23.0+cu128
+Collecting flask (from -r web.requirements.txt (line 5))
+  Using cached flask-3.1.3-py3-none-any.whl.metadata (3.2 kB)
+Collecting flask-socketio (from -r web.requirements.txt (line 6))
+  Using cached flask_socketio-5.6.1-py3-none-any.whl.metadata (2.6 kB)
+Collecting simple-websocket (from -r web.requirements.txt (line 7))
+  Using cached simple_websocket-1.1.0-py3-none-any.whl.metadata (1.5 kB)
+Collecting flask-cors (from -r web.requirements.txt (line 8))
+  Using cached flask_cors-6.0.5-py3-none-any.whl.metadata (5.4 kB)
+Collecting pystray (from -r web.requirements.txt (line 9))
+  Using cached pystray-0.19.5-py2.py3-none-any.whl.metadata (9.4 kB)
+Requirement already satisfied: numpy in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 10)) (2.1.1)
+Requirement already satisfied: ultralytics==8.3.78 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 11)) (8.3.78)
+Requirement already satisfied: imageio~=2.36.1 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 12)) (2.36.1)
+Requirement already satisfied: tqdm~=4.67.1 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 13)) (4.67.3)
+Requirement already satisfied: colorama~=0.4.6 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 14)) (0.4.6)
+Collecting opencv-python-headless (from -r web.requirements.txt (line 15))
+  Using cached opencv_python_headless-4.13.0.92-cp37-abi3-win_amd64.whl.metadata (20 kB)
+Requirement already satisfied: scipy>=1.15.1 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 16)) (1.17.1)
+Requirement already satisfied: scikit-learn>=1.0.0 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 17)) (1.9.0)
+Requirement already satisfied: simplification~=0.7.13 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 18)) (0.7.16)
+Requirement already satisfied: msgpack~=1.1.0 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 19)) (1.1.2)
+Requirement already satisfied: pillow>=11.2.1 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 20)) (12.2.0)
+Requirement already satisfied: orjson>=3.11.0 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 21)) (3.11.9)
+Requirement already satisfied: send2trash~=1.8.3 in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 22)) (1.8.3)
+Requirement already satisfied: aiosqlite in .\build_venv\Lib\site-packages (from -r web.requirements.txt (line 23)) (0.22.1)
+Requirement already satisfied: matplotlib>=3.3.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.11.0)
+Requirement already satisfied: opencv-python>=4.6.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (4.10.0.84)
+Requirement already satisfied: pyyaml>=5.3.1 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (6.0.3)
+Requirement already satisfied: requests>=2.23.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2.34.2)
+Requirement already satisfied: torch>=1.8.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2.8.0+cu128)
+Requirement already satisfied: torchvision>=0.9.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (0.23.0+cu128)
+Requirement already satisfied: psutil in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (7.2.2)
+Requirement already satisfied: py-cpuinfo in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (9.0.0)
+Requirement already satisfied: pandas>=1.1.4 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.0.3)
+Requirement already satisfied: seaborn>=0.11.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (0.13.2)
+Requirement already satisfied: ultralytics-thop>=2.0.0 in .\build_venv\Lib\site-packages (from ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2.0.20)
+Collecting blinker>=1.9.0 (from flask->-r web.requirements.txt (line 5))
+  Using cached blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+Collecting click>=8.1.3 (from flask->-r web.requirements.txt (line 5))
+  Using cached click-8.4.1-py3-none-any.whl.metadata (2.6 kB)
+Collecting itsdangerous>=2.2.0 (from flask->-r web.requirements.txt (line 5))
+  Using cached itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+Requirement already satisfied: jinja2>=3.1.2 in .\build_venv\Lib\site-packages (from flask->-r web.requirements.txt (line 5)) (3.1.6)
+Requirement already satisfied: markupsafe>=2.1.1 in .\build_venv\Lib\site-packages (from flask->-r web.requirements.txt (line 5)) (3.0.3)
+Collecting werkzeug>=3.1.0 (from flask->-r web.requirements.txt (line 5))
+  Using cached werkzeug-3.1.8-py3-none-any.whl.metadata (4.0 kB)
+Collecting python-socketio>=5.12.0 (from flask-socketio->-r web.requirements.txt (line 6))
+  Using cached python_socketio-5.16.3-py3-none-any.whl.metadata (3.3 kB)
+Collecting wsproto (from simple-websocket->-r web.requirements.txt (line 7))
+  Using cached wsproto-1.3.2-py3-none-any.whl.metadata (5.2 kB)
+Requirement already satisfied: six in .\build_venv\Lib\site-packages (from pystray->-r web.requirements.txt (line 9)) (1.17.0)
+Requirement already satisfied: joblib>=1.4.0 in .\build_venv\Lib\site-packages (from scikit-learn>=1.0.0->-r web.requirements.txt (line 17)) (1.5.3)
+Requirement already satisfied: narwhals>=2.0.1 in .\build_venv\Lib\site-packages (from scikit-learn>=1.0.0->-r web.requirements.txt (line 17)) (2.22.1)
+Requirement already satisfied: threadpoolctl>=3.5.0 in .\build_venv\Lib\site-packages (from scikit-learn>=1.0.0->-r web.requirements.txt (line 17)) (3.6.0)
+Requirement already satisfied: contourpy>=1.0.1 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (1.3.3)
+Requirement already satisfied: cycler>=0.10 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (0.12.1)
+Requirement already satisfied: fonttools>=4.22.0 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (4.63.0)
+Requirement already satisfied: kiwisolver>=1.3.1 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (1.5.0)
+Requirement already satisfied: packaging>=20.0 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (26.2)
+Requirement already satisfied: pyparsing>=3 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.3.2)
+Requirement already satisfied: python-dateutil>=2.7 in .\build_venv\Lib\site-packages (from matplotlib>=3.3.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2.9.0.post0)
+Requirement already satisfied: tzdata in .\build_venv\Lib\site-packages (from pandas>=1.1.4->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2026.2)
+Collecting bidict>=0.21.0 (from python-socketio>=5.12.0->flask-socketio->-r web.requirements.txt (line 6))
+  Using cached bidict-0.23.1-py3-none-any.whl.metadata (8.7 kB)
+Collecting python-engineio>=4.13.2 (from python-socketio>=5.12.0->flask-socketio->-r web.requirements.txt (line 6))
+  Using cached python_engineio-4.13.2-py3-none-any.whl.metadata (2.3 kB)
+Requirement already satisfied: charset_normalizer<4,>=2 in .\build_venv\Lib\site-packages (from requests>=2.23.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.4.7)
+Requirement already satisfied: idna<4,>=2.5 in .\build_venv\Lib\site-packages (from requests>=2.23.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.18)
+Requirement already satisfied: urllib3<3,>=1.26 in .\build_venv\Lib\site-packages (from requests>=2.23.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2.7.0)
+Requirement already satisfied: certifi>=2023.5.7 in .\build_venv\Lib\site-packages (from requests>=2.23.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2026.6.17)
+Requirement already satisfied: filelock in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.29.4)
+Requirement already satisfied: typing-extensions>=4.10.0 in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (4.15.0)
+Requirement already satisfied: sympy>=1.13.3 in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (1.14.0)
+Requirement already satisfied: networkx in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (3.6.1)
+Requirement already satisfied: fsspec in .\build_venv\Lib\site-packages (from torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (2026.6.0)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in .\build_venv\Lib\site-packages (from sympy>=1.13.3->torch>=1.8.0->ultralytics==8.3.78->-r web.requirements.txt (line 11)) (1.3.0)
+Collecting h11<1,>=0.16.0 (from wsproto->simple-websocket->-r web.requirements.txt (line 7))
+  Using cached h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+Using cached flask-3.1.3-py3-none-any.whl (103 kB)
+Using cached flask_socketio-5.6.1-py3-none-any.whl (18 kB)
+Using cached simple_websocket-1.1.0-py3-none-any.whl (13 kB)
+Using cached flask_cors-6.0.5-py3-none-any.whl (16 kB)
+Using cached pystray-0.19.5-py2.py3-none-any.whl (49 kB)
+Using cached opencv_python_headless-4.13.0.92-cp37-abi3-win_amd64.whl (40.1 MB)
+Using cached blinker-1.9.0-py3-none-any.whl (8.5 kB)
+Using cached click-8.4.1-py3-none-any.whl (116 kB)
+Using cached itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+Using cached python_socketio-5.16.3-py3-none-any.whl (82 kB)
+Using cached bidict-0.23.1-py3-none-any.whl (32 kB)
+Using cached python_engineio-4.13.2-py3-none-any.whl (59 kB)
+Using cached werkzeug-3.1.8-py3-none-any.whl (226 kB)
+Using cached wsproto-1.3.2-py3-none-any.whl (24 kB)
+Using cached h11-0.16.0-py3-none-any.whl (37 kB)
+Installing collected packages: werkzeug, pystray, opencv-python-headless, itsdangerous, h11, click, blinker, bidict, wsproto, flask, simple-websocket, flask-cors, python-engineio, python-socketio, flask-socketio
+Successfully installed bidict-0.23.1 blinker-1.9.0 click-8.4.1 flask-3.1.3 flask-cors-6.0.5 flask-socketio-5.6.1 h11-0.16.0 itsdangerous-2.2.0 opencv-python-headless-4.13.0.92 pystray-0.19.5 python-engineio-4.13.2 python-socketio-5.16.3 simple-websocket-1.1.0 werkzeug-3.1.8 wsproto-1.3.2
+Requirement already satisfied: opencv-python-headless in .\build_venv\Lib\site-packages (4.13.0.92)
+Requirement already satisfied: flask-cors in .\build_venv\Lib\site-packages (6.0.5)
+Requirement already satisfied: numpy>=2 in .\build_venv\Lib\site-packages (from opencv-python-headless) (2.1.1)
+Requirement already satisfied: flask>=0.9 in .\build_venv\Lib\site-packages (from flask-cors) (3.1.3)
+Requirement already satisfied: Werkzeug>=0.7 in .\build_venv\Lib\site-packages (from flask-cors) (3.1.8)
+Requirement already satisfied: blinker>=1.9.0 in .\build_venv\Lib\site-packages (from flask>=0.9->flask-cors) (1.9.0)
+Requirement already satisfied: click>=8.1.3 in .\build_venv\Lib\site-packages (from flask>=0.9->flask-cors) (8.4.1)
+Requirement already satisfied: itsdangerous>=2.2.0 in .\build_venv\Lib\site-packages (from flask>=0.9->flask-cors) (2.2.0)
+Requirement already satisfied: jinja2>=3.1.2 in .\build_venv\Lib\site-packages (from flask>=0.9->flask-cors) (3.1.6)
+Requirement already satisfied: markupsafe>=2.1.1 in .\build_venv\Lib\site-packages (from flask>=0.9->flask-cors) (3.0.3)
+Requirement already satisfied: colorama in .\build_venv\Lib\site-packages (from click>=8.1.3->flask>=0.9->flask-cors) (0.4.6)
+[4/11] Running PyInstaller (standard)...
+115 INFO: PyInstaller: 6.21.0, contrib hooks: 2026.6
+115 INFO: Python: 3.11.9
+128 INFO: Platform: Windows-10-10.0.26200-SP0
+129 INFO: Python environment: C:\Users\james\hapticai-server\build_venv
+131 INFO: Removing temporary files and cleaning cache in C:\Users\james\AppData\Local\pyinstaller
+137 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\james\\hapticai-server\\build_venv\\Scripts\\pyinstaller.exe',
+ 'C:\\Users\\james\\AppData\\Local\\Programs\\Python\\Python311\\python311.zip',
+ 'C:\\Users\\james\\AppData\\Local\\Programs\\Python\\Python311\\DLLs',
+ 'C:\\Users\\james\\AppData\\Local\\Programs\\Python\\Python311\\Lib',
+ 'C:\\Users\\james\\AppData\\Local\\Programs\\Python\\Python311',
+ 'C:\\Users\\james\\hapticai-server\\build_venv',
+ 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages',
+ 'C:\\Users\\james\\hapticai-server']
+1032 INFO: Appending 'datas' from .spec
+1050 INFO: checking Analysis
+1050 INFO: Building Analysis because Analysis-00.toc is non existent
+1050 INFO: Looking for Python shared library...
+1050 INFO: Using Python shared library: C:\Users\james\AppData\Local\Programs\Python\Python311\python311.dll
+1050 INFO: Running Analysis Analysis-00.toc
+1050 INFO: Target bytecode optimization level: 0
+1050 INFO: Initializing module dependency graph...
+1051 INFO: Initializing module graph hook caches...
+1076 INFO: Analyzing modules for base_library.zip ...
+1809 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+1856 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+2865 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+2928 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+3945 INFO: Caching module dependency graph...
+3971 INFO: Analyzing C:\Users\james\hapticai-server\web_app.py
+4043 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4264 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+4265 INFO: SetuptoolsInfo: initializing cached setuptools info...
+4864 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4911 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5090 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5601 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5634 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5832 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+5995 INFO: Processing standard module hook 'hook-jinja2.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+6388 INFO: Processing pre-safe-import-module hook 'hook-importlib_metadata.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+6438 INFO: Processing standard module hook 'hook-urllib3.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+6510 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+6832 INFO: Processing standard module hook 'hook-certifi.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+6888 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+7361 INFO: Processing standard module hook 'hook-torch.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+3322 WARNING: Failed to collect submodules for 'torch.utils.tensorboard' because importing 'torch.utils.tensorboard' raised: ModuleNotFoundError: No module named 'tensorboard'
+W0617 18:33:03.567000 19096 Lib\site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects are currently not supported in Windows or MacOs.
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._sharding_spec` will be deprecated, use `torch.distributed._shard.sharding_spec` instead
+  __import__(name)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._sharded_tensor` will be deprecated, use `torch.distributed._shard.sharded_tensor` instead
+  __import__(name)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._shard.checkpoint` will be deprecated, use `torch.distributed.checkpoint` instead
+  __import__(name)
+19157 INFO: hook-torch: this torch build does not depend on MKL...
+19368 INFO: Processing standard module hook 'hook-numpy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+20071 INFO: Processing standard module hook 'hook-psutil.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+21556 INFO: Processing standard module hook 'hook-matplotlib.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+21925 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+22174 INFO: Processing standard module hook 'hook-matplotlib.backend_bases.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+22305 INFO: Processing standard module hook 'hook-PIL.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+22364 INFO: Processing standard module hook 'hook-PIL.Image.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+22732 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+22821 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+23455 INFO: Processing standard module hook 'hook-matplotlib.backends.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+23591 INFO: Processing standard module hook 'hook-matplotlib.pyplot.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+24259 INFO: Processing standard module hook 'hook-dateutil.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+24306 INFO: Processing pre-safe-import-module hook 'hook-six.moves.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+25346 INFO: Processing standard module hook 'hook-pandas.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+27357 INFO: Processing standard module hook 'hook-zoneinfo.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+27511 INFO: Processing standard module hook 'hook-scipy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+36729 INFO: Processing standard module hook 'hook-scipy.linalg.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+36823 INFO: Processing standard module hook 'hook-scipy.special._ufuncs.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+36927 INFO: Processing standard module hook 'hook-scipy.special._ellip_harm_2.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+38583 INFO: Processing standard module hook 'hook-scipy.spatial._ckdtree.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+38939 INFO: Processing standard module hook 'hook-scipy.spatial.transform.rotation.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+40021 INFO: Processing standard module hook 'hook-scipy.stats._stats.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+40333 INFO: Processing standard module hook 'hook-scipy.sparse.csgraph.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+42140 INFO: Processing standard module hook 'hook-xml.dom.domreg.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+44178 INFO: Processing standard module hook 'hook-setuptools.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+44183 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+44184 INFO: Processing pre-find-module-path hook 'hook-distutils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+44649 INFO: Processing standard module hook 'hook-distutils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+44728 INFO: Processing standard module hook 'hook-distutils.util.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+44748 INFO: Processing standard module hook 'hook-_osx_support.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+44853 INFO: Processing standard module hook 'hook-pkg_resources.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+45953 INFO: Processing pre-safe-import-module hook 'hook-win32com.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\pre_safe_import_module'
+46590 INFO: Processing standard module hook 'hook-sqlite3.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+48666 INFO: Processing standard module hook 'hook-pandas.io.formats.style.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+50920 INFO: Processing standard module hook 'hook-pandas.plotting.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+52633 INFO: Processing standard module hook 'hook-pandas.io.clipboard.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+52713 INFO: Processing standard module hook 'hook-fsspec.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+53141 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+63802 INFO: Processing standard module hook 'hook-torchvision.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+63846 INFO: Processing standard module hook 'hook-torchvision.io.image.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+65364 INFO: Processing standard module hook 'hook-torchaudio.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+69556 INFO: Processing standard module hook 'hook-scipy.io.matlab.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+71140 INFO: Processing pre-safe-import-module hook 'hook-gi.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+71955 INFO: Processing standard module hook 'hook-cv2.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+73047 INFO: Processing standard module hook 'hook-orjson.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+74026 INFO: Processing standard module hook 'hook-sklearn.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+74606 INFO: Processing standard module hook 'hook-sklearn.utils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+74960 INFO: Processing standard module hook 'hook-narwhals.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+76244 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.numpy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+76266 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.cupy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+76273 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.torch.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+76291 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.dask.array.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+76560 INFO: Processing standard module hook 'hook-sklearn.metrics.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+82076 INFO: Processing standard module hook 'hook-sklearn.metrics.cluster.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+82127 INFO: Processing standard module hook 'hook-sklearn.metrics.pairwise.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+82217 INFO: Processing standard module hook 'hook-sklearn.cluster.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+82319 INFO: Processing standard module hook 'hook-sklearn.neighbors.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+82517 INFO: Processing standard module hook 'hook-sklearn.linear_model.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+83435 INFO: Processing standard module hook 'hook-sklearn.tree.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+83741 INFO: Processing standard module hook 'hook-ultralytics.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+85115 INFO: Processing pre-safe-import-module hook 'hook-tensorflow.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\pre_safe_import_module'
+87140 INFO: Processing standard module hook 'hook-pystray.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+87425 INFO: Analyzing hidden import 'engineio.async_threading'
+87425 ERROR: Hidden import 'engineio.async_threading' not found
+87425 INFO: Analyzing hidden import 'socketio.async_threading'
+87425 ERROR: Hidden import 'socketio.async_threading' not found
+87425 INFO: Processing module hooks (post-graph stage)...
+93450 INFO: Processing standard module hook 'hook-matplotlib.backends.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+93451 INFO: Matplotlib backend selection method: automatic discovery of used backends
+93493 INFO: Discovered Matplotlib backend(s) via `matplotlib.use()` call in module 'sympy.testing.runtests': ['Agg', 'Agg']
+93577 INFO: The following Matplotlib backends were discovered by scanning for `matplotlib.use()` calls: ['Agg']. If your backend of choice is not in this list, either add a `matplotlib.use()` call to your code, or configure the backend collection via hook options (see: https://pyinstaller.org/en/stable/hooks-config.html#matplotlib-hooks).
+93577 INFO: Selected matplotlib backends: ['Agg']
+93932 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+94426 WARNING: Hidden import "scipy.special._cdflib" not found!
+94469 INFO: Processing standard module hook 'hook-setuptools._vendor.importlib_metadata.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+94543 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+95173 INFO: Processing standard module hook 'hook-tzdata.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+95644 INFO: Performing binary vs. data reclassification (1566 entries)
+101927 INFO: Looking for ctypes DLLs
+102156 WARNING: Library nvrtc64_120_0.dll required via ctypes not found
+102216 WARNING: Ignoring /usr/lib64/libgomp.so.1 imported from C:\Users\james\hapticai-server\build_venv\Lib\site-packages\torch\_inductor\codecache.py - only basenames are supported with ctypes imports!
+102550 INFO: Analyzing run-time hooks ...
+102572 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+102574 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+102575 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+102577 INFO: Including run-time hook 'pyi_rth_mplconfig.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+102577 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+102579 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+102584 INFO: Including run-time hook 'pyi_rth_pkgres.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+102587 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+102690 INFO: Creating base_library.zip...
+102709 INFO: Looking for dynamic libraries
+W0617 18:34:32.857000 27564 Lib\site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects are currently not supported in Windows or MacOs.
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharding_spec` will be deprecated, use `torch.distributed._shard.sharding_spec` instead
+  __import__(package)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharded_tensor` will be deprecated, use `torch.distributed._shard.sharded_tensor` instead
+  __import__(package)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._shard.checkpoint` will be deprecated, use `torch.distributed.checkpoint` instead
+  __import__(package)
+requirements: Ultralytics requirement ['lap>=0.5.12'] not found, attempting AutoUpdate...
+Collecting lap>=0.5.12
+  Downloading lap-0.5.13-cp311-cp311-win_amd64.whl.metadata (6.8 kB)
+Requirement already satisfied: numpy>=1.21.6 in .\build_venv\Lib\site-packages (from lap>=0.5.12) (2.1.1)
+Downloading lap-0.5.13-cp311-cp311-win_amd64.whl (1.5 MB)
+   ---------------------------------------- 1.5/1.5 MB 391.0 kB/s  0:00:03
+Installing collected packages: lap
+Successfully installed lap-0.5.13
+
+requirements: AutoUpdate success ✅ 6.1s, installed 1 package: ['lap>=0.5.12']
+requirements: ⚠️ Restart runtime or rerun command for updates to take effect
+
+118428 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torch\\lib', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\numpy.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\pandas.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\scipy.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\cv2\\../../x64/vc17/bin']
+118428 INFO: Extra DLL search directories (PATH): ['C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\cv2\\../../x64/vc17/bin']
+122269 INFO: Warnings written to C:\Users\james\hapticai-server\build\hapticai_windows\warn-hapticai_windows.txt
+122724 INFO: Graph cross-reference written to C:\Users\james\hapticai-server\build\hapticai_windows\xref-hapticai_windows.html
+122879 INFO: checking PYZ
+122879 INFO: Building PYZ because PYZ-00.toc is non existent
+122879 INFO: Building PYZ (ZlibArchive) C:\Users\james\hapticai-server\build\hapticai_windows\PYZ-00.pyz
+126661 INFO: Building PYZ (ZlibArchive) C:\Users\james\hapticai-server\build\hapticai_windows\PYZ-00.pyz completed successfully.
+126736 INFO: checking PKG
+126736 INFO: Building PKG because PKG-00.toc is non existent
+126736 INFO: Building PKG (CArchive) HapticAI.pkg
+126798 INFO: Building PKG (CArchive) HapticAI.pkg completed successfully.
+126800 INFO: Bootloader C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+126800 INFO: checking EXE
+126800 INFO: Building EXE because EXE-00.toc is non existent
+126800 INFO: Building EXE from EXE-00.toc
+126800 INFO: Copying bootloader EXE to C:\Users\james\hapticai-server\dist\HapticAI.exe
+126873 INFO: Copying icon to EXE
+126908 INFO: Copying 0 resources to EXE
+126908 INFO: Embedding manifest in EXE
+126942 INFO: Appending PKG archive to EXE
+127013 INFO: Fixing EXE headers
+127348 INFO: Building EXE from EXE-00.toc completed successfully.
+127372 INFO: checking COLLECT
+127372 INFO: Building COLLECT because COLLECT-00.toc is non existent
+127373 INFO: Removing dir C:\Users\james\hapticai-server\dist\HapticAI
+128121 INFO: Building COLLECT COLLECT-00.toc
+133211 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+133262 INFO: Build complete! The results are available in: C:\Users\james\hapticai-server\dist
+[5/11] Building standard installer (NSIS)...
+Command line defined: "VERSION=v01.01.12"
+Processing config: C:\Program Files (x86)\NSIS\nsisconf.nsh
+Processing script file: "installer.nsi" (ACP)
+
+Internal compiler error #12345: error mmapping file (2077184526, 33554432) is out of range.
+
+Note: you may have one or two (large) stale temporary file(s) left in your temporary directory (Generally this only happens on Windows 9x).
+
+ERROR: NSIS standard build failed. Check output above.
+Press any key to continue . . .

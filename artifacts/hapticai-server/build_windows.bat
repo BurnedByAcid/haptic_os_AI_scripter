@@ -26,27 +26,32 @@ if "%VERSION%"=="" (
 set "PYTHON_CMD=py -3.11"
 for /f "tokens=2" %%V in ('py -3.11 --version 2^>^&1') do echo  Using Python %%V.
 
-:: ── Find makensis ────────────────────────────────────────────────────────────
-set "MAKENSIS=makensis"
-makensis /VERSION >nul 2>&1
-if not errorlevel 1 goto :nsis_found
-if exist "C:\Program Files (x86)\NSIS\makensis.exe" goto :nsis_x86
-if exist "C:\Program Files\NSIS\makensis.exe" goto :nsis_x64
+:: ── Find Inno Setup (64-bit ISCC — handles large PyTorch/CUDA bundles) ───────
+set "ISCC=ISCC"
+ISCC /? >nul 2>&1
+if not errorlevel 1 goto :iscc_found
+if exist "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" goto :iscc_x86
+if exist "C:\Program Files\Inno Setup 6\ISCC.exe" goto :iscc_x64
 echo.
-echo ERROR: NSIS not found. Install NSIS 3.x from https://nsis.sourceforge.io
+echo ERROR: Inno Setup 6 not found.
+echo.
+echo   NSIS cannot build installers this large ^(32-bit limit^).
+echo   Download and install Inno Setup 6 from:
+echo     https://jrsoftware.org/isdl.php
+echo   Then re-run this script.
 echo.
 pause & exit /b 1
 
-:nsis_x86
-set "MAKENSIS=C:\Program Files (x86)\NSIS\makensis.exe"
-echo  Found NSIS at Program Files ^(x86^).
-goto :nsis_found
+:iscc_x86
+set "ISCC=C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+echo  Found Inno Setup 6 at Program Files ^(x86^).
+goto :iscc_found
 
-:nsis_x64
-set "MAKENSIS=C:\Program Files\NSIS\makensis.exe"
-echo  Found NSIS at Program Files.
+:iscc_x64
+set "ISCC=C:\Program Files\Inno Setup 6\ISCC.exe"
+echo  Found Inno Setup 6 at Program Files.
 
-:nsis_found
+:iscc_found
 
 :: ── [1/11] Virtual environment ──────────────────────────────────────────────
 echo.
@@ -77,13 +82,13 @@ if not exist dist\HapticAI\HapticAI.exe (
     pause & exit /b 1
 )
 
-:: ── [5/11] NSIS — standard installer ────────────────────────────────────────
-echo [5/11] Building standard installer ^(NSIS^)...
-"!MAKENSIS!" /DVERSION="%VERSION%" installer.nsi
+:: ── [5/11] Inno Setup — standard installer ───────────────────────────────────
+echo [5/11] Building standard installer ^(Inno Setup^)...
+"!ISCC!" /DVERSION="%VERSION%" installer.iss
 
 if not exist dist\HapticAI-Setup.exe (
     echo.
-    echo ERROR: NSIS standard build failed. Check output above.
+    echo ERROR: Inno Setup standard build failed. Check output above.
     call build_venv\Scripts\deactivate.bat
     pause & exit /b 1
 )
@@ -107,13 +112,13 @@ if not exist dist\HapticAI-50series\HapticAI-50series.exe (
     pause & exit /b 1
 )
 
-:: ── [8/11] NSIS — 50-series installer ───────────────────────────────────────
-echo [8/11] Building 50-series installer ^(NSIS^)...
-"!MAKENSIS!" /DVERSION="%VERSION%" /DGPU_VARIANT=50series installer.nsi
+:: ── [8/11] Inno Setup — 50-series installer ──────────────────────────────────
+echo [8/11] Building 50-series installer ^(Inno Setup^)...
+"!ISCC!" /DVERSION="%VERSION%" /DGPU_VARIANT=50series installer.iss
 
 if not exist dist\HapticAI-Setup-50series.exe (
     echo.
-    echo ERROR: NSIS 50-series build failed. Check output above.
+    echo ERROR: Inno Setup 50-series build failed. Check output above.
     call build_venv\Scripts\deactivate.bat
     pause & exit /b 1
 )
@@ -137,13 +142,13 @@ if not exist dist\HapticAI-CPU\HapticAI-CPU.exe (
     pause & exit /b 1
 )
 
-:: ── [11/11] NSIS — CPU installer ────────────────────────────────────────────
-echo [11/11] Building CPU installer ^(NSIS^)...
-"!MAKENSIS!" /DVERSION="%VERSION%" /DGPU_VARIANT=cpu installer.nsi
+:: ── [11/11] Inno Setup — CPU installer ───────────────────────────────────────
+echo [11/11] Building CPU installer ^(Inno Setup^)...
+"!ISCC!" /DVERSION="%VERSION%" /DGPU_VARIANT=cpu installer.iss
 
 if not exist dist\HapticAI-Setup-CPU.exe (
     echo.
-    echo ERROR: NSIS CPU build failed. Check output above.
+    echo ERROR: Inno Setup CPU build failed. Check output above.
     call build_venv\Scripts\deactivate.bat
     pause & exit /b 1
 )
