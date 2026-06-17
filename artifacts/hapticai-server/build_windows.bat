@@ -57,7 +57,7 @@ call build_venv\Scripts\activate.bat
 
 :: ── [2/11] Build tools ──────────────────────────────────────────────────────
 echo [2/11] Installing build tools...
-!PYTHON_CMD! -m pip install --upgrade pip wheel "pyinstaller<7"
+python -m pip install --upgrade pip wheel "pyinstaller<7"
 
 :: ── [3/11] Standard deps (CUDA 12.8 — RTX 30xx / 40xx) ─────────────────────
 echo [3/11] Installing standard deps ^(CUDA 12.8 for RTX 30xx/40xx^)...
