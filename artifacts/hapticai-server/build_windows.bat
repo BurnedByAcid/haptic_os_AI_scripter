@@ -70,7 +70,7 @@ pip install opencv-python-headless --upgrade flask-cors
 echo [4/11] Running PyInstaller ^(standard^)...
 pyinstaller hapticai_windows.spec --clean --noconfirm
 
-if not exist dist\HapticAI.exe (
+if not exist dist\HapticAI\HapticAI.exe (
     echo.
     echo ERROR: PyInstaller standard build failed. Check output above.
     call build_venv\Scripts\deactivate.bat
@@ -100,7 +100,7 @@ pip install -r cuda.50series.requirements.txt --force-reinstall
 echo [7/11] Running PyInstaller ^(50-series^)...
 pyinstaller hapticai_windows_50series.spec --clean --noconfirm
 
-if not exist dist\HapticAI-50series.exe (
+if not exist dist\HapticAI-50series\HapticAI-50series.exe (
     echo.
     echo ERROR: PyInstaller 50-series build failed. Check output above.
     call build_venv\Scripts\deactivate.bat
@@ -130,7 +130,7 @@ pip install -r cpu.requirements.txt --force-reinstall
 echo [10/11] Running PyInstaller ^(CPU^)...
 pyinstaller hapticai_windows_cpu.spec --clean --noconfirm
 
-if not exist dist\HapticAI-CPU.exe (
+if not exist dist\HapticAI-CPU\HapticAI-CPU.exe (
     echo.
     echo ERROR: PyInstaller CPU build failed. Check output above.
     call build_venv\Scripts\deactivate.bat

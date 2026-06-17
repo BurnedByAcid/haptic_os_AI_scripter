@@ -1,0 +1,185 @@
+1149 INFO: Appending 'datas' from .spec
+1171 INFO: checking Analysis
+1172 INFO: Building Analysis because Analysis-00.toc is non existent
+1172 INFO: Looking for Python shared library...
+1172 INFO: Using Python shared library: C:\Users\james\AppData\Local\Programs\Python\Python311\python311.dll
+1172 INFO: Running Analysis Analysis-00.toc
+1172 INFO: Target bytecode optimization level: 0
+1172 INFO: Initializing module dependency graph...
+1174 INFO: Initializing module graph hook caches...
+1210 INFO: Analyzing modules for base_library.zip ...
+2286 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+2404 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+3756 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4276 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7378 INFO: Caching module dependency graph...
+7411 INFO: Analyzing C:\Users\james\hapticai-server\web_app.py
+7574 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7977 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+7978 INFO: SetuptoolsInfo: initializing cached setuptools info...
+8812 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+8978 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+9336 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+10420 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+10525 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+10798 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+11008 INFO: Processing standard module hook 'hook-jinja2.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+11592 INFO: Processing pre-safe-import-module hook 'hook-importlib_metadata.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+11679 INFO: Processing standard module hook 'hook-urllib3.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+11748 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+12315 INFO: Processing standard module hook 'hook-certifi.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+12349 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+13060 INFO: Processing standard module hook 'hook-torch.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+6010 WARNING: Failed to collect submodules for 'torch.utils.tensorboard' because importing 'torch.utils.tensorboard' raised: ModuleNotFoundError: No module named 'tensorboard'
+W0617 13:53:17.851000 10928 Lib\site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects are currently not supported in Windows or MacOs.
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._sharding_spec` will be deprecated, use `torch.distributed._shard.sharding_spec` instead
+  __import__(name)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._sharded_tensor` will be deprecated, use `torch.distributed._shard.sharded_tensor` instead
+  __import__(name)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\utils\hooks\__init__.py:665: DeprecationWarning: `torch.distributed._shard.checkpoint` will be deprecated, use `torch.distributed.checkpoint` instead
+  __import__(name)
+31903 INFO: hook-torch: this torch build does not depend on MKL...
+32231 INFO: Processing standard module hook 'hook-numpy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+33434 INFO: Processing standard module hook 'hook-psutil.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+35532 INFO: Processing standard module hook 'hook-matplotlib.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+35983 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+36319 INFO: Processing standard module hook 'hook-matplotlib.backend_bases.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+36420 INFO: Processing standard module hook 'hook-PIL.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+36597 INFO: Processing standard module hook 'hook-PIL.Image.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+37000 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+37234 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+38071 INFO: Processing standard module hook 'hook-matplotlib.backends.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+38134 INFO: Processing standard module hook 'hook-matplotlib.pyplot.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+39017 INFO: Processing standard module hook 'hook-dateutil.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+39083 INFO: Processing pre-safe-import-module hook 'hook-six.moves.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+40612 INFO: Processing standard module hook 'hook-pandas.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+42881 INFO: Processing standard module hook 'hook-zoneinfo.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+43117 INFO: Processing standard module hook 'hook-scipy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+56694 INFO: Processing standard module hook 'hook-scipy.linalg.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+56834 INFO: Processing standard module hook 'hook-scipy.special._ufuncs.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+57012 INFO: Processing standard module hook 'hook-scipy.special._ellip_harm_2.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+59238 INFO: Processing standard module hook 'hook-scipy.spatial._ckdtree.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+59715 INFO: Processing standard module hook 'hook-scipy.spatial.transform.rotation.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+61204 INFO: Processing standard module hook 'hook-scipy.stats._stats.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+61742 INFO: Processing standard module hook 'hook-scipy.sparse.csgraph.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+64873 INFO: Processing standard module hook 'hook-xml.dom.domreg.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+68268 INFO: Processing standard module hook 'hook-setuptools.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+68276 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+68278 INFO: Processing pre-find-module-path hook 'hook-distutils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+69004 INFO: Processing standard module hook 'hook-distutils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+69126 INFO: Processing standard module hook 'hook-distutils.util.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+69223 INFO: Processing standard module hook 'hook-_osx_support.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+69562 INFO: Processing standard module hook 'hook-pkg_resources.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+71155 INFO: Processing pre-safe-import-module hook 'hook-win32com.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\pre_safe_import_module'
+72152 INFO: Processing standard module hook 'hook-sqlite3.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+75435 INFO: Processing standard module hook 'hook-pandas.io.formats.style.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+78681 INFO: Processing standard module hook 'hook-pandas.plotting.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+81386 INFO: Processing standard module hook 'hook-pandas.io.clipboard.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+81539 INFO: Processing standard module hook 'hook-fsspec.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+82200 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+98610 INFO: Processing standard module hook 'hook-torchvision.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+98688 INFO: Processing standard module hook 'hook-torchvision.io.image.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+101234 INFO: Processing standard module hook 'hook-torchaudio.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+107317 INFO: Processing standard module hook 'hook-scipy.io.matlab.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+109867 INFO: Processing pre-safe-import-module hook 'hook-gi.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+111094 INFO: Processing standard module hook 'hook-cv2.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+112747 INFO: Processing standard module hook 'hook-orjson.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+114327 INFO: Processing standard module hook 'hook-sklearn.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+115356 INFO: Processing standard module hook 'hook-sklearn.utils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+115911 INFO: Processing standard module hook 'hook-narwhals.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+117831 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.numpy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+117865 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.cupy.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+117877 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.torch.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+117905 INFO: Processing standard module hook 'hook-sklearn.externals.array_api_compat.dask.array.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+118109 INFO: Processing standard module hook 'hook-sklearn.metrics.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+126106 INFO: Processing standard module hook 'hook-sklearn.metrics.cluster.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+126168 INFO: Processing standard module hook 'hook-sklearn.metrics.pairwise.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+126482 INFO: Processing standard module hook 'hook-sklearn.cluster.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+126617 INFO: Processing standard module hook 'hook-sklearn.neighbors.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+126703 INFO: Processing standard module hook 'hook-sklearn.linear_model.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+128112 INFO: Processing standard module hook 'hook-sklearn.tree.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+128522 INFO: Processing standard module hook 'hook-ultralytics.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+130387 INFO: Processing pre-safe-import-module hook 'hook-tensorflow.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\pre_safe_import_module'
+132926 INFO: Processing standard module hook 'hook-pystray.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+133277 INFO: Analyzing hidden import 'engineio.async_threading'
+133277 ERROR: Hidden import 'engineio.async_threading' not found
+133277 INFO: Analyzing hidden import 'socketio.async_threading'
+133277 ERROR: Hidden import 'socketio.async_threading' not found
+133277 INFO: Processing module hooks (post-graph stage)...
+141938 INFO: Processing standard module hook 'hook-matplotlib.backends.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+141945 INFO: Matplotlib backend selection method: automatic discovery of used backends
+142005 INFO: Discovered Matplotlib backend(s) via `matplotlib.use()` call in module 'sympy.testing.runtests': ['Agg', 'Agg']
+142134 INFO: The following Matplotlib backends were discovered by scanning for `matplotlib.use()` calls: ['Agg']. If your backend of choice is not in this list, either add a `matplotlib.use()` call to your code, or configure the backend collection via hook options (see: https://pyinstaller.org/en/stable/hooks-config.html#matplotlib-hooks).
+142134 INFO: Selected matplotlib backends: ['Agg']
+142672 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+143368 WARNING: Hidden import "scipy.special._cdflib" not found!
+143427 INFO: Processing standard module hook 'hook-setuptools._vendor.importlib_metadata.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+143534 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+144490 INFO: Processing standard module hook 'hook-tzdata.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+145150 INFO: Performing binary vs. data reclassification (1460 entries)
+152796 INFO: Looking for ctypes DLLs
+153096 WARNING: Library nvrtc64_120_0.dll required via ctypes not found
+153178 WARNING: Ignoring /usr/lib64/libgomp.so.1 imported from C:\Users\james\hapticai-server\build_venv\Lib\site-packages\torch\_inductor\codecache.py - only basenames are supported with ctypes imports!
+153619 INFO: Analyzing run-time hooks ...
+153647 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+153650 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+153651 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+153654 INFO: Including run-time hook 'pyi_rth_mplconfig.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+153655 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+153657 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks'
+153664 INFO: Including run-time hook 'pyi_rth_pkgres.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+153666 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+153800 INFO: Creating base_library.zip...
+153824 INFO: Looking for dynamic libraries
+W0617 13:55:29.591000 25092 Lib\site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects are currently not supported in Windows or MacOs.
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharding_spec` will be deprecated, use `torch.distributed._shard.sharding_spec` instead
+  __import__(package)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharded_tensor` will be deprecated, use `torch.distributed._shard.sharded_tensor` instead
+  __import__(package)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._shard.checkpoint` will be deprecated, use `torch.distributed.checkpoint` instead
+  __import__(package)
+requirements: Ultralytics requirement ['lap>=0.5.12'] not found, attempting AutoUpdate...
+Collecting lap>=0.5.12
+  Downloading lap-0.5.13-cp311-cp311-win_amd64.whl.metadata (6.8 kB)
+Requirement already satisfied: numpy>=1.21.6 in .\build_venv\Lib\site-packages (from lap>=0.5.12) (2.1.1)
+Downloading lap-0.5.13-cp311-cp311-win_amd64.whl (1.5 MB)
+   ---------------------------------------- 1.5/1.5 MB 15.6 MB/s  0:00:00
+Installing collected packages: lap
+Successfully installed lap-0.5.13
+
+requirements: AutoUpdate success ✅ 2.5s, installed 1 package: ['lap>=0.5.12']
+requirements: ⚠️ Restart runtime or rerun command for updates to take effect
+
+171725 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torch\\lib', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\numpy.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\pandas.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\scipy.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\cv2\\../../x64/vc17/bin']
+171725 INFO: Extra DLL search directories (PATH): ['C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\cv2\\../../x64/vc17/bin']
+177514 INFO: Warnings written to C:\Users\james\hapticai-server\build\hapticai_windows\warn-hapticai_windows.txt
+178088 INFO: Graph cross-reference written to C:\Users\james\hapticai-server\build\hapticai_windows\xref-hapticai_windows.html
+178269 INFO: checking PYZ
+178270 INFO: Building PYZ because PYZ-00.toc is non existent
+178270 INFO: Building PYZ (ZlibArchive) C:\Users\james\hapticai-server\build\hapticai_windows\PYZ-00.pyz
+182947 INFO: Building PYZ (ZlibArchive) C:\Users\james\hapticai-server\build\hapticai_windows\PYZ-00.pyz completed successfully.
+183106 INFO: checking PKG
+183106 INFO: Building PKG because PKG-00.toc is non existent
+183106 INFO: Building PKG (CArchive) HapticAI.pkg
+541982 INFO: Building PKG (CArchive) HapticAI.pkg completed successfully.
+542042 INFO: Bootloader C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+542042 INFO: checking EXE
+542042 INFO: Building EXE because EXE-00.toc is non existent
+542042 INFO: Building EXE from EXE-00.toc
+542042 INFO: Copying bootloader EXE to C:\Users\james\hapticai-server\dist\HapticAI.exe
+542114 INFO: Copying icon to EXE
+542146 INFO: Copying 0 resources to EXE
+542146 INFO: Embedding manifest in EXE
+542178 INFO: Appending PKG archive to EXE
+543849 INFO: Fixing EXE headers
+555156 INFO: Building EXE from EXE-00.toc completed successfully.
+555225 INFO: Build complete! The results are available in: C:\Users\james\hapticai-server\dist
+[5/11] Building standard installer (NSIS)...
+Command line defined: "VERSION=v01.01.12"
+Processing config: C:\Program Files (x86)\NSIS\nsisconf.nsh
+Processing script file: "installer.nsi" (ACP)
+File: failed creating mmap of "dist\HapticAI.exe"
+Error in script "installer.nsi" on line 150 -- aborting creation process
+
+ERROR: NSIS standard build failed. Check output above.
+Press any key to continue . . .

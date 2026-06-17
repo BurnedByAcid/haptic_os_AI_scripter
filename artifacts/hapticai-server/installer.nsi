@@ -147,7 +147,7 @@ Section "${APP_FULL_NAME}" SecMain
 
   SetOutPath "$INSTDIR"
   SetOverwrite on
-  File "dist\${APP_EXE}"
+  File /r "dist\${APP_NAME}\*.*"
 
   ; Compute installed size for Add/Remove Programs (in KB)
   ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
@@ -191,13 +191,8 @@ Section "Uninstall"
   ; Stop the app if it's running (best-effort via HTTP shutdown)
   ExecWait '"$INSTDIR\${APP_EXE}" --shutdown' $0
 
-  ; Remove installed files
-  Delete "$INSTDIR\${APP_EXE}"
-  Delete "$INSTDIR\Uninstall.exe"
-
-  ; Leave the models/ folder — users may want to keep downloaded models.
-  ; Remove install dir only if empty.
-  RMDir "$INSTDIR"
+  ; Remove all installed files (one-directory PyInstaller bundle)
+  RMDir /r "$INSTDIR"
 
   ; Remove Start Menu shortcuts
   Delete "$SMPROGRAMS\HapticAI\${APP_FULL_NAME}.lnk"
