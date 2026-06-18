@@ -28,10 +28,9 @@ const API = import.meta.env.VITE_API_URL ?? "";
 
 type AgreementState = "loading" | "needed" | "accepted";
 
-function detectOS(): "windows" | "mac" | "other" {
+function detectOS(): "windows" | "other" {
   const ua = navigator.userAgent.toLowerCase();
   if (ua.includes("win")) return "windows";
-  if (ua.includes("mac")) return "mac";
   return "other";
 }
 
@@ -64,7 +63,6 @@ interface HapticAIRelease {
   available: boolean;
   version?: string;
   windows?: { sizeBytes: number } | null;
-  mac?: { sizeBytes: number } | null;
 }
 
 type ReleaseState = "loading" | "unavailable" | "available" | "error";
@@ -155,19 +153,19 @@ function HapticAIUpdateBanner({
   onDismiss,
 }: {
   version: string;
-  os: "windows" | "mac" | "other";
+  os: "windows" | "other";
   release: HapticAIRelease | null;
   onDownloaded?: (version: string) => void;
   onDismiss: () => void;
 }) {
-  const platformRelease = os === "windows" ? release?.windows : os === "mac" ? release?.mac : null;
+  const platformRelease = os === "windows" ? release?.windows : null;
   const { downloading, progress, downloadError, handleDownload, handleCancel } = useHapticAIDownload({
     os,
     release,
     onDownloaded,
   });
 
-  const canDownload = (os === "windows" || os === "mac") && !!platformRelease;
+  const canDownload = os === "windows" && !!platformRelease;
 
   return (
     <div className="flex items-center gap-2 border-b border-primary/30 bg-primary/10 px-4 py-2">
@@ -221,7 +219,6 @@ interface GithubRelease {
   exeUrl: string | null;
   exe50Url: string | null;
   exeCpuUrl: string | null;
-  dmgUrl: string | null;
 }
 
 const GITHUB_RELEASE_CACHE_KEY = "hapticai_github_release_v1_cache";
@@ -329,7 +326,7 @@ function UnavailableMessage({
 }
 
 function useHapticAIDownload({ os, release, onDownloaded }: {
-  os: "windows" | "windows-50series" | "windows-cpu" | "mac" | "other";
+  os: "windows" | "windows-50series" | "windows-cpu" | "other";
   release: HapticAIRelease | null;
   onDownloaded?: (version: string) => void;
 }) {
@@ -363,7 +360,9 @@ function useHapticAIDownload({ os, release, onDownloaded }: {
         ? `HapticAI-Setup-${release?.version ?? "latest"}.exe`
         : os === "windows-50series"
         ? `HapticAI-Setup-50series-${release?.version ?? "latest"}.exe`
-        : `HapticAI-${release?.version ?? "latest"}.dmg`;
+        : os === "windows-cpu"
+        ? `HapticAI-Setup-CPU-${release?.version ?? "latest"}.exe`
+        : `HapticAI-${release?.version ?? "latest"}.exe`;
     const controller = new AbortController();
     abortRef.current = controller;
     setDownloading(true);
@@ -507,7 +506,7 @@ function useHapticAIDownload({ os, release, onDownloaded }: {
 }
 
 function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubState }: {
-  os: "windows" | "mac" | "other";
+  os: "windows" | "other";
   release: HapticAIRelease | null;
   state: ReleaseState;
   onDownloaded?: (version: string) => void;
@@ -555,21 +554,8 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
     );
   }
 
-  if (os === "mac") {
-    return (
-      <div className="inline-flex items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground line-through">
-          Download HapticAI for macOS
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
-          Coming Soon
-        </span>
-      </div>
-    );
-  }
-
-  const platformRelease = os === "windows" ? release?.windows : release?.mac;
-  const label = os === "windows" ? "Download for Windows — RTX 30/40 Series" : "Download HapticAI for macOS";
+  const platformRelease = os === "windows" ? release?.windows : null;
+  const label = "Download for Windows — RTX 30/40 Series";
   const label50  = "Download for Windows — RTX 50 Series";
   const labelCpu = "Download for Windows — CPU Only (no GPU needed)";
 
@@ -598,9 +584,7 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
 
   const githubFallbackUrl =
     githubState === "ready" && githubRelease
-      ? os === "windows"
-        ? githubRelease.exeUrl
-        : githubRelease.dmgUrl
+      ? os === "windows" ? githubRelease.exeUrl : null
       : null;
 
   const github50FallbackUrl =
@@ -946,7 +930,7 @@ function DownloadLink({ os, release, state, onDownloaded, githubRelease, githubS
 }
 
 function SetupPanel({ os, serverUrl, onUrlChange, onDownloaded, release, state, githubRelease, githubState }: {
-  os: "windows" | "mac" | "other";
+  os: "windows" | "other";
   serverUrl: string;
   onUrlChange: (url: string) => void;
   onDownloaded?: (version: string) => void;
@@ -1009,8 +993,6 @@ function SetupPanel({ os, serverUrl, onUrlChange, onDownloaded, release, state, 
               <p className="text-xs text-muted-foreground">
                 {os === "windows"
                   ? "Double-click the downloaded .exe file. Windows may show a security prompt — click \"More info\" then \"Run anyway\"."
-                  : os === "mac"
-                  ? "Open the downloaded .app file. macOS may ask you to confirm — go to System Settings → Privacy & Security and click \"Open Anyway\"."
                   : "Open the downloaded executable. Your OS may require you to grant permission to run it."}
               </p>
               <p className="text-xs text-muted-foreground">
