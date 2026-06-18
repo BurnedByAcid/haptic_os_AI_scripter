@@ -13,6 +13,9 @@ on:
         description: 'Version tag (e.g. v01.01.12)'
         required: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: windows-latest
