@@ -100,87 +100,9 @@ async function migrateCommunityUniqueConstraint(): Promise<void> {
   }
 }
 
-/**
- * Idempotent migration: add haptic_ai_warn_dismissed boolean column to users.
- * Safe to run on every boot — ALTER TABLE ADD COLUMN IF NOT EXISTS is a no-op
- * when the column already exists.
- */
-async function migrateHapticAiWarnDismissed(): Promise<void> {
-  if (!process.env.DATABASE_URL) return;
-  try {
-    await pool.query(`
-      ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS haptic_ai_warn_dismissed BOOLEAN NOT NULL DEFAULT FALSE
-    `);
-  } catch (err) {
-    logger.warn({ err }, "Could not add haptic_ai_warn_dismissed column — continuing");
-  }
-}
-
-/**
- * Idempotent migration: create analytics_events table if it does not exist.
- * Tracks per-user feature usage events (feature is one of the known slugs).
- * Safe to run on every boot — CREATE TABLE IF NOT EXISTS is a no-op when
- * the table already exists.
- */
-async function migrateAnalyticsEvents(): Promise<void> {
-  if (!process.env.DATABASE_URL) return;
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS analytics_events (
-        id         SERIAL PRIMARY KEY,
-        user_id    TEXT        NOT NULL,
-        feature    TEXT        NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS analytics_events_user_idx
-        ON analytics_events (user_id, created_at DESC)
-    `);
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS analytics_events_feature_idx
-        ON analytics_events (feature, created_at DESC)
-    `);
-  } catch (err) {
-    logger.warn({ err }, "Could not create analytics_events table — continuing");
-  }
-}
-
-/**
- * Idempotent migration: create hapticai_releases table if it does not exist.
- * This table tracks HapticAI binary releases uploaded to object storage.
- * Safe to run on every boot — CREATE TABLE IF NOT EXISTS is a no-op when
- * the table already exists.
- */
-async function migrateHapticAiReleases(): Promise<void> {
-  if (!process.env.DATABASE_URL) return;
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS hapticai_releases (
-        id          SERIAL PRIMARY KEY,
-        platform    TEXT        NOT NULL,
-        version     TEXT        NOT NULL,
-        size_bytes  BIGINT      NOT NULL,
-        storage_key TEXT        NOT NULL,
-        uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `);
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS hapticai_releases_platform_idx
-        ON hapticai_releases (platform, uploaded_at DESC)
-    `);
-  } catch (err) {
-    logger.warn({ err }, "Could not create hapticai_releases table — continuing");
-  }
-}
-
 await initStripe();
 await migrateLegacyFunscripts();
 await migrateCommunityUniqueConstraint();
-await migrateHapticAiWarnDismissed();
-await migrateAnalyticsEvents();
-await migrateHapticAiReleases();
 
 app.listen(port, (err) => {
   if (err) {
