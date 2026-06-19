@@ -1,16 +1,17 @@
-import { pgTable, text, boolean, timestamp, integer, date, unique, primaryKey, check, index } from "drizzle-orm/pg-core";
+import { pgTable, text, boolean, timestamp, integer, bigint, serial, date, unique, primaryKey, check, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { sql } from "drizzle-orm";
 
 export const usersTable = pgTable("users", {
-  clerkId:            text("clerk_id").primaryKey(),
-  username:           text("username").notNull().unique(),
-  ageVerified:        boolean("age_verified").notNull(),
-  plan:               text("plan").notNull().default("free"),
-  stripeCustomerId:   text("stripe_customer_id"),
-  stripeSubscriptionId: text("stripe_subscription_id"),
-  createdAt:          timestamp("created_at").notNull().defaultNow(),
+  clerkId:                 text("clerk_id").primaryKey(),
+  username:                text("username").notNull().unique(),
+  ageVerified:             boolean("age_verified").notNull(),
+  plan:                    text("plan").notNull().default("free"),
+  stripeCustomerId:        text("stripe_customer_id"),
+  stripeSubscriptionId:    text("stripe_subscription_id"),
+  hapticAiWarnDismissed:   boolean("haptic_ai_warn_dismissed").notNull().default(false),
+  createdAt:               timestamp("created_at").notNull().defaultNow(),
 });
 
 export const scripterUsageTable = pgTable("scripter_usage", {
@@ -144,6 +145,27 @@ export const feedbackTable = pgTable("feedback", {
   message:   text("message").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const analyticsEventsTable = pgTable("analytics_events", {
+  id:        serial("id").primaryKey(),
+  userId:    text("user_id").notNull(),
+  feature:   text("feature").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("analytics_events_user_idx").on(t.userId, t.createdAt),
+  index("analytics_events_feature_idx").on(t.feature, t.createdAt),
+]);
+
+export const hapticaiReleasesTable = pgTable("hapticai_releases", {
+  id:         serial("id").primaryKey(),
+  platform:   text("platform").notNull(),
+  version:    text("version").notNull(),
+  sizeBytes:  bigint("size_bytes", { mode: "number" }).notNull(),
+  storageKey: text("storage_key").notNull(),
+  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  index("hapticai_releases_platform_idx").on(t.platform, t.uploadedAt),
+]);
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({ createdAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
