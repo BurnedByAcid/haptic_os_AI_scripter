@@ -160,16 +160,16 @@ function Router() {
 
       {/* Everything else requires login + onboarding */}
       <Route path="/"          component={() => <ProtectedRoute component={Home} />} />
-      <Route path="/control"   component={() => <ProtectedRoute component={Control} subscriberOnly />} />
-      <Route path="/local-library" component={() => <ProtectedRoute component={Library} subscriberOnly />} />
+      <Route path="/control"   component={() => <ProtectedRoute component={Control} />} />
+      <Route path="/local-library" component={() => <ProtectedRoute component={Library} />} />
       <Route path="/library"       component={() => <ProtectedRoute component={MyLibrary} />} />
-      <Route path="/games"     component={() => <ProtectedRoute component={Games} subscriberOnly />} />
-      <Route path="/beat"      component={() => <ProtectedRoute component={Beat} subscriberOnly />} />
+      <Route path="/games"     component={() => <ProtectedRoute component={Games} />} />
+      <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
       <Route path="/audio-cleaner" component={() => <Redirect to="/beat?tab=cleaner" />} />
       <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
       <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} adminOnly adminFallback="/haptic-ai-soon" />} />
       <Route path="/haptic-ai-soon" component={() => <ProtectedRoute component={HapticAISoon} />} />
-      <Route path="/community"    component={() => <ProtectedRoute component={Community} subscriberOnly />} />
+      <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
       <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
       <Route path="/admin"        component={() => <ProtectedRoute component={Admin} adminOnly />} />
 
