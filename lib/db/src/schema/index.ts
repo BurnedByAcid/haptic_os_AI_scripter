@@ -86,6 +86,7 @@ export const communityScriptsTable = pgTable("community_scripts", {
   createdAt:   timestamp("created_at").notNull().defaultNow(),
 }, (t) => [
   index("community_scripts_tags_gin_idx").using("gin", t.tags),
+  unique("community_scripts_user_video_unique").on(t.userId, t.videoUrl),
 ]);
 
 export const communityFavoritesTable = pgTable("community_favorites", {
