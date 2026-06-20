@@ -17,7 +17,7 @@ const ALL_CARDS: { href: string; label: string; desc: string; icon: typeof PlayS
   { href: "/scripter",  label: "Scripter",       desc: "Create and edit Funscripts",       icon: Mic,        state: "available" },
   { href: "/library",   label: "Library",        desc: "Manage your local files",           icon: Library,    state: "available" },
   { href: "/community", label: "Community",      desc: "Share and discover Funscripts",    icon: Users,      state: "premium"   },
-  { href: "/control",   label: "Manual Controls", desc: "Direct slider control",           icon: Settings2,  state: "available" },
+  { href: "/control",   label: "Manual Controls", desc: "Direct slider control",           icon: Settings2,  state: "premium"   },
   { href: "/games",     label: "Games",          desc: "Play games with haptic feedback",  icon: Gamepad2,   state: "premium"   },
   { href: "/beat",      label: "Live Audio",     desc: "Audio-reactive haptics",           icon: Activity,   state: "premium"   },
 ];
@@ -27,7 +27,7 @@ export default function Home() {
   const { isPro, isFree, plan, isLoaded } = useSubscription();
   const { getToken } = useAuth();
   const [scripterUsed, setScripterUsed] = useState<number | null>(null);
-  const SCRIPTER_LIMIT = 2;
+  const SCRIPTER_LIMIT = 1;
 
   useEffect(() => {
     if (!isLoaded || !isFree) return;
