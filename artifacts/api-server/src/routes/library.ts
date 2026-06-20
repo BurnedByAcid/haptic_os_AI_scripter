@@ -1,8 +1,11 @@
 import { Router, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { pool } from "../lib/db";
+import { getPlan } from "../lib/getPlan";
 import sanitizeHtml from "sanitize-html";
 import { validateTagsForWrite, parseTagsFilter, validateVideoUrl, sanitizeName } from "@workspace/validation";
+
+const FREE_LIBRARY_LIMIT = 10;
 
 const router = Router();
 
@@ -80,6 +83,25 @@ router.get("/library", async (req: Request, res: Response) => {
 router.post("/library", async (req: Request, res: Response) => {
   const auth = getAuth(req);
   if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  // Enforce free plan library cap
+  const plan = await getPlan(auth.userId);
+  if (plan === "free") {
+    const { rows: countRows } = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM private_library WHERE user_id = $1`,
+      [auth.userId]
+    );
+    const currentCount = (countRows[0] as { count: number }).count;
+    if (currentCount >= FREE_LIBRARY_LIMIT) {
+      res.status(403).json({
+        error: `Free accounts are limited to ${FREE_LIBRARY_LIMIT} library entries. Upgrade to add more.`,
+        code: "LIBRARY_LIMIT_REACHED",
+        limit: FREE_LIBRARY_LIMIT,
+        count: currentCount,
+      });
+      return;
+    }
+  }
 
   const { title: rawTitle, video_url, local_file_path, funscript: rawFunscript, tags: rawTags } = req.body as Record<string, unknown>;
 

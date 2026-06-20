@@ -6,7 +6,7 @@ import { logger } from "../lib/logger";
 
 const router = Router();
 
-const FREE_DAILY_LIMIT = 2;
+const FREE_DAILY_LIMIT = 1;
 
 /**
  * GET /api/usage/scripter/today
