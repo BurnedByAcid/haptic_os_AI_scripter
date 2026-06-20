@@ -26,8 +26,7 @@ export default function Home() {
   const { connected, checking } = useHandy();
   const { isPro, isFree, plan, isLoaded } = useSubscription();
   const { getToken } = useAuth();
-  const [scripterUsed, setScripterUsed] = useState<number | null>(null);
-  const SCRIPTER_LIMIT = 1;
+  const [genStatus, setGenStatus] = useState<{ canGenerate: boolean; nextAllowedAt: string | null } | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !isFree) return;
@@ -38,8 +37,8 @@ export default function Home() {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });
         if (res.ok) {
-          const data = await res.json() as { count: number };
-          setScripterUsed(data.count);
+          const data = await res.json() as { canGenerate: boolean; nextAllowedAt: string | null };
+          setGenStatus(data);
         }
       } catch { /* non-fatal */ }
     })();
@@ -81,13 +80,17 @@ export default function Home() {
           </div>
         </Card>
 
-        {/* Scripter limit warning for free users */}
-        {isFree && scripterUsed !== null && scripterUsed >= SCRIPTER_LIMIT && (
+        {/* Scripter generation limit warning for free users */}
+        {isFree && genStatus !== null && !genStatus.canGenerate && (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 flex items-center gap-3">
             <Lock className="h-5 w-5 text-destructive flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-destructive">Scripter limit reached</p>
-              <p className="text-xs text-muted-foreground">You've used all {SCRIPTER_LIMIT} free Scripter sessions today. Upgrade to get unlimited access.</p>
+              <p className="text-sm font-semibold text-destructive">Auto-generation limit reached</p>
+              <p className="text-xs text-muted-foreground">
+                {genStatus.nextAllowedAt
+                  ? `Next generation available ${new Date(genStatus.nextAllowedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Editing is always free.`
+                  : "Come back in ~23 hours or upgrade for unlimited access."}
+              </p>
             </div>
             <Link href="/upgrade">
               <Button size="sm" variant="destructive" className="gap-1.5 flex-shrink-0">
@@ -182,13 +185,13 @@ export default function Home() {
             <span className="text-[11px] text-muted-foreground">Library</span>
             <span className="text-[11px] font-semibold font-mono text-primary">0</span>
           </div>
-          {isFree && scripterUsed !== null && (
+          {isFree && genStatus !== null && (
             <>
               <div className="h-3 w-px bg-border/60" />
               <div className="flex items-center gap-3">
-                <span className="text-[11px] text-muted-foreground">Scripter today</span>
-                <span className={`text-[11px] font-semibold font-mono ${scripterUsed >= SCRIPTER_LIMIT ? "text-destructive" : "text-primary"}`}>
-                  {scripterUsed}/{SCRIPTER_LIMIT}
+                <span className="text-[11px] text-muted-foreground">Auto-generate</span>
+                <span className={`text-[11px] font-semibold font-mono ${!genStatus.canGenerate ? "text-destructive" : "text-primary"}`}>
+                  {genStatus.canGenerate ? "Ready" : "Used"}
                 </span>
               </div>
             </>

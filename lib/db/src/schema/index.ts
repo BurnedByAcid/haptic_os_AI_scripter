@@ -11,6 +11,7 @@ export const usersTable = pgTable("users", {
   stripeCustomerId:        text("stripe_customer_id"),
   stripeSubscriptionId:    text("stripe_subscription_id"),
   hapticAiWarnDismissed:   boolean("haptic_ai_warn_dismissed").notNull().default(false),
+  lastGenerationAt:        timestamp("last_generation_at", { withTimezone: true }),
   createdAt:               timestamp("created_at").notNull().defaultNow(),
 });
 

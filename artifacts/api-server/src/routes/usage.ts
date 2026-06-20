@@ -6,11 +6,13 @@ import { logger } from "../lib/logger";
 
 const router = Router();
 
-const FREE_DAILY_LIMIT = 1;
+const FREE_GENERATION_WINDOW_MS = 23 * 60 * 60 * 1000; // 23 hours rolling
 
 /**
  * GET /api/usage/scripter/today
- * Returns how many Scripter sessions the calling user has used today (read-only).
+ * Returns whether the calling free user can auto-generate right now,
+ * and when the window resets. Subscribers always get { canGenerate: true }.
+ * Public shape: { canGenerate: boolean; nextAllowedAt: string | null }
  */
 router.get("/usage/scripter/today", async (req: Request, res: Response) => {
   const auth = getAuth(req);
@@ -20,13 +22,30 @@ router.get("/usage/scripter/today", async (req: Request, res: Response) => {
   }
 
   try {
+    const plan = await getPlan(auth.userId);
+    if (plan !== "free") {
+      res.json({ canGenerate: true, nextAllowedAt: null });
+      return;
+    }
+
     const { rows } = await pool.query(
-      `SELECT count FROM scripter_usage
-       WHERE user_id = $1 AND usage_date = CURRENT_DATE`,
+      `SELECT last_generation_at FROM users WHERE clerk_id = $1`,
       [auth.userId]
     );
-    const count = rows.length > 0 ? (rows[0] as { count: number }).count : 0;
-    res.json({ count, limit: FREE_DAILY_LIMIT });
+    const lastAt: Date | null = (rows[0] as { last_generation_at: Date | null } | undefined)?.last_generation_at ?? null;
+
+    if (!lastAt) {
+      res.json({ canGenerate: true, nextAllowedAt: null });
+      return;
+    }
+
+    const elapsed = Date.now() - lastAt.getTime();
+    if (elapsed >= FREE_GENERATION_WINDOW_MS) {
+      res.json({ canGenerate: true, nextAllowedAt: null });
+    } else {
+      const nextAllowedAt = new Date(lastAt.getTime() + FREE_GENERATION_WINDOW_MS).toISOString();
+      res.json({ canGenerate: false, nextAllowedAt });
+    }
   } catch {
     res.status(500).json({ error: "Failed to fetch usage" });
   }
@@ -34,12 +53,12 @@ router.get("/usage/scripter/today", async (req: Request, res: Response) => {
 
 /**
  * POST /api/usage/scripter/start
- * Atomically checks the daily limit and increments the counter in a single transaction.
- * For free users: returns { allowed: false } if the limit (2/day) is already reached.
- * For subscribers/pro/admin: always returns { allowed: true } without touching the counter.
+ * Atomically checks the 23-hour rolling window and records a generation.
+ * For free users: returns { allowed: false, nextAllowedAt } if within 23h of last generation.
+ * For subscribers/pro/admin: always returns { allowed: true }.
  *
- * This is the authoritative enforcement point — the frontend must call this and
- * respect the result before showing the editor.
+ * This is the authoritative enforcement point — the frontend must call this
+ * before starting any auto-generation and respect the result.
  */
 router.post("/usage/scripter/start", async (req: Request, res: Response) => {
   const auth = getAuth(req);
@@ -48,11 +67,9 @@ router.post("/usage/scripter/start", async (req: Request, res: Response) => {
     return;
   }
 
-  // Check effective plan outside the transaction — getPlan falls back to
-  // Clerk metadata so bootstrapped admins are correctly recognised.
   const plan = await getPlan(auth.userId);
   if (plan !== "free") {
-    res.json({ allowed: true, count: null, limit: FREE_DAILY_LIMIT });
+    res.json({ allowed: true, nextAllowedAt: null });
     return;
   }
 
@@ -60,48 +77,41 @@ router.post("/usage/scripter/start", async (req: Request, res: Response) => {
   try {
     await client.query("BEGIN");
 
-    // Re-check inside the transaction with a row-level lock so the counter
-    // update is serialised against concurrent requests for the same user.
-    const { rows: userRows } = await client.query(
-      `SELECT plan FROM users WHERE clerk_id = $1 FOR UPDATE`,
+    const { rows } = await client.query(
+      `SELECT plan, last_generation_at FROM users WHERE clerk_id = $1 FOR UPDATE`,
       [auth.userId]
     );
-    const lockedPlan = (userRows[0] as { plan: string } | undefined)?.plan ?? "free";
+    const row = rows[0] as { plan: string; last_generation_at: Date | null } | undefined;
+    const lockedPlan = row?.plan ?? "free";
 
     if (lockedPlan !== "free") {
       await client.query("COMMIT");
-      res.json({ allowed: true, count: null, limit: FREE_DAILY_LIMIT });
+      res.json({ allowed: true, nextAllowedAt: null });
       return;
     }
 
-    const { rows: usageRows } = await client.query(
-      `SELECT count FROM scripter_usage
-       WHERE user_id = $1 AND usage_date = CURRENT_DATE`,
-      [auth.userId]
-    );
-    const currentCount = usageRows.length > 0 ? (usageRows[0] as { count: number }).count : 0;
-
-    if (currentCount >= FREE_DAILY_LIMIT) {
-      await client.query("COMMIT");
-      res.json({ allowed: false, count: currentCount, limit: FREE_DAILY_LIMIT });
-      return;
+    const lastAt: Date | null = row?.last_generation_at ?? null;
+    if (lastAt) {
+      const elapsed = Date.now() - lastAt.getTime();
+      if (elapsed < FREE_GENERATION_WINDOW_MS) {
+        await client.query("COMMIT");
+        const nextAllowedAt = new Date(lastAt.getTime() + FREE_GENERATION_WINDOW_MS).toISOString();
+        res.json({ allowed: false, nextAllowedAt });
+        return;
+      }
     }
 
-    const { rows: updatedRows } = await client.query(
-      `INSERT INTO scripter_usage (user_id, usage_date, count)
-       VALUES ($1, CURRENT_DATE, 1)
-       ON CONFLICT (user_id, usage_date)
-       DO UPDATE SET count = scripter_usage.count + 1
-       RETURNING count`,
+    await client.query(
+      `UPDATE users SET last_generation_at = NOW() WHERE clerk_id = $1`,
       [auth.userId]
     );
-    const newCount = (updatedRows[0] as { count: number }).count;
 
     await client.query("COMMIT");
-    res.json({ allowed: true, count: newCount, limit: FREE_DAILY_LIMIT });
+    const nextAllowedAt = new Date(Date.now() + FREE_GENERATION_WINDOW_MS).toISOString();
+    res.json({ allowed: true, nextAllowedAt });
   } catch (err) {
     await client.query("ROLLBACK");
-    logger.error({ err }, "Failed to record usage");
+    logger.error({ err }, "Failed to record generation usage");
     res.status(500).json({ error: "Failed to record usage" });
   } finally {
     client.release();

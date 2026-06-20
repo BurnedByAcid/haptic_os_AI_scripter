@@ -147,44 +147,51 @@ export default function Scripter() {
   // reappears if the user loads a different video or script.
   const [savedPairKey, setSavedPairKey] = useState<string | null>(null);
 
-  // ─── Daily usage gate (free tier only) ───
-  const [usageState, setUsageState] = useState<"checking" | "allowed" | "blocked">("checking");
-  const usageRecordedRef = useRef(false);
+  // ─── Auto-generation gate (free tier: 1× per 23 hours; editing always unlimited) ───
+  const [genStatus, setGenStatus] = useState<{ allowed: boolean; nextAllowedAt: string | null } | null>(null);
 
   useEffect(() => {
-    if (!planLoaded) return;
-    if (!isFree) {
-      setUsageState("allowed");
-      return;
-    }
-    if (usageRecordedRef.current) return;
-    usageRecordedRef.current = true;
-
+    if (!planLoaded || !isFree) return;
     (async () => {
       try {
         const token = await getToken();
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        const headers: Record<string, string> = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
-
-        // Single atomic call: checks limit AND records usage in one DB transaction.
-        // Returns { allowed: boolean }. Fail-closed: block on any error.
-        const res = await fetch(`${API_BASE}/api/usage/scripter/start`, {
-          method: "POST",
-          headers,
-        });
-        if (!res.ok) {
-          // Server error — block access to prevent limit bypass
-          setUsageState("blocked");
-          return;
+        const res = await fetch(`${API_BASE}/api/usage/scripter/today`, { headers });
+        if (res.ok) {
+          const data = await res.json() as { canGenerate: boolean; nextAllowedAt: string | null };
+          setGenStatus({ allowed: data.canGenerate, nextAllowedAt: data.nextAllowedAt });
         }
-        const { allowed } = await res.json() as { allowed: boolean };
-        setUsageState(allowed ? "allowed" : "blocked");
-      } catch {
-        // Network error — fail closed for free users to enforce the billing gate
-        setUsageState("blocked");
-      }
+      } catch { /* non-fatal — generation will be checked atomically at attempt time */ }
     })();
   }, [planLoaded, isFree, getToken]);
+
+  const checkAndRecordGeneration = useCallback(async (): Promise<boolean> => {
+    if (!isFree) return true;
+    try {
+      const token = await getToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(`${API_BASE}/api/usage/scripter/start`, { method: "POST", headers });
+      if (!res.ok) {
+        toast({ variant: "destructive", title: "Generation unavailable", description: "Could not verify access. Please try again." });
+        return false;
+      }
+      const data = await res.json() as { allowed: boolean; nextAllowedAt: string | null };
+      if (!data.allowed) {
+        const nextTime = data.nextAllowedAt ? new Date(data.nextAllowedAt) : null;
+        const hoursLeft = nextTime ? Math.ceil((nextTime.getTime() - Date.now()) / (1000 * 60 * 60)) : 23;
+        toast({ variant: "destructive", title: "Generation limit reached", description: `Free accounts can auto-generate once every 23 hours. Try again in ~${hoursLeft}h, or upgrade for unlimited access.` });
+        setGenStatus({ allowed: false, nextAllowedAt: data.nextAllowedAt });
+        return false;
+      }
+      setGenStatus({ allowed: false, nextAllowedAt: data.nextAllowedAt });
+      return true;
+    } catch {
+      toast({ variant: "destructive", title: "Generation unavailable", description: "Network error. Please try again." });
+      return false;
+    }
+  }, [isFree, getToken, toast]);
 
   const [points, setPoints] = useState<Point[]>(() => {
     try {
@@ -1046,16 +1053,18 @@ export default function Scripter() {
   }, []);
 
   const bdStartMic = useCallback(async () => {
+    if (!await checkAndRecordGeneration()) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       bdSetupAudio(stream);
       setBdIsActive(true);
     } catch (e) { console.error(e); }
-  }, [bdSetupAudio]);
+  }, [checkAndRecordGeneration, bdSetupAudio]);
 
   const bdStartFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!await checkAndRecordGeneration()) return;
     try {
       const arrayBuffer = await file.arrayBuffer();
       const ctx = new AudioContext();
@@ -1069,9 +1078,10 @@ export default function Scripter() {
       setBdIsActive(true);
       bdLoop();
     } catch (err) { console.error(err); }
-  }, [bdLoop, bdBuildFilters]);
+  }, [checkAndRecordGeneration, bdLoop, bdBuildFilters]);
 
   const bdLoadFromUrl = useCallback(async (url: string) => {
+    if (!await checkAndRecordGeneration()) return;
     try {
       const res = await fetch(url);
       const arrayBuffer = await res.arrayBuffer();
@@ -1088,7 +1098,7 @@ export default function Scripter() {
       sessionStorage.removeItem(AUDIO_CLEANER_SESSION_KEY);
       setBdFromCleaner(null);
     } catch (err) { console.error(err); }
-  }, [bdLoop, bdBuildFilters]);
+  }, [checkAndRecordGeneration, bdLoop, bdBuildFilters]);
 
   const bdStop = useCallback(() => {
     setBdIsActive(false);
@@ -1154,7 +1164,8 @@ export default function Scripter() {
   /** Route the already-loaded video element's audio through the band analyser for live preview.
    *  createMediaElementSource() can only be called once per element, so we persist the context
    *  and source node across stop/start cycles — only the filter graph gets rebuilt each time. */
-  const bdStartVideo = useCallback(() => {
+  const bdStartVideo = useCallback(async () => {
+    if (!await checkAndRecordGeneration()) return;
     const video = videoRef.current;
     if (!video) return;
     // Stop any mic/file session first (but don't destroy the video ctx)
@@ -1183,7 +1194,7 @@ export default function Scripter() {
       setBdIsActive(true);
       bdLoop();
     } catch (err) { console.error("bdStartVideo:", err); }
-  }, [bdLoop, bdStop, bdBuildFilters]);
+  }, [checkAndRecordGeneration, bdLoop, bdStop, bdBuildFilters]);
 
   // ─────────────── Timeline drawing ───────────────
 
@@ -2303,6 +2314,7 @@ export default function Scripter() {
   };
 
   const runAnalysis = async () => {
+    if (!await checkAndRecordGeneration()) return;
     const video = videoRef.current;
     if (!video || !vtZone || !vtSampledPatch) return;
 
@@ -2707,39 +2719,6 @@ export default function Scripter() {
     setVtPreviewPoints([]);
   };
 
-  if (usageState === "checking") {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (usageState === "blocked") {
-    return (
-      <div className="flex items-center justify-center h-full p-8">
-        <div className="flex flex-col items-center gap-4 text-center max-w-sm">
-          <div className="h-16 w-16 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center">
-            <Lock className="h-7 w-7 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold">Daily limit reached</h2>
-            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-              Free accounts can open <strong>2 Scripter sessions per day</strong>. You've used both for today.
-              Come back tomorrow or upgrade for unlimited access.
-            </p>
-          </div>
-          <Link href="/upgrade">
-            <Button className="gap-2">
-              <Crown className="h-4 w-4" />
-              Upgrade for unlimited access
-            </Button>
-          </Link>
-          <p className="text-xs text-muted-foreground">Resets daily at midnight UTC</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-2 px-3 h-full flex flex-col max-w-[1600px] mx-auto gap-2">
