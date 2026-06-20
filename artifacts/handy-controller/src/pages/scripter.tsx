@@ -21,7 +21,6 @@ import { validateVideoUrl } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
 import { VideoControlBar } from "@/components/video-control-bar";
 import { SaveScriptDialog } from "@/components/save-script-dialog";
-import { SaveToLibraryNudge } from "@/components/save-to-library-nudge";
 import { ResumeDraftPicker, ExitWarningDialog, type DraftSummary } from "@/components/scripter-drafts";
 import { useDirtyExitWarning } from "@/hooks/use-dirty-exit-warning";
 import { useLocation } from "wouter";
@@ -142,10 +141,6 @@ export default function Scripter() {
 
   // ─── Save dialog ───
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  // Pair-scoped "already saved" — stores the pair key of the last successful save.
-  // The nudge hides when the current pair key matches this saved value, and naturally
-  // reappears if the user loads a different video or script.
-  const [savedPairKey, setSavedPairKey] = useState<string | null>(null);
 
   // ─── Auto-generation gate (free tier: 1× per 23 hours; editing always unlimited) ───
   const [genStatus, setGenStatus] = useState<{ allowed: boolean; nextAllowedAt: string | null } | null>(null);
@@ -2753,17 +2748,6 @@ export default function Scripter() {
         </div>
       </div>
 
-      {/* ── Save-to-Library nudge (subscribers only, once video + script are ready) ── */}
-      {(() => {
-        const pairKey = videoUrl && points.length > 0
-          ? `${videoUrl}:${points.length}:${points[0]?.time ?? 0}`
-          : null;
-        const alreadySaved = pairKey !== null && pairKey === savedPairKey;
-        return isSubscriber && pairKey !== null && !alreadySaved ? (
-          <SaveToLibraryNudge onSave={() => setSaveDialogOpen(true)} />
-        ) : null;
-      })()}
-
       {/* ── Tab nav + video + content ── */}
       <Tabs
         value={activeTab}
@@ -4141,9 +4125,6 @@ export default function Scripter() {
             onDownload={() => { exportScript(); setSaveDialogOpen(false); }}
             onSavedSuccess={() => {
               markClean();
-              if (videoUrl && points.length > 0) {
-                setSavedPairKey(`${videoUrl}:${points.length}:${points[0]?.time ?? 0}`);
-              }
             }}
           />
         );

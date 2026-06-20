@@ -4,7 +4,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Activity, Crown, Gamepad2, Library, Lock, Mic, PlaySquare, Settings2, Users } from "lucide-react";
+import { Activity, Crown, Gamepad2, Lock, Mic, PlaySquare, Settings2, Users } from "lucide-react";
 import { useAuth } from "@clerk/react";
 import { useState, useEffect } from "react";
 
@@ -15,7 +15,6 @@ type CardState = "available" | "premium" | "coming-soon";
 const ALL_CARDS: { href: string; label: string; desc: string; icon: typeof PlaySquare; state: CardState }[] = [
   { href: "/player",    label: "Video Player",   desc: "Sync local videos with scripts",   icon: PlaySquare, state: "available" },
   { href: "/scripter",  label: "Scripter",       desc: "Create and edit Funscripts",       icon: Mic,        state: "available" },
-  { href: "/library",   label: "Library",        desc: "Manage your local files",           icon: Library,    state: "available" },
   { href: "/community", label: "Community",      desc: "Share and discover Funscripts",    icon: Users,      state: "premium"   },
   { href: "/control",   label: "Manual Controls", desc: "Direct slider control",           icon: Settings2,  state: "available" },
   { href: "/games",     label: "Games",          desc: "Play games with haptic feedback",  icon: Gamepad2,   state: "premium"   },
@@ -179,11 +178,6 @@ export default function Home() {
               plan === "subscriber" ? "text-primary" :
                                       "text-muted-foreground"
             }`}>{plan}</span>
-          </div>
-          <div className="h-3 w-px bg-border/60" />
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] text-muted-foreground">Library</span>
-            <span className="text-[11px] font-semibold font-mono text-primary">0</span>
           </div>
           {isFree && genStatus !== null && (
             <>

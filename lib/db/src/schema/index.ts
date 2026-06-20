@@ -48,31 +48,6 @@ export const scripterSessionsTable = pgTable("scripter_sessions", {
   unique().on(t.userId, t.name),
 ]);
 
-export const privateLibraryTable = pgTable("private_library", {
-  id:            integer("id").generatedAlwaysAsIdentity().primaryKey(),
-  userId:        text("user_id").notNull().references(() => usersTable.clerkId, { onDelete: "cascade" }),
-  title:         text("title").notNull(),
-  videoUrl:      text("video_url"),
-  localFilePath: text("local_file_path"),
-  funscript:     text("funscript").notNull(),
-  tags:          text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
-  createdAt:     timestamp("created_at").notNull().defaultNow(),
-}, (t) => [
-  index("private_library_tags_gin_idx").using("gin", t.tags),
-]);
-
-export const privateLibraryFunscriptsTable = pgTable("private_library_funscripts", {
-  id:            integer("id").generatedAlwaysAsIdentity().primaryKey(),
-  libraryId:     integer("library_id").notNull().references(() => privateLibraryTable.id, { onDelete: "cascade" }),
-  userId:        text("user_id").notNull().references(() => usersTable.clerkId, { onDelete: "cascade" }),
-  name:          text("name").notNull(),
-  funscriptJson: text("funscript_json").notNull(),
-  isActive:      boolean("is_active").notNull().default(false),
-  createdAt:     timestamp("created_at").notNull().defaultNow(),
-  updatedAt:     timestamp("updated_at").notNull().defaultNow(),
-}, (t) => [
-  unique().on(t.libraryId, t.name),
-]);
 
 export const communityScriptsTable = pgTable("community_scripts", {
   id:          integer("id").generatedAlwaysAsIdentity().primaryKey(),

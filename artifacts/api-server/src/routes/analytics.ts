@@ -7,7 +7,7 @@ const router = Router();
 
 const VALID_FEATURES = [
   "scripter", "games", "beat", "player",
-  "community", "library", "control",
+  "community", "control",
 ] as const;
 
 /**

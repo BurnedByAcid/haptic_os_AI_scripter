@@ -10,13 +10,13 @@ import { useLocation } from "wouter";
 const FREE_FEATURES = [
   "Video Player with Funscript sync",
   "Basic device control",
-  "Local script library",
-  "Script editor (Scripter) — 2 sessions/day",
+  "Local file library",
+  "Script editor (Scripter) — 1 auto-generation per 23 hours",
 ];
 
 const SUBSCRIBER_FEATURES = [
   "Everything in Free",
-  "Unlimited Scripter sessions",
+  "Unlimited Scripter auto-generation",
   "Games with haptic feedback",
   "Live Audio reactive haptics",
   "AI-powered control sessions",

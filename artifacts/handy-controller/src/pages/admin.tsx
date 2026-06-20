@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Shield, Search, Crown, Zap, ShieldCheck, AlertCircle,
   Users, TrendingUp, FileText, Star, Heart, Eye,
-  Gamepad2, Music, Play, BookOpen, Sliders, PenLine,
+  Gamepad2, Music, Play, Sliders, PenLine,
   Ticket, RefreshCw, BarChart3, UserPlus, MessageSquare, Bug, Lightbulb, MessageCircle,
   Upload, Monitor, Apple, CheckCircle2,
 } from "lucide-react";
@@ -41,7 +41,6 @@ const FEATURE_META: Record<string, { label: string; icon: typeof Play; color: st
   scripter:  { label: "Scripter",    icon: PenLine,   color: "text-red-400" },
   player:    { label: "Player",      icon: Play,      color: "text-blue-400" },
   community: { label: "Community",   icon: Users,     color: "text-green-400" },
-  library:   { label: "Library",     icon: BookOpen,  color: "text-yellow-400" },
   games:     { label: "Games",       icon: Gamepad2,  color: "text-pink-400" },
   beat:      { label: "Live Audio",  icon: Music,     color: "text-orange-400" },
   control:   { label: "Control",     icon: Sliders,   color: "text-cyan-400" },
@@ -62,7 +61,6 @@ interface AnalyticsData {
     communityViews: number;
     communityRatings: number;
     communityFavorites: number;
-    libraryEntries: number;
   };
   features: Record<string, { total: number; last30: number }>;
   earlyBird: {
@@ -433,7 +431,6 @@ export default function Admin() {
               <StatCard label="Script Views" value={analytics?.content.communityViews ?? "—"} icon={Eye} color="text-blue-400" />
               <StatCard label="Ratings" value={analytics?.content.communityRatings ?? "—"} icon={Star} color="text-yellow-400" />
               <StatCard label="Favorites" value={analytics?.content.communityFavorites ?? "—"} icon={Heart} color="text-pink-400" />
-              <StatCard label="Library Entries" value={analytics?.content.libraryEntries ?? "—"} icon={BookOpen} color="text-cyan-400" />
             </div>
           </div>
 

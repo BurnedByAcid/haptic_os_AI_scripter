@@ -226,7 +226,7 @@ router.get("/admin/analytics", async (req: Request, res: Response) => {
           (SELECT COALESCE(SUM(view_count),0) FROM community_scripts) AS community_views,
           (SELECT COUNT(*) FROM community_ratings)    AS community_ratings,
           (SELECT COUNT(*) FROM community_favorites)  AS community_favorites,
-          (SELECT COUNT(*) FROM private_library)      AS library_entries
+          0                                           AS library_entries
       `),
       // Feature usage (all time and last 30 days)
       pool.query<{ feature: string; total: string; last_30: string }>(`

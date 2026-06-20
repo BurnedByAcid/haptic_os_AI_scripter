@@ -1195,35 +1195,6 @@ function GenerationUI({ serverUrl, sessionToken, options }: { serverUrl: string;
     }
   };
 
-  const handleSaveToLibrary = async () => {
-    if (!result) return;
-    try {
-      const token = await getToken();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      let parsed: unknown;
-      try { parsed = JSON.parse(result.funscript); } catch { parsed = result.funscript; }
-
-      const res = await fetch(`${API}/api/scripter-sessions`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ name: result.name, funscript_json: parsed }),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(errData.error ?? `Server returned ${res.status}`);
-      }
-      toast({ title: "Saved to library", description: `"${result.name}" is now in your script library.` });
-    } catch (err) {
-      toast({
-        title: "Couldn't save to library",
-        description: err instanceof Error ? err.message : "Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleDownload = () => {
     if (!result) return;
     const blob = new Blob([result.funscript], { type: "application/json" });
@@ -1320,14 +1291,11 @@ function GenerationUI({ serverUrl, sessionToken, options }: { serverUrl: string;
             <p className="text-sm font-medium text-foreground">Script generated successfully</p>
           </div>
           <p className="text-xs text-muted-foreground">
-            Your funscript is ready. You can open it in the Scripter to review and edit, save it to your library, or download it directly.
+            Your funscript is ready. You can open it in the Scripter to review and edit, or download it directly.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={handleOpenInScripter} className="gap-1.5 text-xs h-8">
               Open in Scripter
-            </Button>
-            <Button size="sm" variant="outline" onClick={handleSaveToLibrary} className="gap-1.5 text-xs h-8">
-              Save to Library
             </Button>
             <Button size="sm" variant="ghost" onClick={handleDownload} className="gap-1.5 text-xs h-8">
               <Download className="h-3 w-3" />
