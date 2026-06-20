@@ -1,4 +1,4 @@
-import rateLimit, { type RateLimitRequestHandler } from "express-rate-limit";
+import rateLimit, { ipKeyGenerator, type RateLimitRequestHandler } from "express-rate-limit";
 import type { Request } from "express";
 
 function intFromEnv(name: string, fallback: number): number {
@@ -16,7 +16,7 @@ function clientKey(req: Request): string {
   } catch {
     /* ignore */
   }
-  return `ip:${req.ip ?? "unknown"}`;
+  return `ip:${ipKeyGenerator(req)}`;
 }
 
 const SCRIPT_UPLOAD_WINDOW_MS = intFromEnv("RATE_LIMIT_SCRIPT_UPLOAD_WINDOW_MS", 60 * 60 * 1000);
