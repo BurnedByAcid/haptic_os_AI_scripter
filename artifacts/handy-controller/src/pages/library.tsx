@@ -3,11 +3,12 @@ import { getAllEntries, addEntry, deleteEntry, updateEntry, LibraryEntry, Playli
 import { Card, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check, Pencil, ListVideo, Plus } from "lucide-react";
+import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check, Pencil, ListVideo, Plus, Crown, Lock } from "lucide-react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { validateVideoUrl, validateAndParseFunscriptFile, sanitizeName } from "@/lib/validation";
 import { useBlockedReport } from "@/contexts/blocked-report-context";
+import { useSubscription } from "@/hooks/use-subscription";
 import {
   Tooltip,
   TooltipContent,
@@ -116,12 +117,30 @@ function getThumbnailForUrl(url: string): Promise<string> {
 
 type LibraryTab = "library" | "playlists";
 
+const FREE_LIMIT = 10;
+const SUBSCRIBER_LIMIT = 100;
+
 export default function Library() {
   const [entries, setEntries] = useState<LibraryEntry[]>([]);
   const [search, setSearch] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { reportAction } = useBlockedReport();
+  const { isPro } = useSubscription();
+
+  const entryLimit = isPro ? SUBSCRIBER_LIMIT : FREE_LIMIT;
+  const atLimit = entries.length >= entryLimit;
+
+  const showLimitToast = (remaining: number) => {
+    if (remaining > 0) return;
+    toast({
+      variant: "destructive",
+      title: isPro ? "Library full (100 items)" : "Free library full (10 items)",
+      description: isPro
+        ? "Remove some entries to add more."
+        : "Remove some entries or upgrade to a subscription (100 items).",
+    });
+  };
 
   const [activeTab, setActiveTab] = useState<LibraryTab>("library");
 
@@ -310,7 +329,11 @@ export default function Library() {
         ]
       });
       let hadError = false;
+      const current = await getAllEntries();
+      let remaining = entryLimit - current.length;
+      if (remaining <= 0) { showLimitToast(0); return; }
       for (const handle of handles) {
+        if (remaining <= 0) { showLimitToast(0); break; }
         const file = await handle.getFile();
         const isVideo = file.type.startsWith("video/");
         if (!isVideo) {
@@ -338,6 +361,7 @@ export default function Library() {
           thumbnail
         };
         await addEntry(entry);
+        remaining--;
       }
       if (!hadError || handles.length > 1) loadEntries();
     } catch {
@@ -349,7 +373,11 @@ export default function Library() {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
+    const current = await getAllEntries();
+    let remaining = entryLimit - current.length;
+    if (remaining <= 0) { showLimitToast(0); return; }
     for (let i = 0; i < files.length; i++) {
+      if (remaining <= 0) { showLimitToast(0); break; }
       const file = files[i];
       const isVideo = file.type.startsWith("video/");
       if (!isVideo) {
@@ -376,6 +404,7 @@ export default function Library() {
         thumbnail
       };
       await addEntry(entry);
+      remaining--;
     }
     loadEntries();
   };
@@ -383,6 +412,8 @@ export default function Library() {
   const handleAddUrl = async () => {
     const trimmedUrl = urlInput.trim();
     if (!trimmedUrl) return;
+
+    if (atLimit) { showLimitToast(0); return; }
 
     const urlErr = validateVideoUrl(trimmedUrl);
     if (urlErr) {
@@ -489,6 +520,18 @@ export default function Library() {
           <div className="flex items-center gap-4">
             {activeTab === "library" && (
               <>
+                {/* Entry count / limit indicator */}
+                <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${
+                  atLimit
+                    ? "border-destructive/40 bg-destructive/10 text-destructive"
+                    : entries.length >= entryLimit * 0.8
+                      ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-500"
+                      : "border-border/50 bg-muted/50 text-muted-foreground"
+                }`}>
+                  {atLimit ? <Lock className="h-3 w-3" /> : null}
+                  {entries.length}/{entryLimit} items
+                </div>
+
                 <div className="w-64">
                   <Input
                     placeholder="Search library..."
@@ -497,15 +540,15 @@ export default function Library() {
                     className="bg-card"
                   />
                 </div>
-                <Button onClick={() => setShowUrlForm(v => !v)} data-testid="button-add-url">
+                <Button onClick={() => setShowUrlForm(v => !v)} disabled={atLimit} data-testid="button-add-url">
                   <Link className="h-4 w-4 mr-2" /> Add URL
                 </Button>
                 {hasFSA ? (
-                  <Button variant="default" onClick={handleBrowseFSA} data-testid="button-upload-library">
+                  <Button variant="default" onClick={handleBrowseFSA} disabled={atLimit} data-testid="button-upload-library">
                     <FolderOpen className="h-4 w-4 mr-2" /> Browse Files
                   </Button>
                 ) : (
-                  <Button variant="default" className="relative cursor-pointer" data-testid="button-upload-library">
+                  <Button variant="default" className="relative cursor-pointer" disabled={atLimit} data-testid="button-upload-library">
                     <Upload className="h-4 w-4 mr-2" /> Upload
                     <input
                       type="file"
@@ -525,6 +568,22 @@ export default function Library() {
             )}
           </div>
         </div>
+
+        {/* Upgrade prompt when free user hits the limit */}
+        {!isPro && atLimit && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 flex items-center gap-3 -mt-4">
+            <Lock className="h-5 w-5 text-destructive flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-destructive">Library full (10/10 items)</p>
+              <p className="text-xs text-muted-foreground">Delete some entries to add more, or upgrade to get 100 slots.</p>
+            </div>
+            <a href="/upgrade">
+              <Button size="sm" variant="destructive" className="gap-1.5 flex-shrink-0">
+                <Crown className="h-4 w-4" /> Upgrade
+              </Button>
+            </a>
+          </div>
+        )}
 
         {/* Tab switcher */}
         <div className="flex items-center gap-1 border-b border-border/50 -mt-4">
