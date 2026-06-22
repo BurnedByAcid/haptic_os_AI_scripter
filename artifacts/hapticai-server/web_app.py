@@ -59,6 +59,10 @@ def _origin_allowed(origin):
 
 socketio = SocketIO(app, cors_allowed_origins=_origin_allowed, async_mode="threading")
 
+logging.getLogger(__name__).info(
+    "Flask-SocketIO initialised with async_mode=threading"
+)
+
 if _has_flask_cors:
     _CORS(app, origins=_allowed_origins,
           allow_headers=["Content-Type", "Authorization", "X-HapticAI-Token"],
@@ -1564,6 +1568,16 @@ if __name__ == "__main__":
     _log_dir = Path(os.environ.get("APPDATA", str(Path.home()))) / "HapticAI"
     _log_dir.mkdir(parents=True, exist_ok=True)
     _error_log = _log_dir / "error.log"
+    _startup_log = _log_dir / "startup.log"
+
+    _file_handler = logging.FileHandler(_startup_log, mode="w", encoding="utf-8")
+    _file_handler.setLevel(logging.INFO)
+    _file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+    logging.getLogger().addHandler(_file_handler)
+
+    logging.getLogger(__name__).info(
+        "Flask-SocketIO initialised with async_mode=threading"
+    )
 
     try:
         preferred = int(os.environ.get("PORT", 8000))
