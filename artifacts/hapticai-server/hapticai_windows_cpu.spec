@@ -13,7 +13,7 @@ ROOT = Path(SPECPATH)
 block_cipher = None
 
 a = Analysis(
-    [str(ROOT / 'web_app.py')],
+    [str(ROOT / '_launcher.py')],
     pathex=[str(ROOT)],
     binaries=[],
     datas=[
@@ -29,6 +29,7 @@ a = Analysis(
         (str(ROOT / 'assets'), 'assets'),
     ],
     hiddenimports=[
+        'web_app',
         'flask',
         'flask_socketio',
         'engineio',

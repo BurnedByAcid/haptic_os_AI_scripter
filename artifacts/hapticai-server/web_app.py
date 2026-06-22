@@ -1687,5 +1687,36 @@ if __name__ == "__main__":
             _server_thread.join()
 
     except Exception:
-        _error_log.write_text(traceback.format_exc())
-        raise
+        _tb = traceback.format_exc()
+        try:
+            _error_log.write_text(_tb, encoding="utf-8")
+        except Exception:
+            pass
+
+        _short = _tb.strip().splitlines()[-1] if _tb.strip() else "Unknown error"
+        _msg = (
+            f"HapticAI failed to start.\n\n"
+            f"{_short}\n\n"
+            f"Full details have been saved to:\n{_error_log}\n\n"
+            f"Please attach that file when reporting this issue."
+        )
+
+        # Show a native error dialog on Windows; fall back to stderr elsewhere.
+        _shown = False
+        if sys.platform == "win32":
+            try:
+                import ctypes as _ctypes
+                # MB_OK | MB_ICONERROR | MB_SETFOREGROUND
+                _ctypes.windll.user32.MessageBoxW(0, _msg, "HapticAI – Startup Error", 0x10010)
+                _shown = True
+            except Exception:
+                pass
+
+        if not _shown:
+            print("\n" + "=" * 60, file=sys.stderr)
+            print("HapticAI STARTUP ERROR", file=sys.stderr)
+            print("=" * 60, file=sys.stderr)
+            print(_msg, file=sys.stderr)
+            print("=" * 60 + "\n", file=sys.stderr)
+
+        sys.exit(1)
