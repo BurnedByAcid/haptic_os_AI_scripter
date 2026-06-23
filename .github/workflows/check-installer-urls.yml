@@ -1,0 +1,54 @@
+# ============================================================
+#  Check Installer URLs — GitHub Actions
+# ============================================================
+#
+#  Verifies that every INSTALLER_URL defined in install.sh and
+#  install.bat returns HTTP 200.  A typo in a hand-typed raw
+#  GitHub URL would break installs for all users; this workflow
+#  catches that before it merges.
+#
+#  Triggers:
+#    - Every push to main/master
+#    - Every pull request targeting main/master
+#    - Manual trigger (Actions → "Check installer URLs" → Run workflow)
+#
+#  To run locally:
+#    bash artifacts/hapticai-server/check_installer_urls.sh
+# ============================================================
+
+name: Check installer URLs
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'artifacts/hapticai-server/install.sh'
+      - 'artifacts/hapticai-server/install.bat'
+      - 'artifacts/hapticai-server/check_installer_urls.sh'
+      - '.github/workflows/check-installer-urls.yml'
+  pull_request:
+    branches:
+      - main
+      - master
+    paths:
+      - 'artifacts/hapticai-server/install.sh'
+      - 'artifacts/hapticai-server/install.bat'
+      - 'artifacts/hapticai-server/check_installer_urls.sh'
+      - '.github/workflows/check-installer-urls.yml'
+  workflow_dispatch:
+
+jobs:
+  check-installer-urls:
+    name: Verify installer URLs return HTTP 200
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check installer URLs
+        run: |
+          chmod +x artifacts/hapticai-server/check_installer_urls.sh
+          bash artifacts/hapticai-server/check_installer_urls.sh
