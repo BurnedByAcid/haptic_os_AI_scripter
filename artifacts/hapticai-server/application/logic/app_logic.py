@@ -986,7 +986,7 @@ class ApplicationLogic:
                         continue
 
                     if self.batch_overwrite_mode == 0:
-                        # Mode 0: Process all except own matching version (skip if up-to-date FunGen funscript exists)
+                        # Mode 0: Process all except own matching version (skip if up-to-date HapticAI funscript exists)
                         funscript_data = self.file_manager._get_funscript_data(funscript_to_check)
                         if funscript_data:
                             author = funscript_data.get('author', '')
@@ -999,7 +999,7 @@ class ApplicationLogic:
                                 continue
 
                     if self.batch_overwrite_mode == 2:
-                        # Mode 2: Process ALL videos, including up-to-date FunGen funscript. Do not skip for any reason.
+                        # Mode 2: Process ALL videos, including up-to-date HapticAI funscript. Do not skip for any reason.
                         self.logger.info(
                             f"Processing '{video_basename}': Mode 2 selected, will process regardless of funscript existence or version.")
                 # --- End of pre-flight checks ---

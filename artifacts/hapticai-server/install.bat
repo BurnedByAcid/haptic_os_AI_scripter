@@ -2,14 +2,14 @@
 setlocal enabledelayedexpansion
 
 echo ================================================================
-echo          FunGen Enhanced Universal Installer
+echo          HapticAI Enhanced Universal Installer
 echo                    v1.4.4 - ACTIVATION FIXES
 echo ================================================================
 echo This installer will download and install everything needed:
 echo - Miniconda (Python 3.11 + conda package manager)
 echo - Git
 echo - FFmpeg/FFprobe  
-echo - FunGen AI and all dependencies
+echo - HapticAI AI and all dependencies
 echo.
 echo RECOMMENDED: Run this installer as a NORMAL USER
 echo             Most installations work fine without administrator privileges
@@ -44,13 +44,13 @@ if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" (
 pause
 
 REM Set variables
-set "TEMP_DIR=%TEMP%\FunGen_Install"
+set "TEMP_DIR=%TEMP%\HapticAI_Install"
 set "INSTALL_DIR=%~dp0"
 set "MINICONDA_URL=https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe"
 set "MINICONDA_INSTALLER=%TEMP_DIR%\Miniconda3-latest.exe"
 set "MINICONDA_PATH=%USERPROFILE%\miniconda3"
 set "CONDA_EXE=%MINICONDA_PATH%\Scripts\conda.exe"
-set "ENV_NAME=FunGen"
+set "ENV_NAME=HapticAI"
 
 REM Note: ARM64 Windows should use x86_64 version via emulation
 REM Miniconda does not provide native ARM64 builds for Windows
@@ -133,7 +133,7 @@ REM Try to accept TOS, but don't fail if it doesn't work
 echo [OK] Conda configuration updated
 
 echo.
-echo [4/8] Creating FunGen conda environment...
+echo [4/8] Creating HapticAI conda environment...
 echo   Creating environment '%ENV_NAME%' with Python 3.11...
 
 REM Create environment with explicit channel to avoid TOS issues
@@ -157,7 +157,7 @@ echo [OK] Conda environment '%ENV_NAME%' created successfully
 echo.
 echo [5/8] Installing Git and FFmpeg via conda...
 
-REM Install git and ffmpeg into the fungen environment
+REM Install git and ffmpeg into the hapticai environment
 echo   Installing Git...
 "%CONDA_EXE%" install -n %ENV_NAME% git -c conda-forge -y >nul 2>&1
 if !errorlevel! equ 0 (
@@ -175,7 +175,7 @@ if !errorlevel! equ 0 (
 )
 
 echo.
-echo [6/8] Running FunGen universal installer...
+echo [6/8] Running HapticAI universal installer...
 echo   Prerequisites installed, now calling universal installer...
 
 REM Initialize conda environment variables properly
@@ -213,7 +213,7 @@ if exist "%INSTALL_DIR%install.py" (
     echo   install.py not found locally, downloading from GitHub...
 
     REM Use a more reliable download method with proper variable expansion
-    set "INSTALLER_URL=https://raw.githubusercontent.com/ack00gar/FunGen-AI-Powered-Funscript-Generator/main/install.py"
+    set "INSTALLER_URL=https://raw.githubusercontent.com/ack00gar/HapticAI-AI-Powered-Funscript-Generator/main/install.py"
     set "INSTALLER_FILE=%TEMP_DIR%\install.py"
 
     echo   Downloading from: !INSTALLER_URL!
@@ -244,7 +244,7 @@ if !errorlevel! neq 0 (
     exit /b 1
 )
 
-echo [OK] FunGen installation completed by universal installer
+echo [OK] HapticAI installation completed by universal installer
 
 echo.
 echo ================================================================
@@ -252,7 +252,7 @@ echo                  Installation Complete!
 echo ================================================================
 echo.
 echo [OK] Prerequisites installed ^(Miniconda, Git, FFmpeg^)
-echo [OK] FunGen universal installer completed successfully
+echo [OK] HapticAI universal installer completed successfully
 echo.
 echo Check above for launcher instructions.
 echo.

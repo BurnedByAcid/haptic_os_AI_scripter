@@ -219,7 +219,7 @@ class RelativeDistanceTracker(BaseTracker):
             
             if not self.yolo_model_path:
                 # Default model path
-                self.yolo_model_path = "models/FunGen-12s-mix-1.0.0.mlpackage"
+                self.yolo_model_path = "models/HapticAI-12s-mix-1.0.0.mlpackage"
             
             # Import and initialize YOLO model
             from ultralytics import YOLO

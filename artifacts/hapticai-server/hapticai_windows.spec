@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
 PyInstaller spec for HapticAI (Beta) — Windows
-Bundles web_app.py + all FunGen source into a single-file .exe
+Bundles web_app.py + all HapticAI source into a single-file .exe
 """
 
 import sys

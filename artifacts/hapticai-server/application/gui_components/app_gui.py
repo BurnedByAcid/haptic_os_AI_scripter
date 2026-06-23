@@ -1048,7 +1048,7 @@ class GUI:
         #     popup_flags = imgui.WINDOW_ALWAYS_AUTO_RESIZE | (0 if not closable else imgui.WINDOW_CLOSABLE)
 
         #     if imgui.begin_popup_modal("First-Time Setup", closable, flags=popup_flags)[0]:
-        #         imgui.text("Welcome to FunGen!")
+        #         imgui.text("Welcome to HapticAI!")
         #         imgui.text_wrapped("For the application to work, some default AI models need to be downloaded.")
         #         imgui.separator()
 
@@ -1757,7 +1757,7 @@ class GUI:
 
             imgui.text("Overwrite Strategy:")
             imgui.same_line()
-            if imgui.radio_button("Skip existing FunGen scripts", self.batch_overwrite_mode_ui == 0): self.batch_overwrite_mode_ui = 0
+            if imgui.radio_button("Skip existing HapticAI scripts", self.batch_overwrite_mode_ui == 0): self.batch_overwrite_mode_ui = 0
             imgui.same_line()
             if imgui.radio_button("Skip if ANY script exists", self.batch_overwrite_mode_ui == 1): self.batch_overwrite_mode_ui = 1
             imgui.same_line()
@@ -1766,7 +1766,7 @@ class GUI:
             if self.batch_overwrite_mode_ui != self.last_overwrite_mode_ui:
                 for video in self.batch_videos_data:
                     status = video["funscript_status"]
-                    if self.batch_overwrite_mode_ui == 0: video["selected"] = status != 'fungen'
+                    if self.batch_overwrite_mode_ui == 0: video["selected"] = status != 'hapticai'
                     elif self.batch_overwrite_mode_ui == 1: video["selected"] = status is None
                     elif self.batch_overwrite_mode_ui == 2: video["selected"] = True
                 self.last_overwrite_mode_ui = self.batch_overwrite_mode_ui
@@ -1793,13 +1793,13 @@ class GUI:
 
                         imgui.table_set_column_index(1)
                         status = video_data["funscript_status"]
-                        if status == 'fungen': imgui.text_colored(os.path.basename(video_data["path"]), *colors.VIDEO_STATUS_FUNGEN)
+                        if status == 'hapticai': imgui.text_colored(os.path.basename(video_data["path"]), *colors.VIDEO_STATUS_HAPTICAI)
                         elif status == 'other': imgui.text_colored(os.path.basename(video_data["path"]), *colors.VIDEO_STATUS_OTHER)
                         else: imgui.text(os.path.basename(video_data["path"]))
 
                         if imgui.is_item_hovered():
-                            if status == 'fungen':
-                                imgui.set_tooltip("Funscript created by this version of FunGen")
+                            if status == 'hapticai':
+                                imgui.set_tooltip("Funscript created by this version of HapticAI")
                             elif status == 'other':
                                 imgui.set_tooltip("Funscript exists (unknown or older version)")
                             else:

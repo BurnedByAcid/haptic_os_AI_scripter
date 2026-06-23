@@ -1,7 +1,7 @@
 """
 Device Control UI Panel
 
-Comprehensive device control interface for FunGen.
+Comprehensive device control interface for HapticAI.
 Provides device discovery, connection, parameterization, live tracking,
 and synchronized video playback with device control.
 
@@ -34,7 +34,7 @@ except ImportError:
 
 class DeviceControlUI:
     """
-    Device Control UI Panel for FunGen.
+    Device Control UI Panel for HapticAI.
     
     Features:
     - Device discovery and connection
@@ -899,7 +899,7 @@ class DeviceControlUI:
             imgui.text_wrapped(
                 "Support on ko-fi then use the !device_control command in Discord "
                 "to receive your device_control folder. Simply copy it to your "
-                "FunGen directory and restart to activate all features!"
+                "HapticAI directory and restart to activate all features!"
             )
         
         imgui.end()

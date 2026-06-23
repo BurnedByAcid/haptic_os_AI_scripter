@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-FunGen Universal Installer - Stage 2
+HapticAI Universal Installer - Stage 2
 Version: 1.2.0
 Complete installation system that assumes Python is available but nothing else
 
-This installer handles the complete FunGen setup after Python is installed:
+This installer handles the complete HapticAI setup after Python is installed:
 - Git installation and repository cloning
 - FFmpeg suite installation (ffmpeg, ffprobe, ffplay)
 - GPU detection and appropriate PyTorch installation
@@ -37,8 +37,8 @@ INSTALLER_VERSION = "1.3.5"
 # Configuration
 CONFIG = {
     "repo_url": "https://github.com/HapticAI/HapticAI-Powered-Funscript-Generator.git",
-    "project_name": "FunGen",
-    "env_name": "FunGen",
+    "project_name": "HapticAI",
+    "env_name": "HapticAI",
     "python_version": "3.11",
     "main_script": "main.py",
     "min_disk_space_gb": 10,
@@ -123,8 +123,8 @@ class ProgressBar:
         print()  # New line after completion
 
 
-class FunGenUniversalInstaller:
-    """Universal FunGen installer - assumes Python is available"""
+class HapticAIUniversalInstaller:
+    """Universal HapticAI installer - assumes Python is available"""
     
     def __init__(self, install_dir: Optional[str] = None, force: bool = False, 
                 bootstrap_version: Optional[str] = None, skip_clone: bool = False):
@@ -476,7 +476,7 @@ class FunGenUniversalInstaller:
         return False
     
     def clone_repository(self) -> bool:
-        """Clone or update the FunGen repository"""
+        """Clone or update the HapticAI repository"""
         if self.skip_clone:
             # Verify we're in a valid git repository
             if not (self.project_path / ".git").exists():
@@ -506,7 +506,7 @@ class FunGenUniversalInstaller:
                     self.print_success("Using existing repository")
                 return True
             else:
-                self.print_warning("Repository URL does not match FunGen - continuing anyway")
+                self.print_warning("Repository URL does not match HapticAI - continuing anyway")
                 self.print_success("Using existing repository")
                 return True
         
@@ -689,7 +689,7 @@ class FunGenUniversalInstaller:
                 self.print_warning("")
                 self.print_warning("ALTERNATIVE: Use Windows Subsystem for Linux (WSL)")
                 self.print_warning("- Run: wsl --install")
-                self.print_warning("- Install Ubuntu and run FunGen in Linux")
+                self.print_warning("- Install Ubuntu and run HapticAI in Linux")
                 self.print_warning("")
                 
                 response = input("Continue anyway? (not recommended) [y/N]: ").lower()
@@ -729,8 +729,8 @@ class FunGenUniversalInstaller:
             self.print_error("3. Use Windows Subsystem for Linux (WSL2)")
         
         self.print_error("")
-        self.print_error("⚠️  WITHOUT IMGUI, FUNGEN CANNOT DISPLAY ITS GUI!")
-        self.print_error("The installation will continue, but FunGen won't work until this is fixed.")
+        self.print_error("⚠️  WITHOUT IMGUI, HAPTICAI CANNOT DISPLAY ITS GUI!")
+        self.print_error("The installation will continue, but HapticAI won't work until this is fixed.")
         print("  Core requirements installed (GUI unavailable)")
 
     def setup_python_environment(self) -> bool:
@@ -1111,7 +1111,7 @@ class FunGenUniversalInstaller:
                     if ret != 0:
                         self.print_warning(f"Failed to install torch-tensorrt and tensorrt for {cuda_version}: {stderr}")
                         self.print_warning("TensorRT acceleration may not work properly.")
-                        self.print_warning("FunGen will fall back to standard PyTorch inference.")
+                        self.print_warning("HapticAI will fall back to standard PyTorch inference.")
                     else:
                         print(f"    torch-tensorrt and tensorrt for {cuda_version} installed successfully")
                         print(f"    torch constrained to {torch_version}+{cuda_version}")
@@ -1233,7 +1233,7 @@ class FunGenUniversalInstaller:
         self.print_warning("  • ROCm drivers may need updating")
         print()
         self.print_warning("Falling back to CPU-only installation will:")
-        self.print_warning("  ✓ Allow FunGen to run (slower performance)")
+        self.print_warning("  ✓ Allow HapticAI to run (slower performance)")
         self.print_warning("  ✗ No GPU acceleration")
         print()
         
@@ -1335,9 +1335,9 @@ class FunGenUniversalInstaller:
 
         launcher_content = f'''@echo off
 {cd_command}
-{path_setup}echo Activating FunGen environment...
+{path_setup}echo Activating HapticAI environment...
 {activate_cmd}
-echo Starting FunGen...
+echo Starting HapticAI...
 python {CONFIG["main_script"]} %*
 {end_command}pause
 '''
@@ -1371,9 +1371,9 @@ python {CONFIG["main_script"]} %*
         
         launcher_content = f'''#!/bin/bash
 cd "$(dirname "$0")"
-{path_setup}echo "Activating FunGen environment..."
+{path_setup}echo "Activating HapticAI environment..."
 {activate_cmd}
-echo "Starting FunGen..."
+echo "Starting HapticAI..."
 python {CONFIG["main_script"]} "$@"
 '''
         
@@ -1449,10 +1449,10 @@ read -p "Press Enter to close..."
     def print_completion_message(self):
         """Print completion message"""
         print(f"\n{Colors.GREEN}{Colors.BOLD}=" * 60)
-        print("    FunGen Installation Complete!")
+        print("    HapticAI Installation Complete!")
         print("=" * 60 + Colors.ENDC)
         
-        print(f"\n{Colors.CYAN}To run FunGen:{Colors.ENDC}")
+        print(f"\n{Colors.CYAN}To run HapticAI:{Colors.ENDC}")
         print(f"{Colors.YELLOW}  ⚠ IMPORTANT: Use the launcher scripts below (not 'python main.py' directly){Colors.ENDC}")
         
         if self.platform == "Windows":
@@ -1472,7 +1472,7 @@ read -p "Press Enter to close..."
         print(f"  python {CONFIG['main_script']}")
         
         print(f"\n{Colors.YELLOW}First-time setup:{Colors.ENDC}")
-        print("  • FunGen will download required YOLO models on first run")
+        print("  • HapticAI will download required YOLO models on first run")
         print("  • Initial download may take 5-10 minutes")
         print("  • Ensure stable internet connection for model downloads")
         print("  • If validation warnings appear above, they can usually be ignored")
@@ -1511,7 +1511,7 @@ read -p "Press Enter to close..."
             steps = [
                 ("Checking system requirements", self.check_system_requirements),
                 ("Installing Git", self.install_git),
-                ("Cloning FunGen repository", self.clone_repository),
+                ("Cloning HapticAI repository", self.clone_repository),
                 ("Installing FFmpeg", self.install_ffmpeg),
                 ("Setting up Python environment", self.setup_python_environment),
                 ("Installing Python dependencies", self.install_python_dependencies),
@@ -1548,7 +1548,7 @@ read -p "Press Enter to close..."
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description="FunGen Universal Installer - Complete setup from scratch",
+        description="HapticAI Universal Installer - Complete setup from scratch",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
     
@@ -1561,7 +1561,7 @@ This installer assumes Python is available but installs everything else:
 
 Examples:
   python install.py
-  python install.py --dir ~/FunGen
+  python install.py --dir ~/HapticAI
   python install.py --force
   python install.py --uninstall
         """
@@ -1570,7 +1570,7 @@ Examples:
     parser.add_argument(
         "--skip-clone",
         action="store_true",
-        help="Skip git clone and use the current directory (must be run from FunGen repository)"
+        help="Skip git clone and use the current directory (must be run from HapticAI repository)"
     )
     
     parser.add_argument(
@@ -1600,14 +1600,14 @@ Examples:
     parser.add_argument(
         "--version",
         action="version",
-        version=f"FunGen Universal Installer {INSTALLER_VERSION}"
+        version=f"HapticAI Universal Installer {INSTALLER_VERSION}"
     )
     
     args = parser.parse_args()
     
     # Handle uninstall option
     if args.uninstall:
-        print("🗑️ Downloading and running FunGen uninstaller...")
+        print("🗑️ Downloading and running HapticAI uninstaller...")
         
         uninstaller_url = "https://raw.githubusercontent.com/HapticAI/HapticAI-Powered-Funscript-Generator/main/uninstall.py"
         
@@ -1625,11 +1625,11 @@ Examples:
                 
             except Exception as e:
                 print(f"❌ Failed to download uninstaller: {e}")
-                print("Please download fungen_uninstall.py manually from GitHub")
+                print("Please download hapticai_uninstall.py manually from GitHub")
                 sys.exit(1)
     
     # Run installer
-    installer = FunGenUniversalInstaller(
+    installer = HapticAIUniversalInstaller(
         install_dir=args.dir,
         force=args.force,
         bootstrap_version=args.bootstrap_version,

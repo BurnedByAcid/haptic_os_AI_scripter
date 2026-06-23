@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-FunGen Universal Uninstaller
-Safely removes FunGen and its dependencies while preserving user data
+HapticAI Universal Uninstaller
+Safely removes HapticAI and its dependencies while preserving user data
 
 This uninstaller provides multiple removal options:
 - Clean uninstall (removes everything including Python environment)  
-- Partial uninstall (keeps Python/conda, removes only FunGen)
+- Partial uninstall (keeps Python/conda, removes only HapticAI)
 - Safe uninstall (moves files to backup before deletion)
 """
 
@@ -37,8 +37,8 @@ class Colors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
 
-class FunGenUninstaller:
-    """Comprehensive FunGen uninstaller with multiple removal options"""
+class HapticAIUninstaller:
+    """Comprehensive HapticAI uninstaller with multiple removal options"""
     
     def __init__(self, uninstall_type: str = "standard", backup: bool = True, 
                  dry_run: bool = False):
@@ -55,7 +55,7 @@ class FunGenUninstaller:
         
         # Backup location
         timestamp = int(time.time())
-        self.backup_dir = Path.home() / f"FunGen_Backup_{timestamp}"
+        self.backup_dir = Path.home() / f"HapticAI_Backup_{timestamp}"
         
         # Statistics
         self.files_found = 0
@@ -113,12 +113,12 @@ class FunGenUninstaller:
             size_bytes /= 1024.0
         return f"{size_bytes:.1f} TB"
     
-    def discover_fungen_installations(self):
-        """Discover all FunGen-related files and directories"""
-        print(f"{Colors.BLUE}🔍 Scanning for FunGen installations...{Colors.ENDC}")
+    def discover_hapticai_installations(self):
+        """Discover all HapticAI-related files and directories"""
+        print(f"{Colors.BLUE}🔍 Scanning for HapticAI installations...{Colors.ENDC}")
         
         # Common project directory names
-        project_names = ["FunGen", "FunGen-AI-Powered-Funscript-Generator", "VR-Funscript-AI-Generator"]
+        project_names = ["HapticAI", "HapticAI-AI-Powered-Funscript-Generator", "VR-Funscript-AI-Generator"]
         
         # Search locations
         search_locations = [
@@ -151,7 +151,7 @@ class FunGenUninstaller:
             for project_name in project_names:
                 project_path = location / project_name
                 if project_path.exists() and project_path.is_dir():
-                    # Verify it's actually FunGen by checking for main.py
+                    # Verify it's actually HapticAI by checking for main.py
                     if (project_path / "main.py").exists():
                         self.project_paths.append(project_path)
                         size = self.get_directory_size(project_path)
@@ -160,7 +160,7 @@ class FunGenUninstaller:
         # Find conda/venv environments
         self._find_environments()
         
-        # Find installed tools (if installed by FunGen installer)
+        # Find installed tools (if installed by HapticAI installer)
         self._find_tools()
         
         # Find launcher scripts
@@ -172,15 +172,15 @@ class FunGenUninstaller:
         print(f"  Launcher scripts: {len(self.launcher_paths)}")
     
     def _find_environments(self):
-        """Find Python environments created by FunGen"""
+        """Find Python environments created by HapticAI"""
         # Conda environments
         conda_path = Path.home() / "miniconda3"
         if conda_path.exists():
-            fungen_env = conda_path / "envs" / "FunGen"
-            if fungen_env.exists():
-                self.env_paths.append(fungen_env)
-                size = self.get_directory_size(fungen_env)
-                print(f"  Found conda env: {fungen_env} ({self.format_size(size)})")
+            hapticai_env = conda_path / "envs" / "HapticAI"
+            if hapticai_env.exists():
+                self.env_paths.append(hapticai_env)
+                size = self.get_directory_size(hapticai_env)
+                print(f"  Found conda env: {hapticai_env} ({self.format_size(size)})")
         
         # Venv environments (look for venv folders in project directories)
         for project_path in self.project_paths:
@@ -191,7 +191,7 @@ class FunGenUninstaller:
                 print(f"  Found venv: {venv_path} ({self.format_size(size)})")
     
     def _find_tools(self):
-        """Find tools installed by FunGen installer"""
+        """Find tools installed by HapticAI installer"""
         # Tools directory (Windows)
         if self.platform == "Windows":
             for project_path in self.project_paths:
@@ -205,16 +205,16 @@ class FunGenUninstaller:
         else:
             local_bin = Path.home() / ".local" / "bin"
             if local_bin.exists():
-                # Check for FunGen-installed binaries
-                fungen_binaries = []
+                # Check for HapticAI-installed binaries
+                hapticai_binaries = []
                 for binary in ["ffmpeg", "ffprobe"]:
                     binary_path = local_bin / binary
                     if binary_path.exists():
-                        fungen_binaries.append(binary_path)
+                        hapticai_binaries.append(binary_path)
                 
-                if fungen_binaries:
-                    self.tool_paths.extend(fungen_binaries)
-                    print(f"  Found binaries: {len(fungen_binaries)} in {local_bin}")
+                if hapticai_binaries:
+                    self.tool_paths.extend(hapticai_binaries)
+                    print(f"  Found binaries: {len(hapticai_binaries)} in {local_bin}")
     
     def _find_launchers(self):
         """Find launcher scripts"""
@@ -317,9 +317,9 @@ class FunGenUninstaller:
         restore_script = self.backup_dir / ("restore.bat" if self.platform == "Windows" else "restore.sh")
         
         script_content = "#!/bin/bash\n" if self.platform != "Windows" else "@echo off\n"
-        script_content += f"# FunGen Restore Script - Created {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        script_content += f"# HapticAI Restore Script - Created {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
         script_content += f"# This script can restore the backup created during uninstall\n\n"
-        script_content += f"echo 'FunGen Restore Script'\n"
+        script_content += f"echo 'HapticAI Restore Script'\n"
         script_content += f"echo 'Backup location: {self.backup_dir}'\n"
         script_content += f"echo 'Manual restoration required - copy directories back to original locations'\n"
         
@@ -384,9 +384,9 @@ class FunGenUninstaller:
         if self.platform != "Windows" or self.dry_run:
             return
         
-        # FunGen doesn't typically create registry entries, but check for PATH modifications
+        # HapticAI doesn't typically create registry entries, but check for PATH modifications
         print(f"{Colors.BLUE}🔧 Checking Windows registry...{Colors.ENDC}")
-        self.print_info("FunGen doesn't modify registry - skipping registry cleanup")
+        self.print_info("HapticAI doesn't modify registry - skipping registry cleanup")
     
     def print_completion_message(self):
         """Print uninstall completion message"""
@@ -425,10 +425,10 @@ class FunGenUninstaller:
         self.print_header()
         
         # Discover installations
-        self.discover_fungen_installations()
+        self.discover_hapticai_installations()
         
         if not any([self.project_paths, self.env_paths, self.tool_paths, self.launcher_paths]):
-            print(f"{Colors.YELLOW}No FunGen installations found.{Colors.ENDC}")
+            print(f"{Colors.YELLOW}No HapticAI installations found.{Colors.ENDC}")
             return True
         
         # Confirm uninstall
@@ -459,16 +459,16 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Uninstall Types:
-  standard   - Remove FunGen only (keep Python, tools)
+  standard   - Remove HapticAI only (keep Python, tools)
   complete   - Remove everything including Python environments  
   environments - Remove only Python environments
   tools      - Remove only installed tools
 
 Examples:
-  python fungen_uninstall.py                    # Standard uninstall
-  python fungen_uninstall.py --type complete    # Complete removal
-  python fungen_uninstall.py --no-backup        # No backup
-  python fungen_uninstall.py --dry-run          # Preview only
+  python hapticai_uninstall.py                    # Standard uninstall
+  python hapticai_uninstall.py --type complete    # Complete removal
+  python hapticai_uninstall.py --no-backup        # No backup
+  python hapticai_uninstall.py --dry-run          # Preview only
         """
     )
     
@@ -500,7 +500,7 @@ Examples:
     args = parser.parse_args()
     
     # Create and run uninstaller
-    uninstaller = FunGenUninstaller(
+    uninstaller = HapticAIUninstaller(
         uninstall_type=args.type,
         backup=not args.no_backup,
         dry_run=args.dry_run

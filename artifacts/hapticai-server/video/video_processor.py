@@ -464,7 +464,7 @@ class VideoProcessor:
             f"format: {self.vr_input_format if self.determined_video_type == 'VR' else 'N/A'}), "
             f"{self.total_frames}fr, {self.fps:.2f}fps, {self.video_info.get('bit_depth', 'N/A')}bit)")
 
-        # Notify sync server (streamer) that video was loaded in desktop FunGen
+        # Notify sync server (streamer) that video was loaded in desktop HapticAI
         # This broadcasts to ALL connected browser clients (VR viewer, etc.)
         # even if the video was loaded from XBVR/Stash browser
         if hasattr(self, 'sync_server') and self.sync_server and hasattr(self.sync_server, 'loop') and self.sync_server.loop:

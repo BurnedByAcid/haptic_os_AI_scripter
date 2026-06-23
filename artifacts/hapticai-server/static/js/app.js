@@ -212,7 +212,7 @@ fetch('/api/modes').then(r => r.json()).then(modes => {
   });
 
   if (modes.length === 0) {
-    grid.innerHTML = '<p class="text-muted">No modes available. Ensure FunGen dependencies are installed.</p>';
+    grid.innerHTML = '<p class="text-muted">No modes available. Ensure HapticAI dependencies are installed.</p>';
   }
 });
 

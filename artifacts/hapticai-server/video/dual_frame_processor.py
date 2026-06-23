@@ -180,15 +180,15 @@ class SingleFFmpegDualOutputProcessor:
             if self.platform_system == "Windows":
                 # Windows named pipes
                 pipe_names = {
-                    'processing': r'\\.\pipe\fungen_processing',
-                    'fullscreen': r'\\.\pipe\fungen_fullscreen', 
-                    'audio': r'\\.\pipe\fungen_audio'
+                    'processing': r'\\.\pipe\hapticai_processing',
+                    'fullscreen': r'\\.\pipe\hapticai_fullscreen', 
+                    'audio': r'\\.\pipe\hapticai_audio'
                 }
                 self.named_pipes = pipe_names
                 self.logger.info(f"Using Windows named pipes: {list(pipe_names.values())}")
             else:
                 # Unix domain sockets or FIFOs
-                temp_dir = tempfile.mkdtemp(prefix='fungen_pipes_')
+                temp_dir = tempfile.mkdtemp(prefix='hapticai_pipes_')
                 pipe_names = {
                     'processing': os.path.join(temp_dir, 'processing'),
                     'fullscreen': os.path.join(temp_dir, 'fullscreen'),

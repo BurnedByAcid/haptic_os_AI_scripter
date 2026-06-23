@@ -27,7 +27,7 @@ class GitHubAPIClient:
     def _get_headers(self) -> Dict[str, str]:
         """Get common headers for GitHub API requests."""
         headers = {
-            'User-Agent': 'FunGen-Updater/1.0',
+            'User-Agent': 'HapticAI-Updater/1.0',
             'Accept': 'application/vnd.github.v3+json'
         }
         github_token = self.token_manager.get_token()
@@ -110,7 +110,7 @@ class AutoUpdater:
     - Internet connection for GitHub API calls
     """
     REPO_OWNER = "ack00gar"
-    REPO_NAME = "FunGen-AI-Powered-Funscript-Generator"
+    REPO_NAME = "HapticAI-AI-Powered-Funscript-Generator"
     
     # Multi-branch configuration for seamless migration
     PRIMARY_BRANCH = "main"      # Target branch for future updates
@@ -1014,7 +1014,7 @@ class AutoUpdater:
                 if self.MIGRATION_MODE and self.active_branch != self.FALLBACK_BRANCH:
                     branch_info = f"from {self.active_branch} branch (migrated from {self.FALLBACK_BRANCH})"
                 
-                imgui.text(f"A new update is available for FunGen {branch_info}.")
+                imgui.text(f"A new update is available for HapticAI {branch_info}.")
                 imgui.text("Would you like to update and restart the application?")
                 imgui.separator()
 
@@ -1360,7 +1360,7 @@ class AutoUpdater:
             # Tab bar
             if imgui.begin_tab_bar("Updates & GitHub Token Tabs"):
                 # Update Selection Tab
-                if imgui.begin_tab_item("Choose FunGen Update")[0]:
+                if imgui.begin_tab_item("Choose HapticAI Update")[0]:
                     self._updates_active_tab = 0
                     imgui.end_tab_item()
                 

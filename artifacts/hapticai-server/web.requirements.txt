@@ -1,4 +1,4 @@
-# Web-mode requirements for FunGen (derived from core.requirements.txt)
+# Web-mode requirements for HapticAI (derived from core.requirements.txt)
 # GUI-only packages (imgui, glfw, pyopengl, moderngl) are excluded.
 # opencv-python replaced with headless variant.
 # flask/flask-socketio added for web server.

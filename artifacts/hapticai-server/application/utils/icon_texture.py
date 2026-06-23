@@ -1,7 +1,7 @@
 """
 UI Icon Texture Utility
 
-Provides centralized UI icon texture loading and management for FunGen GUI.
+Provides centralized UI icon texture loading and management for HapticAI GUI.
 Used for:
 - Playback controls (play, pause, stop, etc.)
 - Zoom controls (zoom in, zoom out)

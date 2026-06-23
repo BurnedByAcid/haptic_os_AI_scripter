@@ -1,5 +1,5 @@
 """
-Stage output validation utilities for FunGen.
+Stage output validation utilities for HapticAI.
 Validates completeness of stage outputs to enable smart skipping of re-processing.
 """
 

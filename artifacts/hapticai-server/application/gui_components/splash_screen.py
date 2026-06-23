@@ -204,7 +204,7 @@ class SplashScreen:
         # Spacing
         imgui.dummy(1, 30)
 
-        # Title: "FUNGEN" with gradient-like effect (cyan to purple)
+        # Title: "HAPTICAI" with gradient-like effect (cyan to purple)
         title_text = "HAPTICAI"
         title_font_size = imgui.get_font_size() * 3.0
 
@@ -909,7 +909,7 @@ class StandaloneSplashWindow:
             if current_time > 0.3 and self.quality_level > 0.3:  # Start lasers after fade-in
                 self._render_enhanced_laser_eyes(logo_x, logo_y + float_offset, logo_size, current_time - 0.3)
 
-            # "Loading FunGen..." text below the logo
+            # "Loading HapticAI..." text below the logo
             if current_time > 0.3:  # Show after fade-in
                 loading_text = "Loading HapticAI..."
 

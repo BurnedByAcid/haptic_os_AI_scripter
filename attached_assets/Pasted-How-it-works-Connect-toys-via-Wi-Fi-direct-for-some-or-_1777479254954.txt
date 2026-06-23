@@ -33,10 +33,10 @@ Alternatives right now:
 
 Manual editing in Scripter with patterns/interpolation.
 AI Control mode (voice chat drives device live, not pre-made scripts).
-External tools like FunGen (separate AI video-to-funscript generator).
+External tools like HapticAI (separate AI video-to-funscript generator).
 
-Check site for updates — feature expected soon for Premium users.AI Funscript Algorithms ExplainedAI Funscript algorithms (mainly from tools like FunGen; funscript.org's version is still planned).
-Core approach (FunGen VR Hybrid tracker):
+Check site for updates — feature expected soon for Premium users.AI Funscript Algorithms ExplainedAI Funscript algorithms (mainly from tools like HapticAI; funscript.org's version is still planned).
+Core approach (HapticAI VR Hybrid tracker):
 
 Chapter detection: Sparse YOLO (object detection AI) at 2fps scans video and classifies scenes (e.g., missionary, cowgirl).
 Per-chapter tracking: Dense YOLO + ROI optical flow tracks body parts/motion with position-specific amplitude targets.
@@ -50,7 +50,7 @@ Other methods:
 Audio-only: Beat detection for music sync (peaks trigger up/down strokes).
 Simpler: Optical flow or manual rules without full AI.
 
-Limitations: Best on POV/VR; needs refinement in editor. Requires good hardware (GPU speeds it up).YOLO Tracking DetailsYOLO Tracking in FunGen (main tool for AI funscripts):
+Limitations: Best on POV/VR; needs refinement in editor. Requires good hardware (GPU speeds it up).YOLO Tracking DetailsYOLO Tracking in HapticAI (main tool for AI funscripts):
 VR Hybrid Chapter-Aware Tracker:
 
 Sparse YOLO (Chapter Detection): Runs at ~2fps across entire video. Detects and classifies scenes into chapters (e.g., missionary, cowgirl, blowjob). Uses custom-trained YOLO model for sex position/action classes.
@@ -63,7 +63,7 @@ Position-specific amplitude targets per chapter.
 Post-processing: Smoothing, peak detection, autotune filters.
 Models auto-download; recent updates improve stability/precision.
 
-Why hybrid: Sparse saves compute; dense gives accuracy where needed. Best for VR/POV videos. Refine output in editor.Optical Flow MechanicsOptical Flow Mechanics in FunGen (VR Hybrid Tracker):
+Why hybrid: Sparse saves compute; dense gives accuracy where needed. Best for VR/POV videos. Refine output in editor.Optical Flow MechanicsOptical Flow Mechanics in HapticAI (VR Hybrid Tracker):
 Core idea: Measures pixel motion between video frames to track stroke amplitude. YOLO sets ROI; optical flow quantifies movement inside it.
 How it works:
 
@@ -77,7 +77,7 @@ Key benefits:
 Handles occlusion and fast motion better than YOLO alone.
 Real-time or offline; dual-axis (stroke + roll) in live trackers.
 
-Post-processing: Smoothing, peak detection, autotune for clean funscript points. Refine manually in editor.Farneback Algorithm DetailsFarneback Algorithm (Gunnar Farnebäck, 2003): Dense optical flow method used in FunGen trackers.
+Post-processing: Smoothing, peak detection, autotune for clean funscript points. Refine manually in editor.Farneback Algorithm DetailsFarneback Algorithm (Gunnar Farnebäck, 2003): Dense optical flow method used in HapticAI trackers.
 Core mechanics:
 
 Polynomial expansion: Approximates local pixel neighborhoods in two frames as quadratic polynomials (f(x) = xᵀAx + bᵀx + c).
@@ -96,7 +96,7 @@ pyr_scale / levels: Pyramid handling.
 winsize: Neighborhood size (robustness vs. blur).
 poly_n / poly_sigma: Polynomial degree & smoothing.
 
-In FunGen: Applied inside YOLO-defined ROI for precise body motion tracking → stroke amplitude (0-100%). Fast, handles occlusion well after post-smoothing.Polynomial Expansion DetailsPolynomial Expansion in Farneback algorithm: Approximates local pixel neighborhood as quadratic polynomial for motion estimation.
+In HapticAI: Applied inside YOLO-defined ROI for precise body motion tracking → stroke amplitude (0-100%). Fast, handles occlusion well after post-smoothing.Polynomial Expansion DetailsPolynomial Expansion in Farneback algorithm: Approximates local pixel neighborhood as quadratic polynomial for motion estimation.
 Equation (local signal model):
 f(x) ≈ xᵀ A x + bᵀ x + c
 
@@ -111,7 +111,7 @@ Fit coefficients via weighted least squares on neighborhood pixels.
 Weights: Certainty (signal quality) + applicability (Gaussian window).
 Done efficiently on image pyramid (coarse-to-fine).
 
-In FunGen: Applied inside YOLO ROI → extracts motion vectors for stroke amplitude (0-100%). Robust to small shifts/occlusions after smoothing.Weighted Least Squares FittingWeighted Least Squares Fitting in Farneback: Fits quadratic polynomial coefficients (A, b, c) to pixel values in a local neighborhood.
+In HapticAI: Applied inside YOLO ROI → extracts motion vectors for stroke amplitude (0-100%). Robust to small shifts/occlusions after smoothing.Weighted Least Squares FittingWeighted Least Squares Fitting in Farneback: Fits quadratic polynomial coefficients (A, b, c) to pixel values in a local neighborhood.
 Key points:
 
 Minimizes weighted squared error between observed pixel intensities and polynomial model.
@@ -119,10 +119,10 @@ Weights: Certainty (signal quality/uncertainty) + Applicability (Gaussian window
 Solved via normal equations for efficiency (matrix form from normalized convolution).
 Applied per pixel on image pyramid for multi-scale robustness.
 
-In FunGen: Enables accurate local motion approximation inside YOLO ROI → precise optical flow vectors for stroke data.Explain the optimum way to create fun script for a user
+In HapticAI: Enables accurate local motion approximation inside YOLO ROI → precise optical flow vectors for stroke data.Explain the optimum way to create fun script for a user
  of the handyOptimum way for The Handy:
 
-Start with AI generation (fastest base): Use FunGen (Python tool) on POV/VR video → auto-creates solid .funscript via YOLO + optical flow.
+Start with AI generation (fastest base): Use HapticAI (Python tool) on POV/VR video → auto-creates solid .funscript via YOLO + optical flow.
 Refine in editor (premium recommended):
 funscript.org Scripter: Load video + AI script. Use visual timeline, waveform, patterns/interpolation for repeats. Real-time test on Handy.
 Alternatives: HandyFeeling playground scripter or iOS Handy FunScript Creator app.

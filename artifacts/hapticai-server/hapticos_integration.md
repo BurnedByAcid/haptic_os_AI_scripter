@@ -1,8 +1,8 @@
-# HapticOS ↔ FunGen Integration Guide
+# HapticOS ↔ HapticAI Integration Guide
 
 ## Overview
 
-HapticOS connects to the FunGen local server to enable AI-powered haptic script
+HapticOS connects to the HapticAI local server to enable AI-powered haptic script
 generation. The server runs on the user's machine and exposes two endpoints that
 HapticOS polls and calls.
 
@@ -10,7 +10,7 @@ HapticOS polls and calls.
 
 ### `GET /status`
 
-Polled every 3 seconds by `use-fungen-connection.ts` to check whether the server
+Polled every 3 seconds by `use-hapticai-connection.ts` to check whether the server
 is reachable and to discover available generation options.
 
 **Response shape**
@@ -42,7 +42,7 @@ is reachable and to discover available generation options.
 }
 ```
 
-`FunGenOption` types supported by HapticOS: `"number"`, `"boolean"`, `"select"`.
+`HapticAIOption` types supported by HapticOS: `"number"`, `"boolean"`, `"select"`.
 
 ### `POST /generate`
 
@@ -100,7 +100,7 @@ HapticOS defaults to `http://localhost:8000` so out-of-the-box no configuration
 is needed. The user can override it in the Setup Panel.
 
 > **Note:** If you change the default port in `web_app.py`, update the
-> `DEFAULT_URL` constant in `artifacts/handy-controller/src/hooks/use-fungen-connection.ts`
+> `DEFAULT_URL` constant in `artifacts/handy-controller/src/hooks/use-hapticai-connection.ts`
 > to match.
 
 ## Packaging
@@ -110,18 +110,18 @@ scripts:
 
 | Platform | Script | Output |
 |----------|--------|--------|
-| Windows  | `build_windows.bat` | `dist/FunGen.exe` |
-| macOS    | `build_macos.sh`    | `dist/FunGen.app` |
+| Windows  | `build_windows.bat` | `dist/HapticAI.exe` |
+| macOS    | `build_macos.sh`    | `dist/HapticAI.app` |
 
 Both scripts use PyInstaller with the matching `.spec` file
-(`fungen_windows.spec` / `fungen_macos.spec`).
+(`hapticai_windows.spec` / `hapticai_macos.spec`).
 
 ## Development workflow
 
 Run the server locally alongside the HapticOS frontend:
 
 ```bash
-cd artifacts/fungen-server
+cd artifacts/hapticai-server
 pip install -r web.requirements.txt
 python web_app.py
 ```

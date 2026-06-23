@@ -868,7 +868,7 @@ class InfoGraphsUI:
         imgui.text("YOLO Model:")
         imgui.next_column()
         if hasattr(processor, 'yolo_processor') and processor.yolo_processor:
-            model_name = getattr(processor.yolo_processor, 'model_name', 'FunGen-12s')
+            model_name = getattr(processor.yolo_processor, 'model_name', 'HapticAI-12s')
             imgui.text(model_name)
         else:
             imgui.text_disabled("Not loaded")

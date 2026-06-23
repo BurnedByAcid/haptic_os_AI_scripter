@@ -718,7 +718,7 @@ def _try_app_logic_pipeline(raw_actions: list, options: dict, output_dir: Path) 
                 filter=filter_name,
             )
 
-            os.environ["FUNGEN_OUTPUT_DIR"] = str(output_dir)
+            os.environ["HAPTICAI_OUTPUT_DIR"] = str(output_dir)
             core_app = ApplicationLogic(is_cli=True)
             core_app.run_cli(args)
 

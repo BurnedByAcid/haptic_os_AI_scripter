@@ -26,8 +26,8 @@ source build_venv/bin/activate
 echo "[2/5] Installing build tools..."
 pip install --upgrade pip wheel pyinstaller
 
-# Install FunGen dependencies from official requirements files
-echo "[3/5] Installing FunGen dependencies..."
+# Install HapticAI dependencies from official requirements files
+echo "[3/5] Installing HapticAI dependencies..."
 
 # Core requirements (imgui/glfw/moderngl install fine on macOS headless build hosts)
 pip install -r core.requirements.txt --ignore-requires-python

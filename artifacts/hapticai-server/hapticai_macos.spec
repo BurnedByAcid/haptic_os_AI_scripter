@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
 PyInstaller spec for HapticAI (Beta) — macOS
-Bundles web_app.py + all FunGen source into a .app bundle
+Bundles web_app.py + all HapticAI source into a .app bundle
 """
 
 import sys
@@ -88,7 +88,7 @@ app = BUNDLE(
     coll,
     name='HapticAI.app',
     icon=None,
-    bundle_identifier='ai.haptic.fungen',
+    bundle_identifier='ai.haptic.hapticai',
     info_plist={
         'CFBundleShortVersionString': '0.5.4',
         'CFBundleVersion': '0.5.4',

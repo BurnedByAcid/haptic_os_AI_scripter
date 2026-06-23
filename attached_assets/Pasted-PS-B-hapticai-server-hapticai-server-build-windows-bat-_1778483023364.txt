@@ -41,7 +41,7 @@ Installing collected packages: altgraph, setuptools, pywin32-ctypes, pip, pefile
     Uninstalling pip-26.0.1:
       Successfully uninstalled pip-26.0.1
 Successfully installed altgraph-0.17.5 packaging-26.2 pefile-2024.8.26 pip-26.1.1 pyinstaller-6.20.0 pyinstaller-hooks-contrib-2026.5 pywin32-ctypes-0.2.3 setuptools-82.0.1 wheel-0.47.0
-[3/5] Installing FunGen dependencies...
+[3/5] Installing HapticAI dependencies...
 Collecting numpy (from -r core.requirements.txt (line 1))
   Using cached numpy-2.4.4-cp314-cp314-win_amd64.whl.metadata (6.6 kB)
 Collecting imgui (from -r core.requirements.txt (line 2))

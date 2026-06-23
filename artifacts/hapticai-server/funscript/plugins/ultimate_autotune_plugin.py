@@ -48,7 +48,7 @@ class UltimateAutotunePlugin(FunscriptTransformationPlugin):
     
     @property
     def author(self) -> str:
-        return "FunGen Team"
+        return "HapticAI Team"
     
     @property
     def ui_preference(self) -> str:

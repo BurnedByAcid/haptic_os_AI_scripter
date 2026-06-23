@@ -241,7 +241,7 @@ class FeatureDetector:
         
         # Dev features only in development mode
         if feature_info.tier == "dev":
-            return os.getenv("FUNGEN_DEV", "").lower() in ("1", "true", "yes")
+            return os.getenv("HAPTICAI_DEV", "").lower() in ("1", "true", "yes")
         
         return False
     

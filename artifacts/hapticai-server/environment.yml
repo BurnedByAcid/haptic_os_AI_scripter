@@ -1,4 +1,4 @@
-name: FunGen # Replace with your actual environment name
+name: HapticAI # Replace with your actual environment name
 channels:
   - conda-forge
   - defaults

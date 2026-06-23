@@ -1,5 +1,5 @@
 #!/bin/bash
-# FunGen Universal Bootstrap Installer for Linux/macOS
+# HapticAI Universal Bootstrap Installer for Linux/macOS
 # Version: 1.0.2
 # This script requires ZERO dependencies - only uses POSIX shell built-ins
 # Downloads and runs the full Python installer
@@ -12,10 +12,10 @@ BOOTSTRAP_VERSION="1.0.2"
 for arg in "$@"; do
     case $arg in
         -h|--help)
-            echo "FunGen Bootstrap Installer"
+            echo "HapticAI Bootstrap Installer"
             echo "Usage: $0 [options]"
             echo ""
-            echo "This script downloads and installs FunGen automatically."
+            echo "This script downloads and installs HapticAI automatically."
             echo "All options are passed to the universal installer."
             echo ""
             echo "Common options:"
@@ -35,7 +35,7 @@ for arg in "$@"; do
 done
 
 echo "=========================================="
-echo "     FunGen Bootstrap Installer"
+echo "     HapticAI Bootstrap Installer"
 echo "            v${BOOTSTRAP_VERSION}"
 echo "=========================================="
 echo ""
@@ -43,7 +43,7 @@ echo "This installer will download and install everything needed:"
 echo "  - Python 3.11 (Miniconda)"
 echo "  - Git"
 echo "  - FFmpeg/FFprobe"
-echo "  - FunGen AI and all dependencies"
+echo "  - HapticAI AI and all dependencies"
 echo ""
 echo "Note: You may be prompted for your password to install system packages"
 echo "      (Git, FFmpeg) via your system's package manager."
@@ -100,7 +100,7 @@ TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
 # Configuration
-INSTALLER_URL="https://raw.githubusercontent.com/ack00gar/FunGen-AI-Powered-Funscript-Generator/main/install.py"
+INSTALLER_URL="https://raw.githubusercontent.com/ack00gar/HapticAI-AI-Powered-Funscript-Generator/main/install.py"
 PYTHON_INSTALLER="$TEMP_DIR/miniconda-installer.sh"
 UNIVERSAL_INSTALLER="$TEMP_DIR/install.py"
 MINICONDA_PATH="$HOME/miniconda3"
@@ -204,15 +204,15 @@ fi
 export PATH="$MINICONDA_PATH/bin:$PATH"
 
 echo ""
-echo "[3/4] Downloading FunGen universal installer..."
-if ! download_file "$INSTALLER_URL" "$UNIVERSAL_INSTALLER" "FunGen universal installer"; then
+echo "[3/4] Downloading HapticAI universal installer..."
+if ! download_file "$INSTALLER_URL" "$UNIVERSAL_INSTALLER" "HapticAI universal installer"; then
     echo "ERROR: Failed to download universal installer"
     exit 1
 fi
 echo "    Universal installer downloaded successfully"
 
 echo ""
-echo "[4/4] Running FunGen universal installer..."
+echo "[4/4] Running HapticAI universal installer..."
 echo "    The universal installer will now handle the complete setup..."
 echo ""
 
@@ -239,7 +239,7 @@ if [ $INSTALL_RESULT -eq 0 ]; then
     echo "    Bootstrap Installation Complete!"
     echo "=========================================="
     echo ""
-    echo "FunGen has been successfully installed."
+    echo "HapticAI has been successfully installed."
     echo "Check above for launcher instructions."
 else
     echo ""

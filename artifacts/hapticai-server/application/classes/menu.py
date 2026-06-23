@@ -261,7 +261,7 @@ class MainMenu:
             imgui.end_popup()
 
     def _render_about_dialog(self):
-        """Render About FunGen dialog with logo and Ko-fi support."""
+        """Render About HapticAI dialog with logo and Ko-fi support."""
         if not self._show_about_dialog:
             return
 
@@ -269,7 +269,7 @@ class MainMenu:
         from config import constants
 
         # Center and open popup
-        imgui.open_popup("About FunGen##AboutDialog")
+        imgui.open_popup("About HapticAI##AboutDialog")
 
         # Center on main viewport
         mv = imgui.get_main_viewport()
@@ -282,7 +282,7 @@ class MainMenu:
         imgui.set_next_window_size(dialog_width, 0, condition=imgui.ONCE)
 
         opened, _ = imgui.begin_popup_modal(
-            "About FunGen##AboutDialog",
+            "About HapticAI##AboutDialog",
             True,
             flags=imgui.WINDOW_NO_RESIZE | imgui.WINDOW_NO_MOVE
         )
@@ -335,7 +335,7 @@ class MainMenu:
             # GitHub link button
             if imgui.button("GitHub Repository", width=-1):
                 try:
-                    webbrowser.open("https://github.com/ack00gar/FunGen-AI-Powered-Funscript-Generator")
+                    webbrowser.open("https://github.com/ack00gar/HapticAI-AI-Powered-Funscript-Generator")
                 except Exception as e:
                     if hasattr(self.app, 'logger') and self.app.logger:
                         self.app.logger.warning(f"Could not open GitHub link: {e}")
@@ -1059,7 +1059,7 @@ class MainMenu:
 
         if imgui.begin_menu("Help", True):
             # About
-            if _menu_item_simple("About FunGen..."):
+            if _menu_item_simple("About HapticAI..."):
                 self._show_about_dialog = True
 
             imgui.separator()
@@ -1134,7 +1134,7 @@ class MainMenu:
                             app.logger.warning(f"Could not open Discord link: {e}")
                 if imgui.is_item_hovered():
                     imgui.set_tooltip(
-                        "Join the FunGen Discord community\n"
+                        "Join the HapticAI Discord community\n"
                         "Get help, share results, and discuss features!"
                     )
 
@@ -1142,7 +1142,7 @@ class MainMenu:
 
                 if _menu_item_simple("Report Issue on GitHub"):
                     try:
-                        webbrowser.open("https://github.com/ack00gar/FunGen-AI-Powered-Funscript-Generator/issues")
+                        webbrowser.open("https://github.com/ack00gar/HapticAI-AI-Powered-Funscript-Generator/issues")
                     except Exception as e:
                         if hasattr(app, 'logger') and app.logger:
                             app.logger.warning(f"Could not open GitHub issues link: {e}")
@@ -1156,7 +1156,7 @@ class MainMenu:
             imgui.end_menu()
 
     def _render_menu_bar_logo(self):
-        """Render FunGen logo at the start of menu bar."""
+        """Render HapticAI logo at the start of menu bar."""
         # Load logo texture
         logo_manager = get_logo_texture_manager()
         logo_texture = logo_manager.get_texture_id()
@@ -1222,7 +1222,7 @@ class MainMenu:
                 if control_source == 'streamer':
                     control_info = "Controlled by: Streamer (Browser)"
                 elif control_source == 'desktop':
-                    control_info = "Controlled by: Desktop (FunGen)"
+                    control_info = "Controlled by: Desktop (HapticAI)"
                 else:
                     control_info = "Controlled by: None (Idle)"
 

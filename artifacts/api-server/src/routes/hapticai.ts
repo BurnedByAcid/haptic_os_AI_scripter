@@ -522,7 +522,7 @@ router.get("/user/hapticai-status", async (req: Request, res: Response) => {
   try {
     const user = await clerkClient.users.getUser(auth.userId);
     const meta = user.publicMetadata as Record<string, unknown>;
-    const agreed = meta?.hapticaiAgreed === true || meta?.fungenAgreed === true;
+    const agreed = meta?.hapticaiAgreed === true;
     res.json({ agreed });
   } catch {
     res.status(500).json({ error: "Failed to fetch user status." });

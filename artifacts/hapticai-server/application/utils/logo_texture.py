@@ -1,7 +1,7 @@
 """
 Logo Texture Utility
 
-Provides centralized logo texture loading and management for FunGen GUI.
+Provides centralized logo texture loading and management for HapticAI GUI.
 Used for:
 - Video feed placeholder when no video is loaded
 - Error/warning dialogs

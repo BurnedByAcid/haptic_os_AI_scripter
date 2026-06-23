@@ -405,7 +405,7 @@ class ChapterTypeManager:
         export_data = {
             "version": self.VERSION,
             "author": "k00gar",
-            "description": "FunGen custom chapter types library",
+            "description": "HapticAI custom chapter types library",
             "export_date": datetime.now().isoformat(),
             "types": self.custom_types.copy()
         }

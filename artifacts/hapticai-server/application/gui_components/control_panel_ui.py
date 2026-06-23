@@ -437,7 +437,7 @@ class ControlPanelUI:
         fs_proc = app.funscript_processor
 
         flags = imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_MOVE | imgui.WINDOW_NO_COLLAPSE
-        imgui.begin("FunGen Simple##SimpleControlPanel", flags=flags)
+        imgui.begin("HapticAI Simple##SimpleControlPanel", flags=flags)
 
         # Title
         imgui.push_style_color(imgui.COLOR_TEXT, 0.4, 0.8, 1.0, 1.0)
@@ -4986,9 +4986,9 @@ class ControlPanelUI:
                     flags=imgui.TREE_NODE_DEFAULT_OPEN,
                 )
                 if open_:
-                    # FunGen Viewer URL
-                    viewer_url = f"http://{self._get_local_ip()}:{status.get('http_port', 8080)}/fungen"
-                    imgui.text("FunGen Viewer URL:")
+                    # HapticAI Viewer URL
+                    viewer_url = f"http://{self._get_local_ip()}:{status.get('http_port', 8080)}/hapticai"
+                    imgui.text("HapticAI Viewer URL:")
                     imgui.same_line()
                     imgui.push_style_color(imgui.COLOR_TEXT, 0.0, 1.0, 0.5)
                     imgui.text(viewer_url)

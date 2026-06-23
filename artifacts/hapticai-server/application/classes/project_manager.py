@@ -86,7 +86,7 @@ class ProjectManager:
                 title="Open Project",
                 is_save=False,
                 callback=self.load_project,
-                extension_filter=f"FunGen Projects (*{PROJECT_FILE_EXTENSION}),*{PROJECT_FILE_EXTENSION}|Autosave States (*{AUTOSAVE_FILE.split('.')[-1]}),*{AUTOSAVE_FILE.split('.')[-1]}|All files (*.*),*.*", initial_path=initial_dir)
+                extension_filter=f"HapticAI Projects (*{PROJECT_FILE_EXTENSION}),*{PROJECT_FILE_EXTENSION}|Autosave States (*{AUTOSAVE_FILE.split('.')[-1]}),*{AUTOSAVE_FILE.split('.')[-1]}|All files (*.*),*.*", initial_path=initial_dir)
         else:
             self.app.logger.error("File dialog cannot be shown from ProjectManager. GUI bridge missing.")
 
@@ -195,7 +195,7 @@ class ProjectManager:
                     title="Save Project As" if save_as or not self.project_file_path else "Save Project",
                     is_save=True,
                     callback=self.save_project,
-                    extension_filter=f"FunGen Projects (*{PROJECT_FILE_EXTENSION}),*{PROJECT_FILE_EXTENSION}|All files (*.*),*.*",
+                    extension_filter=f"HapticAI Projects (*{PROJECT_FILE_EXTENSION}),*{PROJECT_FILE_EXTENSION}|All files (*.*),*.*",
                     initial_filename=suggested_filename,
                     initial_path=initial_dir_save
                 )

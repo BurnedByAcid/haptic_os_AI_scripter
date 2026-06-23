@@ -18,8 +18,8 @@ class TempManager:
     Centralized temporary file management.
 
     All temp files are stored in a consistent location:
-    - Windows: %LOCALAPPDATA%/fungen/
-    - macOS/Linux: ~/.local/share/fungen/
+    - Windows: %LOCALAPPDATA%/hapticai/
+    - macOS/Linux: ~/.local/share/hapticai/
 
     Benefits:
     - Persistent across reboots (not in /tmp)
@@ -27,7 +27,7 @@ class TempManager:
     - Automatic cleanup of old files
     """
 
-    def __init__(self, app_name: str = "fungen"):
+    def __init__(self, app_name: str = "hapticai"):
         """
         Initialize temp manager.
 

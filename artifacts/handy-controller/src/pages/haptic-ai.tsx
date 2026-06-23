@@ -1345,7 +1345,7 @@ function HapticAIContent() {
     checkedRef.current = true;
 
     const meta = user?.publicMetadata as Record<string, unknown>;
-    const localAgreed = meta?.hapticaiAgreed === true || meta?.fungenAgreed === true;
+    const localAgreed = meta?.hapticaiAgreed === true;
     if (localAgreed) {
       setAgreementState("accepted");
       return;

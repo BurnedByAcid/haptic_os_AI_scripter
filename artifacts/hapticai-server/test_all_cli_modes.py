@@ -70,7 +70,7 @@ def run_test(mode, autotune=True, od_mode=None):
             capture_output=True,
             text=True,
             timeout=60,  # 60 second timeout
-            env={**os.environ, "FUNGEN_TESTING": "1"}
+            env={**os.environ, "HAPTICAI_TESTING": "1"}
         )
         
         # Extract key metrics from output
