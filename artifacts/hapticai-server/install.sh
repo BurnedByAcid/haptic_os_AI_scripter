@@ -100,7 +100,15 @@ TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
 # Configuration
-INSTALLER_URL="https://1496e5f1-f302-402a-b2dd-cd25d95f85b5-00-3k43daw6ksczj-p7li0ssq.riker.replit.dev/api/hapticai/install.py"
+# RELEASE: Pin to a specific tag so installs are reproducible and won't break
+# silently when main changes. Update INSTALLER_TAG and INSTALLER_SHA256 each
+# time a new installer is published.
+INSTALLER_TAG="v1.0.0"
+INSTALLER_URL="https://raw.githubusercontent.com/HapticAI/HapticAI-Powered/refs/tags/${INSTALLER_TAG}/install.py"
+# SHA-256 of install.py at the pinned tag above.
+# Run: sha256sum install.py  (Linux) or  shasum -a 256 install.py  (macOS)
+# Replace this value whenever INSTALLER_TAG is bumped.
+INSTALLER_SHA256="PLACEHOLDER_REPLACE_WITH_SHA256_OF_install.py_AT_${INSTALLER_TAG}"
 PYTHON_INSTALLER="$TEMP_DIR/miniconda-installer.sh"
 UNIVERSAL_INSTALLER="$TEMP_DIR/install.py"
 MINICONDA_PATH="$HOME/miniconda3"
@@ -210,6 +218,32 @@ if ! download_file "$INSTALLER_URL" "$UNIVERSAL_INSTALLER" "HapticAI universal i
     exit 1
 fi
 echo "    Universal installer downloaded successfully"
+
+# Verify SHA-256 checksum so a tampered or partial download is caught early.
+# Skip verification only if the placeholder has not been replaced yet.
+if [[ "$INSTALLER_SHA256" != PLACEHOLDER_* ]]; then
+    echo "    Verifying checksum..."
+    if command -v sha256sum >/dev/null 2>&1; then
+        ACTUAL_SHA256=$(sha256sum "$UNIVERSAL_INSTALLER" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        ACTUAL_SHA256=$(shasum -a 256 "$UNIVERSAL_INSTALLER" | awk '{print $1}')
+    else
+        echo "    WARNING: No sha256sum/shasum tool found — skipping checksum verification"
+        ACTUAL_SHA256="$INSTALLER_SHA256"
+    fi
+    if [ "$ACTUAL_SHA256" != "$INSTALLER_SHA256" ]; then
+        echo "ERROR: Checksum mismatch for install.py"
+        echo "  Expected: $INSTALLER_SHA256"
+        echo "  Got:      $ACTUAL_SHA256"
+        echo "  The downloaded file may be corrupt or tampered with."
+        echo "  Please re-run this script or download install.py manually."
+        exit 1
+    fi
+    echo "    Checksum verified"
+else
+    echo "    WARNING: Checksum placeholder not replaced — skipping verification."
+    echo "             Update INSTALLER_SHA256 in this script for a secure install."
+fi
 
 echo ""
 echo "[4/4] Running HapticAI universal installer..."

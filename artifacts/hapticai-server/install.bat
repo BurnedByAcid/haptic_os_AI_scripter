@@ -213,7 +213,14 @@ if exist "%INSTALL_DIR%install.py" (
     echo   install.py not found locally, downloading from GitHub...
 
     REM Use a more reliable download method with proper variable expansion
-    set "INSTALLER_URL=https://1496e5f1-f302-402a-b2dd-cd25d95f85b5-00-3k43daw6ksczj-p7li0ssq.riker.replit.dev/api/hapticai/install.py"
+    REM RELEASE: Pinned to a specific tag — update INSTALLER_TAG and
+    REM INSTALLER_SHA256 each time a new installer is published.
+    set "INSTALLER_TAG=v1.0.0"
+    set "INSTALLER_URL=https://raw.githubusercontent.com/HapticAI/HapticAI-Powered/refs/tags/!INSTALLER_TAG!/install.py"
+    REM SHA-256 of install.py at the pinned tag above.
+    REM Run in PowerShell: (Get-FileHash install.py -Algorithm SHA256).Hash
+    REM Replace this value whenever INSTALLER_TAG is bumped.
+    set "INSTALLER_SHA256=PLACEHOLDER_REPLACE_WITH_SHA256_OF_install.py_AT_v1.0.0"
     set "INSTALLER_FILE=%TEMP_DIR%\install.py"
 
     echo   Downloading from: !INSTALLER_URL!
@@ -230,6 +237,29 @@ if exist "%INSTALL_DIR%install.py" (
             pause
             exit /b 1
         )
+    )
+
+    REM Verify SHA-256 checksum so a tampered or partial download is caught early.
+    REM Skip verification if the placeholder has not been replaced yet.
+    echo !INSTALLER_SHA256! | findstr /i /b "PLACEHOLDER_" >nul
+    if !errorlevel! equ 0 (
+        echo [WARNING] INSTALLER_SHA256 is still a placeholder - skipping checksum verification.
+        echo           Update INSTALLER_SHA256 in this script for a secure install.
+    ) else (
+        echo   Verifying checksum...
+        for /f "usebackq delims=" %%H in (`powershell -NoProfile -Command "(Get-FileHash '!INSTALLER_FILE!' -Algorithm SHA256).Hash.ToLower()"`) do set "ACTUAL_SHA256=%%H"
+        REM Convert expected to lowercase for comparison
+        for /f "usebackq delims=" %%L in (`powershell -NoProfile -Command "'!INSTALLER_SHA256!'.ToLower()"`) do set "EXPECTED_LOWER=%%L"
+        if /i "!ACTUAL_SHA256!" neq "!EXPECTED_LOWER!" (
+            echo [ERROR] Checksum mismatch for install.py
+            echo   Expected: !EXPECTED_LOWER!
+            echo   Got:      !ACTUAL_SHA256!
+            echo   The downloaded file may be corrupt or tampered with.
+            echo   Please re-run this script or download install.py manually.
+            pause
+            exit /b 1
+        )
+        echo [OK] Checksum verified
     )
 
     echo [OK] Universal installer downloaded successfully
