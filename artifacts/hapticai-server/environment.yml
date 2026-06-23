@@ -1,4 +1,4 @@
-name: HapticAI # Replace with your actual environment name
+name: HapticAI
 channels:
   - conda-forge
   - defaults

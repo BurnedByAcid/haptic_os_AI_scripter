@@ -118,7 +118,7 @@ class HapticAIUninstaller:
         print(f"{Colors.BLUE}🔍 Scanning for HapticAI installations...{Colors.ENDC}")
         
         # Common project directory names
-        project_names = ["HapticAI", "VR-Funscript-AI-Generator"]
+        project_names = ["HapticAI", "HapticAI-AI-Powered-Funscript-Generator", "VR-Funscript-AI-Generator"]
         
         # Search locations
         search_locations = [
