@@ -10,6 +10,7 @@
 #  Triggers:
 #    - Every push to main/master
 #    - Every pull request targeting main/master
+#    - Daily cron (08:00 UTC) — catches broken URLs even without a code change
 #    - Manual trigger (Actions → "Check installer URLs" → Run workflow)
 #
 #  To run locally:
@@ -37,6 +38,8 @@ on:
       - 'artifacts/hapticai-server/install.bat'
       - 'artifacts/hapticai-server/check_installer_urls.sh'
       - '.github/workflows/check-installer-urls.yml'
+  schedule:
+    - cron: '0 8 * * *'
   workflow_dispatch:
 
 jobs:
