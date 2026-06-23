@@ -11,8 +11,9 @@ import sys
 from datetime import datetime
 
 # Test configuration
-TEST_VIDEO = "/Users/k00gar/Downloads/test/test_koogar_extra_short_A.mp4"
-OUTPUT_DIR = "/Users/k00gar/PycharmProjects/VR-Funscript-AI-Generator/output/test_koogar_extra_short_A"
+_HERE = os.path.dirname(os.path.abspath(__file__))
+TEST_VIDEO = os.environ.get("TEST_VIDEO", os.path.join(_HERE, "test_data", "test_input.mp4"))
+OUTPUT_DIR = os.path.join(_HERE, "output", "test_cli")
 
 # Auto-discover all available modes (excluding examples)
 def get_available_modes():
