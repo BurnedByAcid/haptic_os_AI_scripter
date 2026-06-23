@@ -6,15 +6,19 @@ Identical to hapticai_windows.spec but outputs HapticAI-50series.exe
 
 import sys
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_all
 
 ROOT = Path(SPECPATH)
 
 block_cipher = None
 
+_sw_datas, _sw_binaries, _sw_hiddenimports = collect_all('simple_websocket')
+_wp_datas, _wp_binaries, _wp_hiddenimports = collect_all('wsproto')
+
 a = Analysis(
     [str(ROOT / '_launcher.py')],
     pathex=[str(ROOT)],
-    binaries=[],
+    binaries=[] + _sw_binaries + _wp_binaries,
     datas=[
         (str(ROOT / 'templates'), 'templates'),
         (str(ROOT / 'static'), 'static'),
@@ -26,7 +30,7 @@ a = Analysis(
         (str(ROOT / 'tracker'), 'tracker'),
         (str(ROOT / 'video'), 'video'),
         (str(ROOT / 'assets'), 'assets'),
-    ],
+    ] + _sw_datas + _wp_datas,
     hiddenimports=[
         'web_app',
         'flask',
@@ -35,14 +39,6 @@ a = Analysis(
         'engineio.async_threading',
         'socketio',
         'socketio.async_threading',
-        'simple_websocket',
-        'wsproto',
-        'wsproto.utilities',
-        'wsproto.frame_protocol',
-        'wsproto.connection',
-        'wsproto.events',
-        'wsproto.extensions',
-        'wsproto.handshake',
         'pystray',
         'pystray._win32',
         'cv2',
@@ -53,7 +49,7 @@ a = Analysis(
         'ultralytics',
         'torch',
         'torchvision',
-    ],
+    ] + _sw_hiddenimports + _wp_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
