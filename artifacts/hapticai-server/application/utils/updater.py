@@ -110,7 +110,7 @@ class AutoUpdater:
     - Internet connection for GitHub API calls
     """
     REPO_OWNER = "HapticAI"
-    REPO_NAME = "HapticAI"
+    REPO_NAME = "HapticAI-Powered"
     
     # Multi-branch configuration for seamless migration
     PRIMARY_BRANCH = "main"      # Target branch for future updates
