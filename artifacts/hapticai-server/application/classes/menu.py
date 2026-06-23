@@ -2,6 +2,7 @@ import os
 import webbrowser
 import platform
 import imgui
+from config.constants import REPO_GITHUB_URL
 from config.element_group_colors import MenuColors
 from application.utils import get_logo_texture_manager
 
@@ -335,7 +336,7 @@ class MainMenu:
             # GitHub link button
             if imgui.button("GitHub Repository", width=-1):
                 try:
-                    webbrowser.open("https://github.com/HapticAI/HapticAI-Powered")
+                    webbrowser.open(REPO_GITHUB_URL)
                 except Exception as e:
                     if hasattr(self.app, 'logger') and self.app.logger:
                         self.app.logger.warning(f"Could not open GitHub link: {e}")
@@ -1142,7 +1143,7 @@ class MainMenu:
 
                 if _menu_item_simple("Report Issue on GitHub"):
                     try:
-                        webbrowser.open("https://github.com/HapticAI/HapticAI-Powered/issues")
+                        webbrowser.open(f"{REPO_GITHUB_URL}/issues")
                     except Exception as e:
                         if hasattr(app, 'logger') and app.logger:
                             app.logger.warning(f"Could not open GitHub issues link: {e}")

@@ -35,6 +35,7 @@ import argparse
 INSTALLER_VERSION = "1.3.5"
 
 # Configuration
+# NOTE: repo_url must stay in sync with REPO_GITHUB_URL in config/constants.py
 CONFIG = {
     "repo_url": "https://github.com/HapticAI/HapticAI-Powered.git",
     "project_name": "HapticAI",

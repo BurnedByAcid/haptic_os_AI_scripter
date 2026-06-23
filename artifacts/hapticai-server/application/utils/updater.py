@@ -11,7 +11,7 @@ import json
 from typing import List, Dict, Optional
 from datetime import datetime
 from application.utils import GitHubTokenManager, format_github_date, check_internet_connection
-from config.constants import DEFAULT_COMMIT_FETCH_COUNT
+from config.constants import DEFAULT_COMMIT_FETCH_COUNT, REPO_OWNER, REPO_NAME
 from config.element_group_colors import AppGUIColors, UpdateSettingsColors
 
 class GitHubAPIClient:
@@ -109,8 +109,8 @@ class AutoUpdater:
     - Repository must be a valid Git repository
     - Internet connection for GitHub API calls
     """
-    REPO_OWNER = "HapticAI"
-    REPO_NAME = "HapticAI-Powered"
+    REPO_OWNER = REPO_OWNER
+    REPO_NAME = REPO_NAME
     
     # Multi-branch configuration for seamless migration
     PRIMARY_BRANCH = "main"      # Target branch for future updates
