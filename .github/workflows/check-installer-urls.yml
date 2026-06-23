@@ -13,6 +13,11 @@
 #    - Daily cron (08:00 UTC) — catches broken URLs even without a code change
 #    - Manual trigger (Actions → "Check installer URLs" → Run workflow)
 #
+#  Slack notifications:
+#    - Add a SLACK_WEBHOOK_URL repository secret (Settings → Secrets → Actions)
+#      to receive a message in Slack whenever a URL check fails.
+#    - If the secret is absent, the notification step is silently skipped.
+#
 #  To run locally:
 #    bash artifacts/hapticai-server/check_installer_urls.sh
 # ============================================================
@@ -52,6 +57,73 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check installer URLs
+        id: url_check
         run: |
           chmod +x artifacts/hapticai-server/check_installer_urls.sh
-          bash artifacts/hapticai-server/check_installer_urls.sh
+          OUTPUT=$(bash artifacts/hapticai-server/check_installer_urls.sh 2>&1) || CHECK_EXIT=$?
+          echo "$OUTPUT"
+
+          # Collect lines that contain failures for the Slack message
+          FAILED_LINES=$(echo "$OUTPUT" | grep " FAIL " || true)
+          # Escape newlines so the value survives as a multiline output
+          {
+            echo "failed_lines<<EOF"
+            echo "$FAILED_LINES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          exit "${CHECK_EXIT:-0}"
+
+      - name: Notify Slack on failure
+        if: failure() && env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          FAILED_LINES="${{ steps.url_check.outputs.failed_lines }}"
+
+          # Build one bullet per failed URL (trim leading whitespace)
+          BULLETS=""
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            # Extract URL and status from: "Checking <url>  (from <src>) ... FAIL (<status>)"
+            URL=$(echo "$line" | sed 's/^Checking[[:space:]]*//' | sed 's/[[:space:]]*(from[[:space:]].*$//')
+            STATUS=$(echo "$line" | grep -oP '(?<=FAIL \()\d+(?=\))' || echo "???")
+            BULLETS="${BULLETS}• \`${URL}\` → HTTP ${STATUS}\n"
+          done <<< "$FAILED_LINES"
+
+          # Fallback if parsing produced nothing
+          if [ -z "$BULLETS" ]; then
+            BULLETS="_(check logs for details)_\n"
+          fi
+
+          REPO="${{ github.repository }}"
+          RUN_URL="https://github.com/${REPO}/actions/runs/${{ github.run_id }}"
+
+          PAYLOAD=$(printf '{
+            "text": ":rotating_light: *Installer URL check failed* in `%s`",
+            "blocks": [
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": ":rotating_light: *Installer URL check failed*\nRepository: `%s`\n\n*Broken URLs:*\n%s"
+                }
+              },
+              {
+                "type": "actions",
+                "elements": [
+                  {
+                    "type": "button",
+                    "text": { "type": "plain_text", "text": "View run logs" },
+                    "url": "%s"
+                  }
+                ]
+              }
+            ]
+          }' "$REPO" "$REPO" "$BULLETS" "$RUN_URL")
+
+          curl --silent --fail --max-time 10 \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"
