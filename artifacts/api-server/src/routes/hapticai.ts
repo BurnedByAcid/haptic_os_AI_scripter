@@ -1,6 +1,8 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
 import multer from "multer";
+import path from "node:path";
+import fs from "node:fs";
 import { pool } from "../lib/db";
 import { getPlan } from "../lib/getPlan";
 import { uploadReleaseToGCS, downloadReleaseFromGCS } from "../lib/hapticaiStorage";
@@ -70,6 +72,20 @@ async function fetchLatestGithubRelease(): Promise<GitHubReleaseCache["data"]> {
     dmgUrl:    dmgAsset?.browser_download_url    ?? null,
   };
 }
+
+/**
+ * GET /api/hapticai/install.py
+ * Public. Serves the HapticAI stage-2 Python installer script.
+ * This is the authoritative download location referenced by install.sh / install.bat.
+ */
+router.get("/hapticai/install.py", (_req: Request, res: Response) => {
+  const scriptPath = path.resolve(process.cwd(), "../hapticai-server/install.py");
+  if (!fs.existsSync(scriptPath)) {
+    res.status(404).type("text/plain").send("install.py not found");
+    return;
+  }
+  res.type("text/x-python").sendFile(scriptPath);
+});
 
 /**
  * GET /api/hapticai/github-release

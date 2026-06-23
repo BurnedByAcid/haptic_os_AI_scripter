@@ -100,7 +100,7 @@ TEMP_DIR=$(mktemp -d)
 trap "rm -rf $TEMP_DIR" EXIT
 
 # Configuration
-INSTALLER_URL="https://raw.githubusercontent.com/HapticAI/HapticAI-Powered/main/install.py"
+INSTALLER_URL="https://1496e5f1-f302-402a-b2dd-cd25d95f85b5-00-3k43daw6ksczj-p7li0ssq.riker.replit.dev/api/hapticai/install.py"
 PYTHON_INSTALLER="$TEMP_DIR/miniconda-installer.sh"
 UNIVERSAL_INSTALLER="$TEMP_DIR/install.py"
 MINICONDA_PATH="$HOME/miniconda3"
