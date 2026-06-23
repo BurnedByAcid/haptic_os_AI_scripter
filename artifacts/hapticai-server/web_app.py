@@ -1352,7 +1352,7 @@ def _run_hapticai_subprocess(job_id, filepath, mode, settings, output_dir):
     job = jobs[job_id]
     video_path = Path(filepath)
 
-    hapticai_dir = Path(__file__).parent / "HapticAI-Powered-Funscript-Generator-main"
+    hapticai_dir = Path(__file__).parent / "HapticAI-Powered-main"
     main_py = hapticai_dir / "main.py"
     if not main_py.exists():
         hapticai_dir = Path(__file__).parent

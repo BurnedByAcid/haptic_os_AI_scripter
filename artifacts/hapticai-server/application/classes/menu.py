@@ -335,7 +335,7 @@ class MainMenu:
             # GitHub link button
             if imgui.button("GitHub Repository", width=-1):
                 try:
-                    webbrowser.open("https://github.com/ack00gar/HapticAI-AI-Powered-Funscript-Generator")
+                    webbrowser.open("https://github.com/HapticAI/HapticAI")
                 except Exception as e:
                     if hasattr(self.app, 'logger') and self.app.logger:
                         self.app.logger.warning(f"Could not open GitHub link: {e}")
@@ -1142,7 +1142,7 @@ class MainMenu:
 
                 if _menu_item_simple("Report Issue on GitHub"):
                     try:
-                        webbrowser.open("https://github.com/ack00gar/HapticAI-AI-Powered-Funscript-Generator/issues")
+                        webbrowser.open("https://github.com/HapticAI/HapticAI/issues")
                     except Exception as e:
                         if hasattr(app, 'logger') and app.logger:
                             app.logger.warning(f"Could not open GitHub issues link: {e}")

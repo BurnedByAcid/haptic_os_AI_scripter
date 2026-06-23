@@ -14,7 +14,7 @@ const router = Router();
 
 const GITHUB_REPO =
   process.env.HAPTICAI_GITHUB_REPO ??
-  "HapticAI/HapticAI-Powered-Funscript-Generator";
+  "HapticAI/HapticAI-Powered";
 
 interface GitHubReleaseCache {
   data: {

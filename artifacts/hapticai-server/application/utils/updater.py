@@ -109,8 +109,8 @@ class AutoUpdater:
     - Repository must be a valid Git repository
     - Internet connection for GitHub API calls
     """
-    REPO_OWNER = "ack00gar"
-    REPO_NAME = "HapticAI-AI-Powered-Funscript-Generator"
+    REPO_OWNER = "HapticAI"
+    REPO_NAME = "HapticAI"
     
     # Multi-branch configuration for seamless migration
     PRIMARY_BRANCH = "main"      # Target branch for future updates

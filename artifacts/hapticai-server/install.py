@@ -36,7 +36,7 @@ INSTALLER_VERSION = "1.3.5"
 
 # Configuration
 CONFIG = {
-    "repo_url": "https://github.com/HapticAI/HapticAI-Powered-Funscript-Generator.git",
+    "repo_url": "https://github.com/HapticAI/HapticAI-Powered.git",
     "project_name": "HapticAI",
     "env_name": "HapticAI",
     "python_version": "3.11",
@@ -1491,7 +1491,7 @@ read -p "Press Enter to close..."
         print(f"\n{Colors.CYAN}Support & Documentation:{Colors.ENDC}")
         print("  • Project documentation: README.md in the project folder")
         print("  • Discord community: https://discord.gg/WYkjMbtCZA")
-        print("  • Report issues: https://github.com/HapticAI/HapticAI-Powered-Funscript-Generator/issues")
+        print("  • Report issues: https://github.com/HapticAI/HapticAI-Powered/issues")
         
         print(f"\n{Colors.GREEN}Installation completed successfully!{Colors.ENDC}")
         print()
@@ -1609,7 +1609,7 @@ Examples:
     if args.uninstall:
         print("🗑️ Downloading and running HapticAI uninstaller...")
         
-        uninstaller_url = "https://raw.githubusercontent.com/HapticAI/HapticAI-Powered-Funscript-Generator/main/uninstall.py"
+        uninstaller_url = "https://raw.githubusercontent.com/HapticAI/HapticAI-Powered/main/uninstall.py"
         
         with tempfile.TemporaryDirectory() as temp_dir:
             uninstaller_path = Path(temp_dir) / "uninstall.py"
