@@ -142,6 +142,8 @@ export default function Scripter() {
   // ─── Save dialog ───
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
+  const { toast } = useToast();
+
   // ─── Auto-generation gate (free tier: 1× per 23 hours; editing always unlimited) ───
   const [genStatus, setGenStatus] = useState<{ allowed: boolean; nextAllowedAt: string | null } | null>(null);
 
@@ -229,7 +231,6 @@ export default function Scripter() {
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const [urlResolving, setUrlResolving] = useState(false);
-  const { toast } = useToast();
   const { openBlockedReport } = useBlockedReport();
   const [currentTime, setCurrentTime] = useState(0);
   // Tracks how many times each base filename has been exported this session
