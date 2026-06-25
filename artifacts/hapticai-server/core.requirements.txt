@@ -1,4 +1,4 @@
-numpy
+numpy<2.5
 imgui
 ultralytics==8.3.78
 glfw~=2.8.0

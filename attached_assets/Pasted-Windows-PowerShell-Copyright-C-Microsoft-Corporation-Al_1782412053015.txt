@@ -1,0 +1,246 @@
+Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+Install the latest PowerShell for new features and improvements! https://aka.ms/PSWindows
+
+PS C:\Users\james> C:\Users\james\hapticai-server\build_windows_cpu.bat v01.01.15
+============================================================
+ HapticAI (Beta) Windows CPU Build Script
+ Builds ONE installer:
+   HapticAI-Setup-CPU.exe   (No GPU required)
+============================================================
+ Using Python 3.11.9.
+ Found Inno Setup 6 at Program Files (x86).
+
+[1/5] Creating virtual environment using py -3.11...
+[2/5] Installing build tools...
+Requirement already satisfied: pip in c:\users\james\hapticai-server\build_venv\lib\site-packages (24.0)
+Collecting pip
+  Using cached pip-26.1.2-py3-none-any.whl.metadata (4.6 kB)
+Collecting wheel
+  Using cached wheel-0.47.0-py3-none-any.whl.metadata (2.3 kB)
+Collecting pyinstaller<7
+  Using cached pyinstaller-6.21.0-py3-none-win_amd64.whl.metadata (8.5 kB)
+Collecting packaging>=24.0 (from wheel)
+  Using cached packaging-26.2-py3-none-any.whl.metadata (3.5 kB)
+Collecting altgraph (from pyinstaller<7)
+  Using cached altgraph-0.17.5-py2.py3-none-any.whl.metadata (7.5 kB)
+Collecting pefile>=2022.5.30 (from pyinstaller<7)
+  Using cached pefile-2024.8.26-py3-none-any.whl.metadata (1.4 kB)
+Collecting pyinstaller-hooks-contrib>=2026.6 (from pyinstaller<7)
+  Using cached pyinstaller_hooks_contrib-2026.6-py3-none-any.whl.metadata (16 kB)
+Collecting pywin32-ctypes>=0.2.1 (from pyinstaller<7)
+  Using cached pywin32_ctypes-0.2.3-py3-none-any.whl.metadata (3.9 kB)
+Requirement already satisfied: setuptools>=42.0.0 in c:\users\james\hapticai-server\build_venv\lib\site-packages (from pyinstaller<7) (65.5.0)
+Using cached pip-26.1.2-py3-none-any.whl (1.8 MB)
+Using cached wheel-0.47.0-py3-none-any.whl (32 kB)
+Using cached pyinstaller-6.21.0-py3-none-win_amd64.whl (1.4 MB)
+Using cached packaging-26.2-py3-none-any.whl (100 kB)
+Using cached pefile-2024.8.26-py3-none-any.whl (74 kB)
+Using cached pyinstaller_hooks_contrib-2026.6-py3-none-any.whl (457 kB)
+Using cached pywin32_ctypes-0.2.3-py3-none-any.whl (30 kB)
+Using cached altgraph-0.17.5-py2.py3-none-any.whl (21 kB)
+Installing collected packages: altgraph, pywin32-ctypes, pip, pefile, packaging, wheel, pyinstaller-hooks-contrib, pyinstaller
+  Attempting uninstall: pip
+    Found existing installation: pip 24.0
+    Uninstalling pip-24.0:
+      Successfully uninstalled pip-24.0
+Successfully installed altgraph-0.17.5 packaging-26.2 pefile-2024.8.26 pip-26.1.2 pyinstaller-6.21.0 pyinstaller-hooks-contrib-2026.6 pywin32-ctypes-0.2.3 wheel-0.47.0
+[3/5] Installing CPU-only deps (no GPU required)...
+Collecting numpy (from -r core.requirements.txt (line 1))
+  Using cached numpy-2.5.0.tar.gz (20.7 MB)
+  Installing build dependencies ... done
+  Getting requirements to build wheel ... done
+  Installing backend dependencies ... done
+  Preparing metadata (pyproject.toml) ... error
+  error: subprocess-exited-with-error
+
+  × Preparing metadata (pyproject.toml) did not run successfully.
+  │ exit code: 1
+  ╰─> [175 lines of output]
+      + C:\Users\james\hapticai-server\build_venv\Scripts\python.exe C:\Users\james\AppData\Local\Temp\pip-install-vwq06f35\numpy_86109c84fce747e19a4aec52514f99dd\vendored-meson\meson\meson.py setup C:\Users\james\AppData\Local\Temp\pip-install-vwq06f35\numpy_86109c84fce747e19a4aec52514f99dd C:\Users\james\AppData\Local\Temp\pip-install-vwq06f35\numpy_86109c84fce747e19a4aec52514f99dd\.mesonpy-eie4o9z4 -Dbuildtype=release -Db_ndebug=if-release -Db_vscrt=md --native-file=C:\Users\james\AppData\Local\Temp\pip-install-vwq06f35\numpy_86109c84fce747e19a4aec52514f99dd\.mesonpy-eie4o9z4\meson-python-native-file.ini
+      The Meson build system
+      Version: 1.9.2
+      Source dir: C:\Users\james\AppData\Local\Temp\pip-install-vwq06f35\numpy_86109c84fce747e19a4aec52514f99dd
+      Build dir: C:\Users\james\AppData\Local\Temp\pip-install-vwq06f35\numpy_86109c84fce747e19a4aec52514f99dd\.mesonpy-eie4o9z4
+      Build type: native build
+      Activating VS 18.7.1
+      Project name: NumPy
+      Project version: 2.5.0
+      C compiler for the host machine: cl (msvc 19.51.36248 "Microsoft (R) C/C++ Optimizing Compiler Version 19.51.36248 for x64")
+      C linker for the host machine: link link 14.51.36248.0
+      C++ compiler for the host machine: cl (msvc 19.51.36248 "Microsoft (R) C/C++ Optimizing Compiler Version 19.51.36248 for x64")
+      C++ linker for the host machine: link link 14.51.36248.0
+      Cython compiler for the host machine: cython (cython 3.2.6)
+      Host machine cpu family: x86_64
+      Host machine cpu: x86_64
+      Program python found: YES (C:\Users\james\hapticai-server\build_venv\Scripts\python.exe)
+      Run-time dependency python found: YES 3.11
+      Has header "Python.h" with dependency python: YES
+      Compiler for C supports arguments -fno-strict-aliasing: NO
+      Test features "X86_V2" : Supported
+      Test features "X86_V3" : Supported
+      Test features "X86_V4" : disabled due to X86_V4 is disabled due to "Considered broken by Highway on MSVC"
+      Test features "AVX512_ICL" : disabled due to AVX512_ICL is disabled due to "unsupported by Highway on MSVC"
+      Test features "AVX512_SPR" : disabled due to AVX512_SPR is disabled due to "msvc compiler does not support it"
+      Configuring npy_cpu_dispatch_config.h using configuration
+      Message:
+      CPU Optimization Options
+        baseline:
+          Requested : min
+          Enabled   : X86_V2
+        dispatch:
+          Requested : max
+          Enabled   : X86_V3
+
+      Library m found: NO
+      Fetching value of define "__MINGW32__" : (undefined)
+      Did not find pkg-config by name 'pkg-config'
+      Found pkg-config: NO
+      Run-time dependency scipy-openblas found: NO (tried pkgconfig)
+      Run-time dependency mkl found: NO (tried pkgconfig and system)
+      Run-time dependency mkl found: NO (tried pkgconfig and system)
+      Found CMake: C:\Program Files\Microsoft Visual Studio\18\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.EXE (4.3.1)
+      Run-time dependency openblas found: NO (tried pkgconfig, pkgconfig, pkgconfig, system and cmake)
+      Run-time dependency flexiblas found: NO (tried pkgconfig and cmake)
+      Run-time dependency blis found: NO (tried pkgconfig and cmake)
+      Run-time dependency blas found: NO (tried pkgconfig and system)
+      Run-time dependency mkl found: NO (tried pkgconfig and system)
+      Run-time dependency openblas found: NO (tried pkgconfig, pkgconfig, pkgconfig, system and cmake)
+      Run-time dependency flexiblas found: NO (tried pkgconfig and cmake)
+      Run-time dependency lapack found: NO (tried pkgconfig and system)
+      Program _build_utils/process_src_template.py found: YES (C:\Users\james\hapticai-server\build_venv\Scripts\python.exe C:\Users\james\AppData\Local\Temp\pip-install-vwq06f35\numpy_86109c84fce747e19a4aec52514f99dd\numpy\_build_utils/process_src_template.py)
+      Program _build_utils/tempita.py found: YES (C:\Users\james\hapticai-server\build_venv\Scripts\python.exe C:\Users\james\AppData\Local\Temp\pip-install-vwq06f35\numpy_86109c84fce747e19a4aec52514f99dd\numpy\_build_utils/tempita.py)
+      ..\numpy\meson.build:366: WARNING: Project targets '>=1.8.3' but uses feature deprecated since '0.60.0': install_subdir with empty directory. It worked by accident and is buggy. Use install_emptydir instead.
+      Configuring __config__.py using configuration
+      ..\numpy\meson.build:460: WARNING: The variable(s) 'BLAS_INCLUDEDIR', 'BLAS_LIBDIR', 'BLAS_OPENBLAS_CONFIG', 'BLAS_PCFILEDIR', 'BLAS_TYPE_NAME', 'BLAS_VERSION', 'LAPACK_INCLUDEDIR', 'LAPACK_LIBDIR', 'LAPACK_OPENBLAS_CONFIG', 'LAPACK_PCFILEDIR', 'LAPACK_TYPE_NAME', 'LAPACK_VERSION' in the input file 'numpy\__config__.py.in' are not present in the given configuration data.
+      Checking for size of "short" : 2
+      Checking for size of "int" : 4
+      Checking for size of "long" : 4
+      Checking for size of "long long" : 8
+      Checking for size of "float" : 4
+      Checking for size of "double" : 8
+      Checking for size of "long double" : 8
+      Checking for size of "size_t" : 8
+      Checking for size of "size_t" : 8 (cached)
+      Checking for size of "wchar_t" : 2
+      Checking for size of "off_t" : 4
+      Checking for size of "Py_intptr_t" with dependency python: 8
+      Checking for size of "PY_LONG_LONG" with dependency python: 8
+      Has header "complex.h" : YES
+      Checking for type "_Fcomplex" : YES
+      Checking for size of "_Fcomplex" : 8
+      Checking for type "_Dcomplex" : YES
+      Checking for size of "_Dcomplex" : 16
+      Checking for type "_Lcomplex" : YES
+      Checking for size of "_Lcomplex" : 16
+      Checking if "mandatory libm functions (batched)" with dependency -lm links: YES
+      Checking if "C99 complex funcs (batched)" with dependency -lm links: YES
+      Checking for function "isfinite" with dependency -lm: NO
+      Checking for function "isinf" with dependency -lm: NO
+      Checking for function "isnan" with dependency -lm: NO
+      Checking for function "signbit" with dependency -lm: NO
+      Checking if "thread_local" compiles: NO
+      Checking if "_Thread_local" compiles: YES
+      Checking if "__thread" compiles: NO
+      Checking if "__declspec(thread)" compiles: YES
+      Checking for function "fallocate" : NO
+      Header "Python.h" has symbol "HAVE_FTELLO" with dependency python: NO
+      Checking for function "ftello" : NO
+      Header "Python.h" has symbol "HAVE_FSEEKO" with dependency python: NO
+      Checking for function "fseeko" : NO
+      Checking for function "backtrace" : NO
+      Checking for function "madvise" : NO
+      Has header "features.h" : NO
+      Has header "xlocale.h" : NO
+      Has header "dlfcn.h" : NO
+      Has header "execinfo.h" : NO
+      Has header "libunwind.h" : NO
+      Has header "sys/mman.h" : NO
+      Checking for function "strtold_l" : NO
+      Checking if "__attribute__((optimize("unroll-loops")))" compiles: NO
+      Checking if "__attribute__((optimize("O3")))" compiles: NO
+      Checking if "__attribute__((nonnull(1)))" compiles: NO
+      Compiler for C supports arguments /O2: YES
+      Message: Long double format: IEEE_DOUBLE_LE
+      Has header "endian.h" : NO
+      Has header "sys/endian.h" : NO
+      Compiler for C supports function attribute visibility:hidden: NO
+      Configuring config.h using configuration
+      Configuring _numpyconfig.h using configuration
+      Compiler for C supports arguments -d2VolatileMetadata-: YES
+      Configuring numpy.pc using configuration
+      Generating multi-targets for "_umath_tests.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "argfunc.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "x86_simd_argsort.dispatch.h"
+        Enabled targets: X86_V3
+      Generating multi-targets for "x86_simd_qsort.dispatch.h"
+        Enabled targets: X86_V3
+      Generating multi-targets for "x86_simd_qsort_16bit.dispatch.h"
+        Enabled targets:
+      Generating multi-targets for "highway_qsort.dispatch.h"
+        Enabled targets:
+      Generating multi-targets for "highway_qsort_16bit.dispatch.h"
+        Enabled targets:
+      Generating multi-targets for "loops_arithm_fp.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "loops_arithmetic.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "loops_comparison.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "loops_exponent_log.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "loops_hyperbolic.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "loops_logical.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "loops_minmax.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "loops_modulo.dispatch.h"
+        Enabled targets: baseline
+      Generating multi-targets for "loops_trigonometric.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "loops_umath_fp.dispatch.h"
+        Enabled targets: baseline
+      Generating multi-targets for "loops_unary.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "loops_unary_fp.dispatch.h"
+        Enabled targets: baseline
+      Generating multi-targets for "loops_unary_fp_le.dispatch.h"
+        Enabled targets: baseline
+      Generating multi-targets for "loops_unary_complex.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "loops_autovec.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Generating multi-targets for "loops_half.dispatch.h"
+        Enabled targets: baseline
+      Generating multi-targets for "_simd.dispatch.h"
+        Enabled targets: X86_V3, baseline
+      Build targets in project: 78
+      WARNING: Deprecated features used:
+       * 0.60.0: {'install_subdir with empty directory'}
+
+      NumPy 2.5.0
+
+        User defined options
+          Native files: C:\Users\james\AppData\Local\Temp\pip-install-vwq06f35\numpy_86109c84fce747e19a4aec52514f99dd\.mesonpy-eie4o9z4\meson-python-native-file.ini
+          b_ndebug    : if-release
+          b_vscrt     : md
+          buildtype   : release
+
+      Found ninja.EXE-1.13.0.git.kitware.jobserver-pipe-1 at C:\Users\james\AppData\Local\Temp\pip-build-env-fopblwgf\normal\Scripts\ninja.EXE
+
+      meson-python: error: The package requires Python version >=3.12, running on 3.11.9
+      [end of output]
+
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+error: metadata-generation-failed
+
+× Encountered error while generating package metadata.
+╰─> numpy
+
+note: This is an issue with the package mentioned above, not pip.
+hint: See above for details.
+Looking in indexes: https://download.pytorch.org/whl/cpu
