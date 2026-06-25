@@ -26,6 +26,11 @@ source build_venv/bin/activate
 echo "[2/5] Installing build tools..."
 pip install --upgrade pip wheel pyinstaller
 
+# Cap meson-python so any source-build uses a Python 3.11 compatible version.
+# PIP_CONSTRAINT propagates into pip's isolated build environments, preventing
+# meson-python >= 0.18 (requires Python 3.12) from being pulled in automatically.
+export PIP_CONSTRAINT="$(dirname "$0")/build_constraints.txt"
+
 # Install HapticAI dependencies from official requirements files
 echo "[3/5] Installing HapticAI dependencies..."
 

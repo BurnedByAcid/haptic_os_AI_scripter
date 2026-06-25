@@ -64,6 +64,11 @@ call build_venv\Scripts\activate.bat
 echo [2/11] Installing build tools...
 python -m pip install --upgrade pip wheel "pyinstaller<7"
 
+:: Cap meson-python so any source-build uses a Python 3.11 compatible version.
+:: PIP_CONSTRAINT propagates into pip's isolated build environments, preventing
+:: meson-python >= 0.18 (requires Python 3.12) from being pulled in automatically.
+set "PIP_CONSTRAINT=%~dp0build_constraints.txt"
+
 :: ── [3/11] Standard deps (CUDA 12.8 — RTX 30xx / 40xx) ─────────────────────
 echo [3/11] Installing standard deps ^(CUDA 12.8 for RTX 30xx/40xx^)...
 pip install -r core.requirements.txt --ignore-requires-python
