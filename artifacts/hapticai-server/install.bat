@@ -216,7 +216,16 @@ if exist "%INSTALL_DIR%install.py" (
     REM RELEASE: Pinned to a specific tag — update INSTALLER_TAG and
     REM INSTALLER_SHA256 each time a new installer is published.
     set "INSTALLER_TAG=v1.0.0"
-    set "INSTALLER_URL=https://raw.githubusercontent.com/HapticAI/HapticAI-Powered/refs/tags/!INSTALLER_TAG!/install.py"
+    REM INSTALLER_URL points to the API server's /api/hapticai/install.py route.
+    REM The fallback is the Replit dev-domain URL (always reachable during development).
+    REM Set HAPTICAI_BASE_URL to your production / custom domain to override it.
+    set "INSTALLER_URL=https://1496e5f1-f302-402a-b2dd-cd25d95f85b5-00-3k43daw6ksczj-pzce384d.riker.replit.dev/api/hapticai/install.py"
+    REM Allow override via HAPTICAI_BASE_URL for production / custom-domain deployments.
+    REM Uses unquoted form so that check_installer_urls.sh does not attempt to curl
+    REM the unexpanded variable (its pattern requires "KEY=VALUE" quoting style).
+    if defined HAPTICAI_BASE_URL (
+        set INSTALLER_URL=!HAPTICAI_BASE_URL!/api/hapticai/install.py
+    )
     REM SHA-256 of install.py at the pinned tag above.
     REM Run in PowerShell: (Get-FileHash install.py -Algorithm SHA256).Hash
     REM Replace this value whenever INSTALLER_TAG is bumped.

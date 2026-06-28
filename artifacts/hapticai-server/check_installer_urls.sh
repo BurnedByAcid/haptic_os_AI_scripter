@@ -4,6 +4,15 @@
 # Extracts every INSTALLER_URL defined in install.sh and install.bat, then
 # verifies each one returns HTTP 200.  Exit code 0 = all OK, 1 = any failure.
 #
+# Variable references such as ${INSTALLER_TAG} (shell) and !INSTALLER_TAG!
+# (batch) are resolved by reading the INSTALLER_TAG assignment from each file
+# before the URL is checked.
+#
+# NOTE: All regex patterns that contain literal " characters are stored in
+# variables rather than written inline.  Inline " inside [[ =~ ]] triggers
+# bash quoting and makes the captured group a literal string, breaking
+# extraction.  Variable-form patterns bypass that interpretation.
+#
 # Usage:
 #   bash artifacts/hapticai-server/check_installer_urls.sh
 #
@@ -17,15 +26,50 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_SH="$SCRIPT_DIR/install.sh"
 INSTALL_BAT="$SCRIPT_DIR/install.bat"
 
+# ---------------------------------------------------------------------------
+# Regex patterns — stored in variables so bash does not apply quote-removal
+# to the " characters inside [[ =~ ]], which would treat the captured-group
+# syntax as a literal string rather than a regex.
+# ---------------------------------------------------------------------------
+# Shell-script form:  INSTALLER_TAG="v1.0.0"
+PAT_SH_TAG='INSTALLER_TAG[[:space:]]*=[[:space:]]*"([^"]+)"'
+# Shell-script form:  INSTALLER_URL="https://..."
+PAT_SH_URL='INSTALLER_URL[[:space:]]*=[[:space:]]*"([^"]+)"'
+# Batch form:  set "INSTALLER_TAG=v1.0.0"
+PAT_BAT_TAG='[Ss][Ee][Tt][[:space:]]+"INSTALLER_TAG=([^"]+)"'
+# Batch form:  set "INSTALLER_URL=https://..."
+PAT_BAT_URL='[Ss][Ee][Tt][[:space:]]+"INSTALLER_URL=([^"]+)"'
+# Batch bare form:  INSTALLER_URL=https://...  (no surrounding quotes)
+PAT_BAT_BARE='^[[:space:]]*INSTALLER_URL=([^[:space:]"]+)'
+
 declare -a URLS=()
 declare -a SOURCES=()
 
-# --- Extract URL from install.sh ---
-# Matches lines like:  INSTALLER_URL="https://..."
+# ---------------------------------------------------------------------------
+# Helper: substitute a known tag value into a URL template that may still
+# contain ${INSTALLER_TAG} (shell form) or !INSTALLER_TAG! (batch form).
+# ---------------------------------------------------------------------------
+expand_installer_tag() {
+    local url="$1"
+    local tag="$2"
+    # Replace shell-style reference
+    url="${url//\$\{INSTALLER_TAG\}/$tag}"
+    # Replace batch-style reference
+    url="${url//!INSTALLER_TAG!/$tag}"
+    echo "$url"
+}
+
+# --- Extract INSTALLER_TAG and INSTALLER_URL from install.sh ---
 if [ -f "$INSTALL_SH" ]; then
+    SH_TAG=""
     while IFS= read -r line; do
-        if [[ "$line" =~ INSTALLER_URL[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
-            URLS+=("${BASH_REMATCH[1]}")
+        if [[ "$line" =~ $PAT_SH_TAG ]]; then
+            SH_TAG="${BASH_REMATCH[1]}"
+        fi
+        if [[ "$line" =~ $PAT_SH_URL ]]; then
+            raw_url="${BASH_REMATCH[1]}"
+            expanded="$(expand_installer_tag "$raw_url" "${SH_TAG:-}")"
+            URLS+=("$expanded")
             SOURCES+=("install.sh")
         fi
     done < "$INSTALL_SH"
@@ -33,22 +77,26 @@ else
     echo "[WARN] install.sh not found at $INSTALL_SH"
 fi
 
-# --- Extract URL from install.bat ---
-# Matches lines like:  set "INSTALLER_URL=https://..."
-# The key=value pair is inside the outer quotes, e.g.:
-#   set "INSTALLER_URL=https://raw.githubusercontent.com/..."
+# --- Extract INSTALLER_TAG and INSTALLER_URL from install.bat ---
 if [ -f "$INSTALL_BAT" ]; then
+    BAT_TAG=""
     while IFS= read -r line; do
         # Strip Windows CR if present
         line="${line%$'\r'}"
 
-        # Match:  set "INSTALLER_URL=<url>"
-        if [[ "$line" =~ [Ss][Ee][Tt][[:space:]]+\"INSTALLER_URL=([^\"]+)\" ]]; then
-            URLS+=("${BASH_REMATCH[1]}")
+        if [[ "$line" =~ $PAT_BAT_TAG ]]; then
+            BAT_TAG="${BASH_REMATCH[1]}"
+        fi
+
+        if [[ "$line" =~ $PAT_BAT_URL ]]; then
+            raw_url="${BASH_REMATCH[1]}"
+            expanded="$(expand_installer_tag "$raw_url" "${BAT_TAG:-}")"
+            URLS+=("$expanded")
             SOURCES+=("install.bat")
-        # Also match bare:  INSTALLER_URL=https://...  (no surrounding quotes)
-        elif [[ "$line" =~ ^[[:space:]]*INSTALLER_URL=([^[:space:]\"]+) ]]; then
-            URLS+=("${BASH_REMATCH[1]}")
+        elif [[ "$line" =~ $PAT_BAT_BARE ]]; then
+            raw_url="${BASH_REMATCH[1]}"
+            expanded="$(expand_installer_tag "$raw_url" "${BAT_TAG:-}")"
+            URLS+=("$expanded")
             SOURCES+=("install.bat")
         fi
     done < "$INSTALL_BAT"
