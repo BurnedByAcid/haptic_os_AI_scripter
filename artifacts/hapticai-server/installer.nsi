@@ -1,6 +1,6 @@
 ; HapticAI — NSIS 3.x Installer Script
 ; Requires NSIS 3.x with MUI2, nsDialogs, LogicLib (all bundled with NSIS 3).
-; Run: makensis /DVERSION=v01.01.12 installer.nsi
+; Run: makensis installer.nsi
 ; Input:  dist\HapticAI.exe   (produced by PyInstaller)
 ; Output: dist\HapticAI-Setup.exe
 
@@ -55,11 +55,6 @@ CRCCheck force
 !define APP_PUBLISHER "HapticOS"
 !define APP_URL       "https://hapticos.org"
 
-; VERSION is passed in via /DVERSION=v01.01.12 from build_windows.bat
-!ifndef VERSION
-  !define VERSION "v0.0.0"
-!endif
-
 Name          "${APP_FULL_NAME}"
 OutFile       "${OUTFILE}"
 InstallDir    "$PROGRAMFILES64\HapticAI"
@@ -78,11 +73,9 @@ ManifestDPIAware true
 ; Shows up in Explorer → Properties → Details tab.
 VIProductVersion  "1.0.0.0"
 VIAddVersionKey   "ProductName"      "${APP_FULL_NAME}"
-VIAddVersionKey   "ProductVersion"   "${VERSION}"
 VIAddVersionKey   "CompanyName"      "${APP_PUBLISHER}"
 VIAddVersionKey   "LegalCopyright"   "© 2025 ${APP_PUBLISHER}"
 VIAddVersionKey   "FileDescription"  "${APP_FULL_NAME} Installer"
-VIAddVersionKey   "FileVersion"      "${VERSION}"
 
 ; ── MUI2 appearance ────────────────────────────────────────────────────────
 !define MUI_ABORTWARNING
@@ -154,7 +147,6 @@ Section "${APP_FULL_NAME}" SecMain
 
   ; Registry: install location
   WriteRegStr HKLM "${REG_KEY}" "InstallDir" "$INSTDIR"
-  WriteRegStr HKLM "${REG_KEY}" "Version"    "${VERSION}"
 
   ; Registry: Add/Remove Programs — required values
   WriteRegStr   HKLM "${UNINSTALL_KEY}" "DisplayName"     "${APP_FULL_NAME}"
@@ -164,7 +156,6 @@ Section "${APP_FULL_NAME}" SecMain
   ; Registry: Add/Remove Programs — recommended values
   WriteRegStr   HKLM "${UNINSTALL_KEY}" "DisplayIcon"     "$INSTDIR\${APP_EXE}"
   WriteRegStr   HKLM "${UNINSTALL_KEY}" "Publisher"       "${APP_PUBLISHER}"
-  WriteRegStr   HKLM "${UNINSTALL_KEY}" "DisplayVersion"  "${VERSION}"
   WriteRegStr   HKLM "${UNINSTALL_KEY}" "URLInfoAbout"    "${APP_URL}"
   WriteRegStr   HKLM "${UNINSTALL_KEY}" "HelpLink"        "${APP_URL}"
   WriteRegStr   HKLM "${UNINSTALL_KEY}" "URLUpdateInfo"   "${APP_URL}"

@@ -1,8 +1,8 @@
 ; HapticAI — Inno Setup 6 Installer Script
 ; Requires Inno Setup 6 (64-bit ISCC.exe — handles large PyTorch/CUDA bundles)
-; Run: iscc /DVERSION=v01.01.12 installer.iss
-;      iscc /DVERSION=v01.01.12 /DGPU_VARIANT=50series installer.iss
-;      iscc /DVERSION=v01.01.12 /DGPU_VARIANT=cpu installer.iss
+; Run: iscc installer.iss
+;      iscc /DGPU_VARIANT=50series installer.iss
+;      iscc /DGPU_VARIANT=cpu installer.iss
 ; Input:  dist\HapticAI\         (one-dir PyInstaller bundle)
 ; Output: dist\HapticAI-Setup.exe
 
@@ -28,14 +28,9 @@
   #define OUT_BASE      "HapticAI-Setup"
 #endif
 
-#ifndef VERSION
-  #define VERSION "v0.0.0"
-#endif
-
 ; ── [Setup] ──────────────────────────────────────────────────────────────────
 [Setup]
 AppName={#APP_FULL_NAME}
-AppVersion={#VERSION}
 AppPublisher=HapticOS
 AppPublisherURL=https://hapticos.org
 AppSupportURL=https://hapticos.org

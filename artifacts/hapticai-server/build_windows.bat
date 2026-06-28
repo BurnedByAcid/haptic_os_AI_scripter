@@ -13,15 +13,6 @@ echo    HapticAI-Setup-50series.exe   (RTX 50xx, CUDA 12.9)
 echo    HapticAI-Setup-CPU.exe        (No GPU required, CPU-only)
 echo ============================================================
 
-:: ── Require version argument ────────────────────────────────────────────────
-set VERSION=%1
-if "%VERSION%"=="" (
-    echo.
-    echo Usage: build_windows.bat ^<version^>   e.g.  build_windows.bat v01.01.12
-    echo.
-    pause & exit /b 1
-)
-
 :: ── Python ───────────────────────────────────────────────────────────────────
 set "PYTHON_CMD=py -3.11"
 for /f "tokens=2" %%V in ('py -3.11 --version 2^>^&1') do echo  Using Python %%V.
@@ -89,7 +80,7 @@ if not exist dist\HapticAI\HapticAI.exe (
 
 :: ── [5/11] Inno Setup — standard installer ───────────────────────────────────
 echo [5/11] Building standard installer ^(Inno Setup^)...
-"!ISCC!" /DVERSION="%VERSION%" installer.iss
+"!ISCC!" installer.iss
 
 if not exist dist\HapticAI-Setup.exe (
     echo.
@@ -119,7 +110,7 @@ if not exist dist\HapticAI-50series\HapticAI-50series.exe (
 
 :: ── [8/11] Inno Setup — 50-series installer ──────────────────────────────────
 echo [8/11] Building 50-series installer ^(Inno Setup^)...
-"!ISCC!" /DVERSION="%VERSION%" /DGPU_VARIANT=50series installer.iss
+"!ISCC!" /DGPU_VARIANT=50series installer.iss
 
 if not exist dist\HapticAI-Setup-50series.exe (
     echo.
@@ -149,7 +140,7 @@ if not exist dist\HapticAI-CPU\HapticAI-CPU.exe (
 
 :: ── [11/11] Inno Setup — CPU installer ───────────────────────────────────────
 echo [11/11] Building CPU installer ^(Inno Setup^)...
-"!ISCC!" /DVERSION="%VERSION%" /DGPU_VARIANT=cpu installer.iss
+"!ISCC!" /DGPU_VARIANT=cpu installer.iss
 
 if not exist dist\HapticAI-Setup-CPU.exe (
     echo.
@@ -171,12 +162,11 @@ echo ============================================================
 echo.
 echo  1. Go to https://github.com/BurnedByAcid/hapticai-server/releases
 echo  2. Click  Draft a new release
-echo  3. Set the tag to:  %VERSION%
-echo  4. Upload ALL THREE of these files:
+echo  3. Upload ALL THREE of these files:
 echo       dist\HapticAI-Setup.exe            (RTX 30xx/40xx, CUDA 12.8)
 echo       dist\HapticAI-Setup-50series.exe   (RTX 50xx, CUDA 12.9)
 echo       dist\HapticAI-Setup-CPU.exe        (CPU-only, no GPU needed)
-echo  5. Mark as Latest release and Publish
+echo  4. Mark as Latest release and Publish
 echo.
 echo  Download links on HapticOS update automatically within 1 hour.
 echo ============================================================
