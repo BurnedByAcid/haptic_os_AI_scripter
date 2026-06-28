@@ -38,12 +38,15 @@ export async function getStatus(key: string): Promise<HandyStatusResult> {
 
   const connResp = connRes.value;
 
-  // 401 = invalid/unknown connection key
-  if (connResp.status === 401) {
+  // 401 or 400 = invalid/unknown connection key.
+  // The Handy API returns 401 for non-UUID-shaped keys and 400 ("Invalid
+  // connection key or channel reference") for UUID-shaped keys that are
+  // not registered — both mean the key is wrong, not a network problem.
+  if (connResp.status === 401 || connResp.status === 400) {
     return { connected: false, failureReason: "invalid_key" };
   }
 
-  // Other non-OK responses (4xx/5xx) are treated as transient server/network errors
+  // Other non-OK responses (5xx etc.) are transient server/network errors
   if (!connResp.ok) {
     return { connected: false, failureReason: "network_error" };
   }

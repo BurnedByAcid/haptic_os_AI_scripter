@@ -142,7 +142,7 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
       // SSE requires credentials as query params — EventSource doesn't support headers
       const ck = encodeURIComponent(key);
-      const url = `${BASE}/events?ck=${ck}&apikey=${ck}`;
+      const url = `${BASE}/events?ck=${ck}`;
       sse = new EventSource(url);
 
       sse.onopen = () => {
