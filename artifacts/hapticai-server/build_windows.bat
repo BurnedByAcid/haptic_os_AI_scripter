@@ -17,6 +17,11 @@ echo ============================================================
 set "PYTHON_CMD=py -3.11"
 for /f "tokens=2" %%V in ('py -3.11 --version 2^>^&1') do echo  Using Python %%V.
 
+:: ── Extract app version from config/constants.py ─────────────────────────
+for /f "delims=" %%V in ('py -3.11 get_version.py 2^>^&1') do set "APP_VERSION=%%V"
+if "!APP_VERSION!"=="" set "APP_VERSION=0.0.0"
+echo  App version: !APP_VERSION!
+
 :: ── Find Inno Setup (64-bit ISCC — handles large PyTorch/CUDA bundles) ───────
 set "ISCC=ISCC"
 ISCC /? >nul 2>&1
@@ -80,7 +85,7 @@ if not exist dist\HapticAI\HapticAI.exe (
 
 :: ── [5/11] Inno Setup — standard installer ───────────────────────────────────
 echo [5/11] Building standard installer ^(Inno Setup^)...
-"!ISCC!" installer.iss
+"!ISCC!" /DAPP_VERSION=!APP_VERSION! installer.iss
 
 if not exist dist\HapticAI-Setup.exe (
     echo.
@@ -110,7 +115,7 @@ if not exist dist\HapticAI-50series\HapticAI-50series.exe (
 
 :: ── [8/11] Inno Setup — 50-series installer ──────────────────────────────────
 echo [8/11] Building 50-series installer ^(Inno Setup^)...
-"!ISCC!" /DGPU_VARIANT=50series installer.iss
+"!ISCC!" /DAPP_VERSION=!APP_VERSION! /DGPU_VARIANT=50series installer.iss
 
 if not exist dist\HapticAI-Setup-50series.exe (
     echo.
@@ -140,7 +145,7 @@ if not exist dist\HapticAI-CPU\HapticAI-CPU.exe (
 
 :: ── [11/11] Inno Setup — CPU installer ───────────────────────────────────────
 echo [11/11] Building CPU installer ^(Inno Setup^)...
-"!ISCC!" /DGPU_VARIANT=cpu installer.iss
+"!ISCC!" /DAPP_VERSION=!APP_VERSION! /DGPU_VARIANT=cpu installer.iss
 
 if not exist dist\HapticAI-Setup-CPU.exe (
     echo.

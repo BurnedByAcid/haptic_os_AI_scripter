@@ -52,6 +52,11 @@ CRCCheck force
   !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\HapticAI"
 !endif
 
+; ── App version (pass in via /DAPP_VERSION=x.y.z, e.g. from build_windows.bat) ─
+!ifndef APP_VERSION
+  !define APP_VERSION "0.0.0"
+!endif
+
 !define APP_PUBLISHER "HapticOS"
 !define APP_URL       "https://hapticos.org"
 
@@ -71,8 +76,9 @@ ManifestDPIAware true
 
 ; ── Windows file-property version info ─────────────────────────────────────
 ; Shows up in Explorer → Properties → Details tab.
-VIProductVersion  "1.0.0.0"
+VIProductVersion  "${APP_VERSION}.0"
 VIAddVersionKey   "ProductName"      "${APP_FULL_NAME}"
+VIAddVersionKey   "ProductVersion"   "${APP_VERSION}"
 VIAddVersionKey   "CompanyName"      "${APP_PUBLISHER}"
 VIAddVersionKey   "LegalCopyright"   "© 2025 ${APP_PUBLISHER}"
 VIAddVersionKey   "FileDescription"  "${APP_FULL_NAME} Installer"
@@ -155,6 +161,7 @@ Section "${APP_FULL_NAME}" SecMain
 
   ; Registry: Add/Remove Programs — recommended values
   WriteRegStr   HKLM "${UNINSTALL_KEY}" "DisplayIcon"     "$INSTDIR\${APP_EXE}"
+  WriteRegStr   HKLM "${UNINSTALL_KEY}" "DisplayVersion"  "${APP_VERSION}"
   WriteRegStr   HKLM "${UNINSTALL_KEY}" "Publisher"       "${APP_PUBLISHER}"
   WriteRegStr   HKLM "${UNINSTALL_KEY}" "URLInfoAbout"    "${APP_URL}"
   WriteRegStr   HKLM "${UNINSTALL_KEY}" "HelpLink"        "${APP_URL}"

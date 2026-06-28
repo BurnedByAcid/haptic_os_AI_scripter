@@ -6,6 +6,11 @@
 ; Input:  dist\HapticAI\         (one-dir PyInstaller bundle)
 ; Output: dist\HapticAI-Setup.exe
 
+; ── App version (passed in via /DAPP_VERSION=x.y.z from build_windows.bat) ──
+#ifndef APP_VERSION
+  #define APP_VERSION "0.0.0"
+#endif
+
 ; ── GPU variant selection ────────────────────────────────────────────────────
 #ifndef GPU_VARIANT
   #define GPU_VARIANT "standard"
@@ -31,6 +36,7 @@
 ; ── [Setup] ──────────────────────────────────────────────────────────────────
 [Setup]
 AppName={#APP_FULL_NAME}
+AppVersion={#APP_VERSION}
 AppPublisher=HapticOS
 AppPublisherURL=https://hapticos.org
 AppSupportURL=https://hapticos.org
