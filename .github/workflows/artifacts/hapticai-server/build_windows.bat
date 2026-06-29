@@ -131,6 +131,11 @@ for %%F in (dist\HapticAI-Setup-50series.exe) do echo  Size: %%~zF bytes
 echo.
 echo [9/11] Installing CPU-only PyTorch ^(no GPU required^)...
 pip install -r cpu.requirements.txt --force-reinstall
+:: torchaudio is CUDA-only; remove it so it doesn't conflict with CPU torch.
+pip uninstall torchaudio -y >nul 2>&1
+:: torchvision's force-reinstall pulls in the latest numpy, violating the
+:: ultralytics cap.  Re-pin it now so PyInstaller bundles the right version.
+pip install "numpy>=1.23.0,<=2.1.1" --force-reinstall
 
 :: ── [10/11] PyInstaller — CPU build ─────────────────────────────────────────
 echo [10/11] Running PyInstaller ^(CPU^)...
