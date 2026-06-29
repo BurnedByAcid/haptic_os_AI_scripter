@@ -29,7 +29,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd artifacts/hapticai-server && pip install -r web.requirements.txt -q && python web_app.py"
+args = "cd .github/workflows/artifacts/hapticai-server && HAPTICAI_HOST=0.0.0.0 python web_app.py"
 
 [agent]
 stack = "PNPM_WORKSPACE"

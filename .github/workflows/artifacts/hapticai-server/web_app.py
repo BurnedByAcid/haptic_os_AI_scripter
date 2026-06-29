@@ -1682,8 +1682,12 @@ if __name__ == "__main__":
 
         # ── Main thread: run tray (blocks) or wait for server thread ────────
         if _tray_icon is not None:
-            _tray_icon.run()
-        else:
+            try:
+                _tray_icon.run()
+            except Exception as _tray_run_err:
+                logger.warning(f"System tray failed to run (headless?): {_tray_run_err}")
+                _tray_icon = None
+        if _tray_icon is None:
             _server_thread.join()
 
     except Exception:
