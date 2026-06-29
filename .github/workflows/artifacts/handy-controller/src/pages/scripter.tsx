@@ -3143,7 +3143,7 @@ export default function Scripter() {
                     Movement Limit
                   </span>
                   <span className={`font-mono text-xs ${limiterEnabled ? "text-primary" : "text-muted-foreground/60"}`}>
-                    {vtMovementLimit} u/sec
+                    {vtMovementLimit} TUPS
                   </span>
                 </label>
                 <p className="text-[10px] text-muted-foreground leading-snug">
@@ -3850,12 +3850,12 @@ export default function Scripter() {
                         Movement Limit
                       </label>
                       <span className={`text-xs font-mono ${limiterEnabled ? "text-primary" : "text-muted-foreground/60"}`}>
-                        {vtMovementLimit} units/sec
+                        {vtMovementLimit} TUPS
                       </span>
                     </div>
                     <Slider
-                      min={60}
-                      max={400}
+                      min={100}
+                      max={700}
                       step={10}
                       value={[vtMovementLimit]}
                       onValueChange={v => setVtMovementLimit(v[0])}
@@ -3863,7 +3863,7 @@ export default function Scripter() {
                     />
                     <p className="text-[10px] text-muted-foreground mt-1">
                       {limiterEnabled
-                        ? "Max total movement in any 1-second window (default 300). Applied after scan."
+                        ? "Max Travel Units Per Second (TUPS). Most devices handle 300–400; fast devices up to 700."
                         : "Limiter off — every detection alternates raw 0↔100."}
                     </p>
                   </div>
