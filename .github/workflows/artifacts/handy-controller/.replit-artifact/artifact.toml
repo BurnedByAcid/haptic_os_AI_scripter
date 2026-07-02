@@ -19,7 +19,7 @@ run = "pnpm --filter @workspace/handy-controller run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/handy-controller", "run", "build" ]
-publicDir = "artifacts/handy-controller/dist/public"
+publicDir = ".github/workflows/artifacts/handy-controller/dist/public"
 serve = "static"
 
 [[services.production.rewrites]]
