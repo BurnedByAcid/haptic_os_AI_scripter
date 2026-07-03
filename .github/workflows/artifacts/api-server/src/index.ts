@@ -46,8 +46,6 @@ async function initStripe() {
   }
 }
 
-await initStripe();
-
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
@@ -55,4 +53,10 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Initialize Stripe after the port is open so the startup health probe
+  // can succeed immediately without waiting for migrations / webhook setup.
+  initStripe().catch((err) => {
+    logger.error({ err }, "Stripe initialization failed");
+  });
 });
