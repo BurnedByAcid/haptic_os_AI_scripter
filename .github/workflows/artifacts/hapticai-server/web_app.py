@@ -178,10 +178,20 @@ def _cleanup_stale_uploads():
     for jid in stale_jobs:
         jobs.pop(jid, None)
 
-UPLOAD_FOLDER = Path("uploads")
-OUTPUT_FOLDER = Path("output")
-UPLOAD_FOLDER.mkdir(exist_ok=True)
-OUTPUT_FOLDER.mkdir(exist_ok=True)
+def _get_data_dir() -> Path:
+    """Return a writable per-user data directory (never inside Program Files)."""
+    if sys.platform == "win32":
+        base = Path(os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
+    elif sys.platform == "darwin":
+        base = Path.home() / "Library" / "Application Support"
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share"))
+    return base / "HapticAI"
+
+UPLOAD_FOLDER = _get_data_dir() / "uploads"
+OUTPUT_FOLDER = _get_data_dir() / "output"
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
+OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
 
 # ── User settings (output folder preference) ─────────────────────────────────
