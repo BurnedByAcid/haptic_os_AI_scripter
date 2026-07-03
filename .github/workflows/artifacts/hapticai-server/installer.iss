@@ -51,6 +51,7 @@ SolidCompression=yes
 PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
+LicenseFile=LICENSE
 SetupIconFile=assets\branding\icon.ico
 UninstallDisplayIcon={app}\{#APP_EXE}
 UninstallDisplayName={#APP_FULL_NAME}
