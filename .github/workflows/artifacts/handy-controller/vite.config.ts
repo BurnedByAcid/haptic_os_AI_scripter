@@ -90,6 +90,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
       "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
+      "@workspace/validation": path.resolve(import.meta.dirname, "../../../../lib/validation/src/index.ts"),
     },
     dedupe: ["react", "react-dom"],
   },
@@ -112,6 +113,10 @@ export default defineConfig({
     },
     fs: {
       strict: true,
+      allow: [
+        path.resolve(import.meta.dirname, "../../../../"),
+        path.resolve(import.meta.dirname),
+      ],
     },
     proxy: {
       "/api": {

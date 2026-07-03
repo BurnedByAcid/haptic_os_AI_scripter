@@ -1,0 +1,2 @@
+- [Deeply-nested pnpm workspace symlinks](pnpm-deep-package-symlinks.md) — packages at .github/workflows/artifacts/* get wrong @workspace/* symlink depth; fix with esbuild alias + vite resolve.alias.
+- [Vite bin shim broken in hoisted pnpm mode](vite-hoisted-pnpm.md) — per-package .bin/vite references old pnpm store after hoisted install; fix by running vite via `node /abs/path/to/node_modules/vite/bin/vite.js` in workflow run command.

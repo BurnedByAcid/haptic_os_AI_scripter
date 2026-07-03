@@ -9,6 +9,8 @@ import { rm } from "node:fs/promises";
 globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
+// Workspace root is 4 levels up: api-server → artifacts → workflows → .github → root
+const workspaceRoot = path.resolve(artifactDir, '../../../../');
 
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
@@ -27,6 +29,11 @@ async function buildAll() {
     // Examples of unbundleable packages:
     // - uses native modules and loads them dynamically (e.g. sharp)
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
+    alias: {
+      "@workspace/validation": path.resolve(workspaceRoot, "lib/validation/src/index.ts"),
+      "@workspace/api-zod":    path.resolve(workspaceRoot, "lib/api-zod/src/index.ts"),
+      "@workspace/db":         path.resolve(workspaceRoot, "lib/db/src/index.ts"),
+    },
     external: [
       "*.node",
       "stripe-replit-sync",

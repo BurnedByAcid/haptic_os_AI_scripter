@@ -15,7 +15,7 @@ paths = [ "/" ]
 localPort = 20441
 
 [services.development]
-run = "pnpm --filter @workspace/handy-controller run dev"
+run = "sh -c 'cd /home/runner/workspace/.github/workflows/artifacts/handy-controller && node /home/runner/workspace/node_modules/vite/bin/vite.js --config vite.config.ts --host 0.0.0.0'"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/handy-controller", "run", "build" ]
