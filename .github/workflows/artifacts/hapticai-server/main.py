@@ -254,5 +254,9 @@ def main():
         run_gui()
 
 if __name__ == "__main__":
+    # freeze_support() MUST be the very first call in __main__ when using
+    # PyInstaller + multiprocessing spawn mode on Windows.  Without it,
+    # each spawned worker process re-enters main(), causing crashes or hangs.
+    multiprocessing.freeze_support()
     main()
     

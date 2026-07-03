@@ -1,0 +1,222 @@
+112210 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+112310 INFO: Creating base_library.zip...
+112324 INFO: Looking for dynamic libraries
+W0703 12:59:42.072000 22360 Lib\site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects are currently not supported in Windows or MacOs.
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharding_spec` will be deprecated, use `torch.distributed._shard.sharding_spec` instead
+  __import__(package)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._sharded_tensor` will be deprecated, use `torch.distributed._shard.sharded_tensor` instead
+  __import__(package)
+C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\building\build_main.py:227: DeprecationWarning: `torch.distributed._shard.checkpoint` will be deprecated, use `torch.distributed.checkpoint` instead
+  __import__(package)
+121158 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torch\\lib', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\numpy.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\torchvision', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\pandas.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\scipy.libs', 'C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\cv2\\../../x64/vc17/bin']
+121158 INFO: Extra DLL search directories (PATH): ['C:\\Users\\james\\hapticai-server\\build_venv\\Lib\\site-packages\\cv2\\../../x64/vc17/bin']
+124621 INFO: Warnings written to C:\Users\james\hapticai-server\build\hapticai_windows\warn-hapticai_windows.txt
+125024 INFO: Graph cross-reference written to C:\Users\james\hapticai-server\build\hapticai_windows\xref-hapticai_windows.html
+125159 INFO: checking PYZ
+125160 INFO: Building PYZ because PYZ-00.toc is non existent
+125160 INFO: Building PYZ (ZlibArchive) C:\Users\james\hapticai-server\build\hapticai_windows\PYZ-00.pyz
+128776 INFO: Building PYZ (ZlibArchive) C:\Users\james\hapticai-server\build\hapticai_windows\PYZ-00.pyz completed successfully.
+128851 INFO: checking PKG
+128851 INFO: Building PKG because PKG-00.toc is non existent
+128851 INFO: Building PKG (CArchive) HapticAI.pkg
+128891 INFO: Building PKG (CArchive) HapticAI.pkg completed successfully.
+128893 INFO: Bootloader C:\Users\james\hapticai-server\build_venv\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+128893 INFO: checking EXE
+128893 INFO: Building EXE because EXE-00.toc is non existent
+128894 INFO: Building EXE from EXE-00.toc
+128894 INFO: Copying bootloader EXE to C:\Users\james\hapticai-server\dist\HapticAI.exe
+128950 INFO: Copying icon to EXE
+128975 INFO: Copying 0 resources to EXE
+128975 INFO: Embedding manifest in EXE
+129001 INFO: Appending PKG archive to EXE
+129070 INFO: Fixing EXE headers
+129362 INFO: Building EXE from EXE-00.toc completed successfully.
+129384 INFO: checking COLLECT
+129384 INFO: Building COLLECT because COLLECT-00.toc is non existent
+129385 INFO: Building COLLECT COLLECT-00.toc
+134173 INFO: Building COLLECT COLLECT-00.toc completed successfully.
+134223 INFO: Build complete! The results are available in: C:\Users\james\hapticai-server\dist
+[5/11] Building standard installer (Inno Setup)...
+Inno Setup 6 Command-Line Compiler
+Copyright (C) 1997-2026 Jordan Russell. All rights reserved.
+Portions Copyright (C) 2000-2026 Martijn Laan. All rights reserved.
+Portions Copyright (C) 2001-2004 Alex Yackimoff. All rights reserved.
+https://www.innosetup.com
+
+Compiler engine version: Inno Setup 6.7.3
+Non-commercial use only
+
+Preprocessing
+   Reading file: C:\Program Files (x86)\Inno Setup 6\ISPPBuiltins.iss
+Parsing [Setup] section, line 38
+Parsing [Setup] section, line 39
+Parsing [Setup] section, line 40
+Parsing [Setup] section, line 41
+Parsing [Setup] section, line 42
+Parsing [Setup] section, line 43
+Parsing [Setup] section, line 44
+Parsing [Setup] section, line 45
+Parsing [Setup] section, line 46
+Parsing [Setup] section, line 47
+Parsing [Setup] section, line 48
+Parsing [Setup] section, line 49
+Parsing [Setup] section, line 50
+Parsing [Setup] section, line 51
+Parsing [Setup] section, line 52
+Parsing [Setup] section, line 53
+Parsing [Setup] section, line 54
+Parsing [Setup] section, line 55
+Parsing [Setup] section, line 56
+Parsing [Setup] section, line 57
+Reading file (LicenseFile)
+Reading file (WizardImageFile)
+Reading file (WizardSmallImageFile)
+Preparing Setup program executable
+   Verification successful
+   Updating icons (Setup.e32)
+   Updating version info (Setup.e32)
+Determining language code pages
+Parsing [Languages] section, line 61
+   Reading file: C:\Program Files (x86)\Inno Setup 6\Default.isl
+   Messages in script file
+Reading default messages from Default.isl
+Parsing [Languages] section, line 61
+   Reading file: C:\Program Files (x86)\Inno Setup 6\Default.isl
+Parsing [LangOptions], [Messages], and [CustomMessages] sections
+   Messages in script file
+Reading [Code] section
+Parsing [Tasks] section, line 65
+Parsing [Icons] section, line 75
+Parsing [Icons] section, line 76
+Parsing [Icons] section, line 77
+Parsing [Run] section, line 82
+Parsing [Files] section, line 70
+Creating setup files
+   Verification successful
+   Updating icons (Setup.exe)
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\HapticAI.exe
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\81d243bd2c585b0f4821__mypyc.cp311-win_amd64.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-console-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-datetime-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-debug-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-errorhandling-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-fibers-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-file-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-file-l1-2-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-file-l2-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-handle-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-heap-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-interlocked-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-libraryloader-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-localization-l1-2-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-memory-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-namedpipe-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-processenvironment-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-processthreads-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-processthreads-l1-1-1.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-profile-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-rtlsupport-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-string-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-synch-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-synch-l1-2-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-sysinfo-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-timezone-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-core-util-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-conio-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-convert-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-environment-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-filesystem-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-heap-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-locale-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-math-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-private-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-process-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-runtime-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-stdio-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-string-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-time-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\api-ms-win-crt-utility-l1-1-0.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\base_library.zip
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\dbgcore.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\dbghelp.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\libcrypto-3.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\libffi-8.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\libssl-3.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\msvcp140.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\pyexpat.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\python3.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\python311.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\select.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\sqlite3.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\ucrtbase.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\unicodedata.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\VCOMP140.DLL
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\vcruntime140.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\vcruntime140_1.dll
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_asyncio.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_bz2.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_ctypes.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_decimal.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_elementtree.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_hashlib.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_lzma.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_multiprocessing.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_overlapped.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_queue.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_socket.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_sqlite3.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_ssl.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_uuid.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\_zoneinfo.pyd
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\chapter_manager.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\chapter_thumbnail_cache.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\chapter_type_manager.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\file_dialog.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\gauge.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\interactive_timeline.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\menu.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\movement_bar.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\plugin_preview_renderer.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\plugin_ui_manager.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\plugin_ui_renderer.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\project_manager.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\settings_manager.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\shortcut_manager.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\simulator_3d.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\undo_redo_manager.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\classes\__init__.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gpu_rendering\gpu_timeline_integration.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gpu_rendering\gpu_timeline_renderer.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gpu_rendering\texture_cache.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gpu_rendering\__init__.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\app_gui.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\autotuner_window.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\chapter_type_manager_ui.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\control_panel_ui.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\device_control_ui.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\dynamic_tracker_ui.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\fullscreen_display.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\generated_file_manager_window.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\info_graphs_ui.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\keyboard_shortcuts_dialog.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\splash_screen.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\toolbar_ui.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\video_display_ui.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\video_navigation_ui.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\__init__.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\engine_compiler\tensorrt_compiler_window.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\engine_compiler\tensorrt_validation_panel.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\gui_components\engine_compiler\__init__.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\logic\app_calibration.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\logic\app_energy_saver.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\logic\app_event_handlers.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\logic\app_file_manager.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\logic\app_funscript_processor.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\logic\app_logic.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\logic\app_stage_processor.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\logic\app_state_ui.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\logic\app_utility.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\logic\tensorrt_compiler_logic.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\logic\__init__.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\application\utils\button_styles.py
+   Compressing: C:\Users\james\hapticai-server\dist\HapticAI\_internal\appl
