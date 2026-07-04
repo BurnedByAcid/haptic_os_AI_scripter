@@ -1707,7 +1707,7 @@ export default function Scripter() {
   /**
    * Dynamic preset — adaptive per-marker stroke that respects vtMovementLimit
    * across the entire selection. All selected markers are kept; only heights
-   * change.
+   * change. When limiterEnabled is false, falls back to raw 0↔100 alternation.
    */
   const applyDynamicPattern = () => {
     const sel = [...pointsRef.current]
@@ -1715,11 +1715,16 @@ export default function Scripter() {
       .sort((a, b) => a.time - b.time);
     if (sel.length === 0) return;
 
-    const positions = computeAdaptivePositions(
-      sel.map(p => p.time),
-      vtMovementLimit,
-      false, // start low (matches previous Dynamic parity)
-    );
+    let positions: number[];
+    if (limiterEnabled) {
+      positions = computeAdaptivePositions(
+        sel.map(p => p.time),
+        vtMovementLimit,
+        false, // start low
+      );
+    } else {
+      positions = sel.map((_, i) => (i % 2 === 0 ? 0 : 100));
+    }
 
     const idxMap = new Map(sel.map((s, i) => [s.id, i]));
     setPoints(prev => prev.map(p => {
@@ -3536,16 +3541,36 @@ export default function Scripter() {
                     <div className="flex items-center justify-between mb-1.5">
                       <div>
                         <span className="font-medium">Dynamic</span>
-                        <span className="ml-1 text-muted-foreground text-[10px]">max travel</span>
+                        <span className="ml-1 text-muted-foreground text-[10px]">adaptive travel</span>
                       </div>
                       <Button size="sm" className="h-6 text-[10px]" disabled={selectedIds.size === 0} onClick={applyDynamicPattern}>Apply</Button>
                     </div>
-                    <div className="flex gap-0.5 h-6">
-                      {[0,100,0,100,0,100,0,100].map((v,i) => (
+                    <div className="flex gap-0.5 h-6 mb-2">
+                      {(limiterEnabled ? [0,68,0,75,0,62,0,70] : [0,100,0,100,0,100,0,100]).map((v,i) => (
                         <div key={i} className="flex-1 bg-border/30 rounded-sm flex items-end overflow-hidden">
                           <div className="w-full bg-red-400/70 rounded-sm" style={{ height: `${v}%` }} />
                         </div>
                       ))}
+                    </div>
+                    <div className="space-y-1.5 pt-1.5 border-t border-border/30">
+                      <label className="flex items-center justify-between cursor-pointer" onClick={() => setLimiterEnabled(v => !v)}>
+                        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                          <Checkbox checked={limiterEnabled} onCheckedChange={v => setLimiterEnabled(v === true)} />
+                          Movement Limit
+                        </span>
+                        <span className={`text-[10px] font-mono ${limiterEnabled ? "text-primary" : "text-muted-foreground/50"}`}>
+                          {limiterEnabled ? `${vtMovementLimit} TUPS` : "off"}
+                        </span>
+                      </label>
+                      <div className={`transition-opacity duration-200 ${limiterEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
+                        <Slider
+                          min={200}
+                          max={600}
+                          step={50}
+                          value={[vtMovementLimit]}
+                          onValueChange={v => setVtMovementLimit(v[0])}
+                        />
+                      </div>
                     </div>
                   </div>
 
