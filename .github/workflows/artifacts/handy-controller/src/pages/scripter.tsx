@@ -3146,6 +3146,15 @@ export default function Scripter() {
                     {vtMovementLimit} TUPS
                   </span>
                 </label>
+                <div className={`transition-opacity duration-200 ${limiterEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
+                  <Slider
+                    min={200}
+                    max={600}
+                    step={50}
+                    value={[vtMovementLimit]}
+                    onValueChange={v => setVtMovementLimit(v[0])}
+                  />
+                </div>
                 <p className="text-[10px] text-muted-foreground leading-snug">
                   {limiterEnabled
                     ? "Beats auto-scale to fit the limit per 1-second window. Applied when recording stops."
@@ -3855,16 +3864,16 @@ export default function Scripter() {
                     </div>
                     <div className={`transition-opacity duration-200 ${limiterEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
                       <Slider
-                        min={100}
-                        max={700}
-                        step={10}
+                        min={200}
+                        max={600}
+                        step={50}
                         value={[vtMovementLimit]}
                         onValueChange={v => setVtMovementLimit(v[0])}
                       />
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1">
                       {limiterEnabled
-                        ? "Max Travel Units Per Second (TUPS). Most devices handle 300–400; fast devices up to 700."
+                        ? "Max Travel Units Per Second (TUPS). Most devices handle 300–400; fast devices up to 600."
                         : "Limiter off — every detection alternates raw 0↔100."}
                     </p>
                   </div>
