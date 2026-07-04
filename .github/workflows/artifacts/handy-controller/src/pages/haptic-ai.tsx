@@ -15,10 +15,12 @@ import {
   ChevronUp,
   Circle,
   Download,
+  FileCode,
   Loader2,
   RefreshCw,
   Settings2,
   WifiOff,
+  X,
 } from "lucide-react";
 import { useLocation } from "wouter";
 
@@ -1042,6 +1044,7 @@ function SetupPanel({ os, serverUrl, onUrlChange, onDownloaded, release, state, 
 function HapticAIContent() {
   const { getToken } = useAuth();
   const { user } = useUser();
+  const [, navigate] = useLocation();
   const [agreementState, setAgreementState] = useState<AgreementState>("loading");
   const checkedRef = useRef(false);
   const { status, capabilities, serverUrl, setServerUrl, retry } = useHapticAIConnection();
@@ -1057,6 +1060,7 @@ function HapticAIContent() {
   const [hasEverConnected, setHasEverConnected] = useState(false);
   const [urlSettingsOpen, setUrlSettingsOpen] = useState(false);
   const [urlInput, setUrlInput] = useState(serverUrl);
+  const [pendingScript, setPendingScript] = useState<{ funscript: string; name: string } | null>(null);
 
   useEffect(() => {
     if (status === "connected") setHasEverConnected(true);
@@ -1082,6 +1086,43 @@ function HapticAIContent() {
     writeDismissedUpdateVersion(version);
     setDismissedUpdateVersion(version);
   }, []);
+
+  // ─── postMessage bridge: receive scripts from the HapticAI iframe ───────────
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      try {
+        const expectedOrigin = new URL(serverUrl).origin;
+        if (event.origin !== expectedOrigin) return;
+      } catch {
+        return;
+      }
+      const data = event.data as unknown;
+      if (
+        typeof data !== "object" ||
+        data === null ||
+        (data as Record<string, unknown>).type !== "hapticai_script_ready"
+      ) return;
+      const msg = data as Record<string, unknown>;
+      const funscript = typeof msg.funscript === "string" ? msg.funscript : null;
+      if (!funscript) return;
+      const name = typeof msg.name === "string" && msg.name.trim() ? msg.name.trim() : "HapticAI";
+      setPendingScript({ funscript, name });
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [serverUrl]);
+
+  const handleOpenInScripter = useCallback(() => {
+    if (!pendingScript) return;
+    try {
+      sessionStorage.setItem(
+        "hapticai_import",
+        JSON.stringify({ funscript: pendingScript.funscript, name: pendingScript.name }),
+      );
+    } catch { /* ignore */ }
+    setPendingScript(null);
+    navigate("/scripter");
+  }, [pendingScript, navigate]);
 
   const showUpdateBanner =
     lastDownloadedVersion !== null &&
@@ -1154,6 +1195,31 @@ function HapticAIContent() {
       )}
 
       <HapticAIWarningBanner />
+
+      {/* Script-ready banner — shown when HapticAI sends a generated script via postMessage */}
+      {pendingScript && (
+        <div className="flex-shrink-0 flex items-center gap-2 border-b border-green-500/30 bg-green-500/10 px-4 py-2">
+          <FileCode className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+          <span className="text-xs text-foreground flex-1 min-w-0">
+            <span className="font-medium">Script ready:</span>{" "}
+            <span className="text-muted-foreground truncate">{pendingScript.name}</span>
+          </span>
+          <button
+            onClick={handleOpenInScripter}
+            className="inline-flex items-center gap-1 rounded bg-green-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-green-700 transition-colors flex-shrink-0"
+          >
+            <FileCode className="h-3 w-3" />
+            Open in Scripter
+          </button>
+          <button
+            onClick={() => setPendingScript(null)}
+            className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 ml-1"
+            aria-label="Dismiss"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Connection status bar */}
       <div className="flex-shrink-0 flex items-center justify-between border-b border-border bg-card/60 px-4 py-2">
