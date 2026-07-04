@@ -3847,20 +3847,21 @@ export default function Scripter() {
                           checked={limiterEnabled}
                           onCheckedChange={v => setLimiterEnabled(v === true)}
                         />
-                        Movement Limit
+                        <span className={limiterEnabled ? undefined : "text-muted-foreground/60"}>Movement Limit</span>
                       </label>
                       <span className={`text-xs font-mono ${limiterEnabled ? "text-primary" : "text-muted-foreground/60"}`}>
                         {vtMovementLimit} TUPS
                       </span>
                     </div>
-                    <Slider
-                      min={100}
-                      max={700}
-                      step={10}
-                      value={[vtMovementLimit]}
-                      onValueChange={v => setVtMovementLimit(v[0])}
-                      disabled={!limiterEnabled}
-                    />
+                    <div className={`transition-opacity duration-200 ${limiterEnabled ? "opacity-100" : "opacity-40 pointer-events-none"}`}>
+                      <Slider
+                        min={100}
+                        max={700}
+                        step={10}
+                        value={[vtMovementLimit]}
+                        onValueChange={v => setVtMovementLimit(v[0])}
+                      />
+                    </div>
                     <p className="text-[10px] text-muted-foreground mt-1">
                       {limiterEnabled
                         ? "Max Travel Units Per Second (TUPS). Most devices handle 300–400; fast devices up to 700."
