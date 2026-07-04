@@ -25,6 +25,7 @@ export interface HapticAIConnection {
   serverUrl: string;
   sessionToken: string;
   setServerUrl: (url: string) => void;
+  retry: () => void;
 }
 
 const DEFAULT_URL = "http://localhost:8000";
@@ -94,5 +95,10 @@ export function useHapticAIConnection(): HapticAIConnection {
     setServerUrl(url);
   }, []);
 
-  return { status, capabilities, serverUrl, sessionToken, setServerUrl: handleSetServerUrl };
+  const retry = useCallback(() => {
+    setStatus("connecting");
+    poll(serverUrl);
+  }, [serverUrl, poll]);
+
+  return { status, capabilities, serverUrl, sessionToken, setServerUrl: handleSetServerUrl, retry };
 }

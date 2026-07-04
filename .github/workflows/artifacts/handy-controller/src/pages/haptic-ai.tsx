@@ -1,15 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth, useUser } from "@clerk/react";
-import { useSubscription } from "@/hooks/use-subscription";
 import { PremiumGate } from "@/components/premium-gate";
 import { HapticAIEuaModal } from "@/components/hapticai-eua-modal";
 import { HapticAIWarningBanner } from "@/components/hapticai-warning-banner";
 import { HapticAIConsentDialog } from "@/components/haptic-ai-consent-dialog";
 import { useHapticAIConnection } from "@/hooks/use-hapticai-connection";
-import type { HapticAIOption } from "@/hooks/use-hapticai-connection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   AlertTriangle,
@@ -19,9 +16,10 @@ import {
   Circle,
   Download,
   Loader2,
-  Wand2,
+  RefreshCw,
+  Settings2,
+  WifiOff,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
 const API = import.meta.env.VITE_API_URL ?? "";
@@ -1040,280 +1038,13 @@ function SetupPanel({ os, serverUrl, onUrlChange, onDownloaded, release, state, 
   );
 }
 
-function OptionControl({
-  option,
-  value,
-  onChange,
-}: {
-  option: HapticAIOption;
-  value: unknown;
-  onChange: (key: string, val: unknown) => void;
-}) {
-  if (option.type === "boolean") {
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id={`opt-${option.key}`}
-          checked={!!value}
-          onChange={(e) => onChange(option.key, e.target.checked)}
-          className="h-4 w-4 rounded border-input accent-primary"
-        />
-        <label htmlFor={`opt-${option.key}`} className="text-sm text-foreground cursor-pointer">
-          {option.label}
-        </label>
-      </div>
-    );
-  }
-  if (option.type === "select" && Array.isArray(option.choices)) {
-    return (
-      <div className="space-y-1">
-        <label className="text-xs text-muted-foreground">{option.label}</label>
-        <select
-          value={String(value ?? option.default ?? "")}
-          onChange={(e) => onChange(option.key, e.target.value)}
-          className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          {option.choices.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-      </div>
-    );
-  }
-  return (
-    <div className="space-y-1">
-      <label className="text-xs text-muted-foreground">{option.label}</label>
-      <input
-        type="number"
-        value={Number(value ?? option.default ?? 0)}
-        min={option.min}
-        max={option.max}
-        step={option.step ?? 1}
-        onChange={(e) => onChange(option.key, Number(e.target.value))}
-        className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-      />
-    </div>
-  );
-}
-
-function initOptionValues(options: HapticAIOption[]): Record<string, unknown> {
-  const stored = (() => {
-    try {
-      const raw = localStorage.getItem("hapticai_option_values");
-      return raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-    } catch { return {}; }
-  })();
-  const result: Record<string, unknown> = {};
-  for (const opt of options) {
-    result[opt.key] = opt.key in stored ? stored[opt.key] : opt.default;
-  }
-  return result;
-}
-
-function GenerationUI({ serverUrl, sessionToken, options }: { serverUrl: string; sessionToken: string; options: HapticAIOption[] }) {
-  const [prompt, setPrompt] = useState("");
-  const [optionValues, setOptionValues] = useState<Record<string, unknown>>(() => initOptionValues(options));
-  const [generating, setGenerating] = useState(false);
-  const [result, setResult] = useState<{ funscript: string; name: string } | null>(null);
-  const [genError, setGenError] = useState<string | null>(null);
-  const { toast } = useToast();
-  const [, navigate] = useLocation();
-  const { getToken } = useAuth();
-
-  useEffect(() => {
-    setOptionValues(initOptionValues(options));
-  }, [options]);
-
-  const handleOptionChange = (key: string, val: unknown) => {
-    setOptionValues((prev) => {
-      const next = { ...prev, [key]: val };
-      try { localStorage.setItem("hapticai_option_values", JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  };
-
-  const hasCustomValues = options.some(
-    (opt) => optionValues[opt.key] !== undefined && optionValues[opt.key] !== opt.default,
-  );
-
-  const handleResetOptions = () => {
-    const defaults: Record<string, unknown> = {};
-    for (const opt of options) defaults[opt.key] = opt.default;
-    try { localStorage.removeItem("hapticai_option_values"); } catch { /* ignore */ }
-    setOptionValues(defaults);
-  };
-
-  const handleGenerate = async () => {
-    if (!prompt.trim() || generating) return;
-    setGenerating(true);
-    setResult(null);
-    setGenError(null);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
-      const body: Record<string, unknown> = { prompt: prompt.trim() };
-      if (options.length > 0) body.options = optionValues;
-      const genHeaders: Record<string, string> = { "Content-Type": "application/json" };
-      if (sessionToken) genHeaders["X-HapticAI-Token"] = sessionToken;
-      const res = await fetch(`${serverUrl}/generate`, {
-        method: "POST",
-        headers: genHeaders,
-        body: JSON.stringify(body),
-        signal: controller.signal,
-        mode: "cors",
-      });
-      clearTimeout(timeoutId);
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(errData.error ?? `Server returned ${res.status}`);
-      }
-      const data = await res.json() as { funscript?: string; actions?: unknown[] };
-      const funscriptStr = typeof data.funscript === "string"
-        ? data.funscript
-        : JSON.stringify(data);
-      const name = `hapticai-${Date.now()}`;
-      setResult({ funscript: funscriptStr, name });
-    } catch (err) {
-      const msg = err instanceof Error
-        ? (err.name === "AbortError" ? "Generation timed out — HapticAI took too long to respond." : err.message)
-        : "Generation failed.";
-      setGenError(msg);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleOpenInScripter = () => {
-    if (!result) return;
-    try {
-      sessionStorage.setItem("hapticai_import", JSON.stringify({ funscript: result.funscript, name: result.name }));
-      navigate("/scripter");
-      toast({ title: "Opening in Scripter…", description: "Your generated script is ready to edit." });
-    } catch {
-      toast({ title: "Couldn't open in Scripter", variant: "destructive" });
-    }
-  };
-
-  const handleDownload = () => {
-    if (!result) return;
-    const blob = new Blob([result.funscript], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${result.name}.funscript`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Describe what you want
-        </label>
-
-        <Textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="e.g. A slow build-up that intensifies over 2 minutes with short rapid bursts at the peak…"
-          rows={4}
-          maxLength={1000}
-          className="resize-none text-sm"
-          disabled={generating}
-        />
-        <p className="text-[11px] text-muted-foreground text-right">
-          {prompt.length}/1000
-        </p>
-      </div>
-
-      {options.length > 0 && (
-        <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Generation Options</p>
-            {hasCustomValues && (
-              <button
-                type="button"
-                onClick={handleResetOptions}
-                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
-              >
-                Reset to defaults
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {options.map((opt) => (
-              <OptionControl
-                key={opt.key}
-                option={opt}
-                value={optionValues[opt.key] ?? opt.default}
-                onChange={handleOptionChange}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      <Button
-        onClick={handleGenerate}
-        disabled={!prompt.trim() || generating}
-        className="w-full gap-2"
-      >
-        {generating ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Generating…
-          </>
-        ) : (
-          <>
-            <Wand2 className="h-4 w-4" />
-            Generate Script
-          </>
-        )}
-      </Button>
-
-      {generating && (
-        <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground text-center">
-          HapticAI is processing your request. This may take a moment…
-        </div>
-      )}
-
-      {genError && (
-        <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {genError}
-        </div>
-      )}
-
-      {result && (
-        <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <p className="text-sm font-medium text-foreground">Script generated successfully</p>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Your funscript is ready. You can open it in the Scripter to review and edit, or download it directly.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={handleOpenInScripter} className="gap-1.5 text-xs h-8">
-              Open in Scripter
-            </Button>
-            <Button size="sm" variant="ghost" onClick={handleDownload} className="gap-1.5 text-xs h-8">
-              <Download className="h-3 w-3" />
-              Download .funscript
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function HapticAIContent() {
   const { getToken } = useAuth();
   const { user } = useUser();
   const [agreementState, setAgreementState] = useState<AgreementState>("loading");
   const checkedRef = useRef(false);
-  const { status, capabilities, serverUrl, sessionToken, setServerUrl } = useHapticAIConnection();
+  const { status, capabilities, serverUrl, setServerUrl, retry } = useHapticAIConnection();
   const os = detectOS();
   const { release, state: releaseState } = useHapticAIRelease();
   const { githubRelease, githubState } = useGithubRelease();
@@ -1323,6 +1054,25 @@ function HapticAIContent() {
   const [dismissedUpdateVersion, setDismissedUpdateVersion] = useState<string | null>(
     () => readDismissedUpdateVersion()
   );
+  const [hasEverConnected, setHasEverConnected] = useState(false);
+  const [urlSettingsOpen, setUrlSettingsOpen] = useState(false);
+  const [urlInput, setUrlInput] = useState(serverUrl);
+
+  useEffect(() => {
+    if (status === "connected") setHasEverConnected(true);
+  }, [status]);
+
+  useEffect(() => {
+    setUrlInput(serverUrl);
+  }, [serverUrl]);
+
+  const handleSaveUrl = useCallback(() => {
+    const trimmed = urlInput.trim().replace(/\/$/, "");
+    if (trimmed) {
+      setServerUrl(trimmed);
+      setUrlSettingsOpen(false);
+    }
+  }, [urlInput, setServerUrl]);
 
   const handleDownloaded = useCallback((version: string) => {
     setLastDownloadedVersion(version);
@@ -1384,6 +1134,9 @@ function HapticAIContent() {
     );
   }
 
+  const showIframe = hasEverConnected;
+  const showDisconnectedOverlay = hasEverConnected && status !== "connected";
+
   return (
     <div className="flex flex-col h-full">
       {agreementState === "needed" && (
@@ -1402,59 +1155,126 @@ function HapticAIContent() {
 
       <HapticAIWarningBanner />
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-          {/* Header */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-foreground">HapticAI</h1>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/30">
-                Beta
-              </span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Generate haptic scripts from natural language using the HapticAI local engine.
-            </p>
-          </div>
-
-          {/* Connection status bar */}
-          <div className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-2.5">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">HapticAI status:</span>
-              <ConnectionDot status={status} />
-            </div>
-            <div className="flex items-center gap-2">
-              {capabilities.version && (
-                <span className="text-[10px] text-muted-foreground font-mono">v{capabilities.version}</span>
-              )}
-              <span className="text-[10px] text-muted-foreground">
-                {serverUrl}
-              </span>
-            </div>
-          </div>
-
-          {/* Setup panel — shown when unreachable */}
-          {status !== "connected" && (
-            <SetupPanel os={os} serverUrl={serverUrl} onUrlChange={setServerUrl} onDownloaded={handleDownloaded} release={release} state={releaseState} githubRelease={githubRelease} githubState={githubState} />
-          )}
-
-          {/* Generation UI — shown when connected */}
-          {status === "connected" && (
-            <Card className="border-border/60">
-              <CardContent className="p-5">
-                <GenerationUI serverUrl={serverUrl} sessionToken={sessionToken} options={capabilities.options ?? []} />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Placeholder when connecting */}
-          {status === "connecting" && (
-            <div className="rounded-lg border border-border bg-muted/20 px-4 py-8 text-center space-y-2">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mx-auto" />
-              <p className="text-sm text-muted-foreground">Connecting to HapticAI…</p>
-            </div>
+      {/* Connection status bar */}
+      <div className="flex-shrink-0 flex items-center justify-between border-b border-border bg-card/60 px-4 py-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">HapticAI:</span>
+          <ConnectionDot status={status} />
+          {capabilities.version && (
+            <span className="text-[10px] text-muted-foreground font-mono">v{capabilities.version}</span>
           )}
         </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-muted-foreground font-mono hidden sm:inline">{serverUrl}</span>
+          <button
+            onClick={() => setUrlSettingsOpen((o) => !o)}
+            className="flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            aria-label="Change server URL"
+            title="Change server URL"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Collapsible URL settings panel */}
+      {urlSettingsOpen && (
+        <div className="flex-shrink-0 border-b border-border bg-muted/30 px-4 py-2.5 flex items-center gap-2">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">Server URL</span>
+          <Input
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSaveUrl(); if (e.key === "Escape") setUrlSettingsOpen(false); }}
+            className="h-7 text-xs font-mono flex-1 min-w-0"
+            placeholder="http://localhost:8000"
+            autoFocus
+          />
+          <Button size="sm" onClick={handleSaveUrl} className="h-7 px-2.5 text-xs flex-shrink-0">
+            Save
+          </Button>
+          <button
+            onClick={() => setUrlSettingsOpen(false)}
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Main content area */}
+      <div className="flex-1 relative overflow-hidden">
+        {showIframe ? (
+          <>
+            <iframe
+              src={serverUrl}
+              className="w-full h-full border-0"
+              title="HapticAI"
+              allow="clipboard-read; clipboard-write"
+            />
+            {showDisconnectedOverlay && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-background/90 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-3 text-center px-6">
+                  <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                    <WifiOff className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">HapticAI is not reachable</p>
+                    <p className="text-xs text-muted-foreground">
+                      Make sure the HapticAI app is still running on your computer at{" "}
+                      <code className="bg-muted px-1 py-0.5 rounded text-[11px]">{serverUrl}</code>
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={retry}
+                    className="gap-1.5"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="overflow-y-auto h-full">
+            <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+              {/* Header */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-foreground">HapticAI</h1>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/30">
+                    Beta
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Generate haptic scripts from natural language using the HapticAI local engine.
+                </p>
+              </div>
+
+              {/* Connecting spinner */}
+              {status === "connecting" && (
+                <div className="rounded-lg border border-border bg-muted/20 px-4 py-8 text-center space-y-2">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mx-auto" />
+                  <p className="text-sm text-muted-foreground">Connecting to HapticAI…</p>
+                </div>
+              )}
+
+              {/* Setup panel — shown when unreachable / never connected */}
+              <SetupPanel
+                os={os}
+                serverUrl={serverUrl}
+                onUrlChange={setServerUrl}
+                onDownloaded={handleDownloaded}
+                release={release}
+                state={releaseState}
+                githubRelease={githubRelease}
+                githubState={githubState}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
