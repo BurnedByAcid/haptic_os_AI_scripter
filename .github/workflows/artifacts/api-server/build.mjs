@@ -36,7 +36,6 @@ async function buildAll() {
     },
     external: [
       "*.node",
-      "stripe-replit-sync",
       "sharp",
       "better-sqlite3",
       "sqlite3",
