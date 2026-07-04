@@ -1,0 +1,131 @@
+
+2026-07-04 17:27:05.86
+772460e6
+System
+starting artifact processes for monorepo deployment
+
+2026-07-04 17:27:05.86
+772460e6
+System
+registered static handler for artifact path=/ publicDir=artifacts/handy-controller/dist/public
+
+2026-07-04 17:27:05.86
+772460e6
+System
+forwarding local port 0 to external port 80 (mapped as 1104)
+
+2026-07-04 17:27:05.87
+772460e6
+System
+artifact process started pid=18 artifact=artifacts/api-server
+
+2026-07-04 17:27:05.88
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-04 17:27:05.89
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-04 17:27:05.90
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-04 17:27:05.91
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-04 17:27:05.94
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-04 17:27:06.18
+772460e6
+User
+{"level":30,"time":1783200426179,"pid":21,"hostname":"localhost","msg":"Initializing Stripe schema..."}
+
+2026-07-04 17:27:07.31
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-04 17:27:07.59
+772460e6
+User
+{"level":30,"time":1783200427595,"pid":18,"hostname":"localhost","msg":"Initializing Stripe schema..."}
+
+2026-07-04 17:27:07.60
+772460e6
+User
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+
+2026-07-04 17:27:07.60
+772460e6
+User
+(node:18) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+
+2026-07-04 17:27:07.60
+772460e6
+User
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+2026-07-04 17:27:07.60
+772460e6
+User
+To prepare for this change:
+
+2026-07-04 17:27:07.60
+772460e6
+User
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+2026-07-04 17:27:10.36
+772460e6
+User
+(node:21) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+
+2026-07-04 17:27:10.36
+772460e6
+User
+To prepare for this change:
+
+2026-07-04 17:27:10.36
+772460e6
+User
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+
+2026-07-04 17:27:10.36
+772460e6
+User
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+
+2026-07-04 17:27:10.36
+772460e6
+User
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+2026-07-04 17:27:10.36
+772460e6
+User
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+
+2026-07-04 17:27:10.60
+772460e6
+User
+{"level":30,"time":1783200430607,"pid":21,"hostname":"localhost","req":{"id":2,"method":"GET","url":"/api/users/me"},"res":{"statusCode":404},"responseTime":644,"msg":"request completed"}
+
+2026-07-04 17:27:10.60
+772460e6
+User
+{"level":30,"time":1783200430609,"pid":21,"hostname":"localhost","req":{"id":3,"method":"GET","url":"/api/user/preferences"},"res":{"statusCode":304},"responseTime":642,"msg":"request completed"}
+
+2026-07-04 17:27:12.69
+772460e6
+User
+{"level":30,"time":1783200432697,"pid":21,"hostname":"localhost","
