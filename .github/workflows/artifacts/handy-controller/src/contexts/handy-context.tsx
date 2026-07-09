@@ -152,7 +152,8 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
         setChecking(false);
       };
 
-      sse.addEventListener("device_connected", (e: MessageEvent) => {
+      // Handler: device connected (model/firmware from payload when present)
+      const onDeviceConnected = (e: MessageEvent) => {
         if (!mountedRef.current || cancelled) return;
         setConnected(true);
         // Only overwrite model/firmware when the SSE payload actually carries them;
@@ -167,36 +168,51 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
         } catch {
           // Ignore malformed or missing payload
         }
-      });
+      };
+      // v3 name + v4/new-firmware alias
+      sse.addEventListener("device_connected", onDeviceConnected);
+      sse.addEventListener("connected", onDeviceConnected);
 
-      sse.addEventListener("device_disconnected", () => {
+      // Handler: device disconnected
+      const onDeviceDisconnected = () => {
         if (!mountedRef.current || cancelled) return;
         setConnected(false);
         setBattery(undefined);
         setCharging(false);
         setDeviceModel(undefined);
         setFirmwareVersion(undefined);
-      });
+      };
+      // v3 name + v4/new-firmware alias
+      sse.addEventListener("device_disconnected", onDeviceDisconnected);
+      sse.addEventListener("disconnected", onDeviceDisconnected);
 
-      sse.addEventListener("battery_changed", (e: MessageEvent) => {
+      // Handler: battery state
+      const onBatteryChanged = (e: MessageEvent) => {
         if (!mountedRef.current || cancelled) return;
         try {
           const data = JSON.parse(e.data as string) as {
             battery_level?: number;
+            level?: number;
             charger_connected?: boolean;
+            charging?: boolean;
             charging_complete?: boolean;
           };
-          if (typeof data.battery_level === "number") {
-            setBattery(data.battery_level);
+          const level = data.battery_level ?? data.level;
+          if (typeof level === "number") {
+            setBattery(level);
           }
           // charging = plugged in (regardless of whether already full)
-          setCharging(!!data.charger_connected);
+          setCharging(!!(data.charger_connected ?? data.charging));
         } catch {
           // Ignore malformed events
         }
-      });
+      };
+      // v3 name + v4/new-firmware alias
+      sse.addEventListener("battery_changed", onBatteryChanged);
+      sse.addEventListener("battery", onBatteryChanged);
 
-      sse.addEventListener("mode_changed", (e: MessageEvent) => {
+      // Handler: mode changed
+      const onModeChanged = (e: MessageEvent) => {
         if (!mountedRef.current || cancelled) return;
         try {
           const data = JSON.parse(e.data as string) as { mode?: number };
@@ -211,7 +227,10 @@ export function HandyProvider({ children }: { children: React.ReactNode }) {
         } catch {
           // Ignore malformed events
         }
-      });
+      };
+      // v3 name + v4/new-firmware alias
+      sse.addEventListener("mode_changed", onModeChanged);
+      sse.addEventListener("mode", onModeChanged);
 
       sse.onerror = () => {
         if (cancelled) return;
