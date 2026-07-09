@@ -79,7 +79,12 @@ router.post("/users/onboard", async (req: Request, res: Response) => {
     return;
   }
 
-  const { username } = req.body as { username?: unknown };
+  const { username, ageVerified } = req.body as { username?: unknown; ageVerified?: unknown };
+
+  if (ageVerified !== true) {
+    res.status(400).json({ error: "Age verification is required." });
+    return;
+  }
 
   const validationError = validateUsername(username);
   if (validationError) {
@@ -114,7 +119,7 @@ router.post("/users/onboard", async (req: Request, res: Response) => {
     try {
       await pool.query(
         `INSERT INTO users (clerk_id, username, age_verified, plan) VALUES ($1, $2, $3, 'free')`,
-        [auth.userId, usernameStr, true],
+        [auth.userId, usernameStr, ageVerified],
       );
     } catch (err: unknown) {
       // PostgreSQL unique-constraint violation code
