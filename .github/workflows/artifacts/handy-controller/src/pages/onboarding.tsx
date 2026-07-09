@@ -27,6 +27,12 @@ export default function OnboardingPage() {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    if (!isUserLoaded || !user) return;
+    if (user.firstName) setFirstName(user.firstName);
+    if (user.lastName) setLastName(user.lastName);
+  }, [isUserLoaded, user]);
+
   const USERNAME_RE = /^[a-zA-Z0-9_-]+$/;
 
   function validateLocalUsername(value: string): string | null {
