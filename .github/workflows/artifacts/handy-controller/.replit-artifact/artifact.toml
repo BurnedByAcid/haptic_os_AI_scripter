@@ -15,7 +15,7 @@ paths = [ "/" ]
 localPort = 8081
 
 [services.development]
-run = "pnpm --filter @workspace/handy-controller run dev"
+run = "fuser -k 8081/tcp || true && pnpm --filter @workspace/handy-controller run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/handy-controller", "run", "build" ]
