@@ -25,6 +25,7 @@ export default function OnboardingPage() {
   const [ageVerified, setAgeVerified] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [retryMessage, setRetryMessage] = useState("");
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -106,6 +107,7 @@ export default function OnboardingPage() {
 
     setSubmitting(true);
     setSubmitError("");
+    setRetryMessage("");
     try {
       await user?.update({ firstName: firstName.trim(), lastName: lastName.trim() });
     } catch {
@@ -113,28 +115,56 @@ export default function OnboardingPage() {
       setSubmitting(false);
       return;
     }
-    try {
-      const token = await getToken();
-      const res = await fetch(`${API_BASE}/api/users/onboard`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ username, ageVerified }),
-      });
-      const data = (await res.json()) as { message?: string; error?: string };
-      if (!res.ok) {
-        setSubmitError(data.error ?? "Something went wrong.");
+
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY_MS = 2500;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const token = await getToken();
+        const res = await fetch(`${API_BASE}/api/users/onboard`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ username, ageVerified }),
+        });
+        const data = (await res.json()) as { message?: string; error?: string };
+
+        if (res.status === 503 && attempt < MAX_RETRIES) {
+          setRetryMessage("Almost there, retrying…");
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+          continue;
+        }
+
+        if (!res.ok) {
+          setRetryMessage("");
+          setSubmitError(data.error ?? "Something went wrong.");
+          setSubmitting(false);
+          return;
+        }
+
+        setRetryMessage("");
+        await user?.reload();
+        setLocation("/");
+        return;
+      } catch {
+        if (attempt < MAX_RETRIES) {
+          setRetryMessage("Almost there, retrying…");
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+          continue;
+        }
+        setRetryMessage("");
+        setSubmitError("Network error. Please try again.");
         setSubmitting(false);
         return;
       }
-      await user?.reload();
-      setLocation("/");
-    } catch {
-      setSubmitError("Network error. Please try again.");
-      setSubmitting(false);
     }
+
+    setRetryMessage("");
+    setSubmitError("Service is temporarily unavailable. Please try again.");
+    setSubmitting(false);
   }
 
   const canSubmit =
@@ -287,7 +317,12 @@ export default function OnboardingPage() {
             </span>
           </label>
 
-          {submitError && <p className="text-sm text-red-400">{submitError}</p>}
+          {retryMessage && (
+            <p className="text-sm text-muted-foreground">{retryMessage}</p>
+          )}
+          {submitError && !retryMessage && (
+            <p className="text-sm text-red-400">{submitError}</p>
+          )}
 
           <Button
             className="w-full bg-[#DC2626] text-white font-bold hover:bg-[#DC2626]/90 disabled:opacity-40"
@@ -296,7 +331,8 @@ export default function OnboardingPage() {
           >
             {submitting ? (
               <span className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" /> Setting up…
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {retryMessage ? retryMessage : "Setting up…"}
               </span>
             ) : (
               "Get Started"
