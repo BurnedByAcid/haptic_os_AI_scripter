@@ -1,0 +1,360 @@
+# AIScripter Build Guide for AI Systems
+
+## Project Overview
+
+AIScripter is a 3-tier video processing application that generates adult video control scripts. The system consists of:
+
+1. **saas-web** (Next.js 16.2.10 React frontend with custom Node.js server)
+2. **local-daemon** (Rust tokio service managing WebSocket connections and job concurrency)
+3. **ai-engine** (Python OpenCV/SciPy video analysis engine)
+
+## Architecture
+
+### Communication Flow
+```
+User Browser (React UI)
+    ↓ HTTP + WebSocket
+Next.js Server (saas-web/server.js)
+    ↓ WebSocket
+Rust Daemon (local-daemon) - connects via persistent WebSocket
+    ↓ Spawns subprocess
+Python Engine (ai-engine/engine.py)
+    ↓ Process frames
+Output: .funscript JSON file
+```
+
+### Key Design Patterns
+
+- **WebSocket Registry**: Daemon maintains persistent connection; server tracks all connected daemons
+- **Job Concurrency**: Daemon limits concurrent Python jobs to 4 (Arc<Semaphore> in Rust)
+- **Video Input**: Supports local paths, direct HTTP URLs, and embedded video pages (via yt-dlp CLI fallback)
+- **Temp File Cleanup**: RAII guard (TempInputGuard) auto-deletes downloaded videos after processing
+- **Theme System**: CSS custom properties with @media (prefers-color-scheme, forced-colors) for light/dark/high-contrast modes
+- **Machine ID Persistence**: Browser localStorage stores last successful daemon ID; restores on reload with fallback to connected list
+
+## Prerequisites
+
+- **Node.js** 18+ (for saas-web)
+- **Rust** 1.70+ (for local-daemon)
+- **Python** 3.8+ (for ai-engine)
+- **yt-dlp** (optional, installed via pip; enables embedded video link support)
+
+## Build Steps
+
+### 1. Set Up Python AI Engine
+
+```bash
+cd ai-engine
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+**Key Dependencies:**
+- opencv-python (frame extraction)
+- scipy (signal processing, peak detection)
+- numpy (array math)
+- yt-dlp (video download fallback)
+
+**Verify:** `python engine.py --help` should run without error.
+
+### 2. Build Rust Daemon
+
+```bash
+cd local-daemon
+cargo build --release
+```
+
+**Key Dependencies (Cargo.toml):**
+- tokio (async runtime with full features)
+- tokio-tungstenite (WebSocket client)
+- reqwest 0.12 with rustls-tls (HTTP downloads for direct URLs)
+- serde + serde_json (protocol serialization)
+- anyhow (error handling)
+- tracing (structured logging)
+
+**Output:** `local-daemon/target/release/local-daemon` (Windows: `.exe`)
+
+**Configuration (config.rs):**
+- `ws_url`: WebSocket server URL (default: `ws://localhost:3000`)
+- `machine_id`: Unique daemon identifier (default: hostname)
+- `auth_token`: Bearer token for authentication (env var or default)
+- `max_concurrent_jobs`: Job concurrency limit (default: 4)
+- `reconnect_delay_ms`: WebSocket reconnection backoff (default: 2000ms)
+
+### 3. Build Next.js Web App
+
+```bash
+cd saas-web
+npm install
+npm run build
+npm start
+```
+
+**Development Mode (for local iteration):**
+```bash
+npm run dev  # Runs Next.js dev server (not used in production)
+```
+
+**Production Mode:**
+```bash
+npm run build
+npm start  # Runs custom server.js (required for WebSocket + REST routing)
+```
+
+**Key Dependencies (package.json):**
+- next 16.2.10 (React framework with Turbopack)
+- react 19 (UI library)
+- ws (WebSocket server)
+- express-like routing in server.js
+
+**Port:** Default 3000
+
+## Environment Variables
+
+### saas-web (server.js)
+
+```bash
+WS_SERVER_PORT=3000          # HTTP/WebSocket listen port
+NEXT_PUBLIC_API_BASE=""      # Frontend API prefix (usually empty for same-origin)
+AUTH_TOKEN="secret-key"      # Bearer token for daemon authentication
+OUTPUT_DIR="/tmp/outputs"    # Where daemons write .funscript files
+```
+
+### local-daemon (config.rs / env)
+
+```bash
+WS_URL="ws://server-host:3000"   # Server WebSocket address
+MACHINE_ID="my-machine"           # Unique daemon identifier
+AUTH_TOKEN="secret-key"           # Must match server AUTH_TOKEN
+```
+
+## API Endpoints
+
+### saas-web/server.js provides:
+
+```
+POST /api/jobs/trigger
+  Input:  {video_path: string, machine_id?: string}
+  Output: {job_id: string, output_path: string}
+  
+GET /api/jobs/:id
+  Output: {job_id, machine_id, video_path, status, progress, output_path, error, timestamps}
+  
+GET /api/jobs/:id/funscript
+  Output: {version: "1.0", inverted: false, range: 90, actions: [{at: ms, pos: 0-100}]}
+  
+GET /api/jobs/machines
+  Output: [machine_id_1, machine_id_2, ...]
+  
+GET /api/jobs/preflight
+  Output: {supports_embedded_video_link: bool, yt_dlp_available: bool}
+```
+
+## Protocol Messages
+
+### Client → Server (Rust daemon sends)
+
+```json
+{"type": "Handshake", "machine_id": "host123", "auth_token": "xyz", "yt_dlp_available": true}
+{"type": "ProcessingProgress", "job_id": "abc", "progress": 45}
+{"type": "ProcessingComplete", "job_id": "abc", "output_path": "/tmp/video.funscript"}
+{"type": "ProcessingError", "job_id": "abc", "error": "Frame read failed", "code": 1}
+```
+
+### Server → Client (Web sends)
+
+```json
+{"type": "StartProcessing", "job_id": "abc", "video_path": "https://example.com/video.mp4", "output_path": "/tmp/video.funscript"}
+```
+
+## Video Input Processing (local-daemon/src/engine.rs)
+
+1. **Detect URL**: Check if video_path starts with `http://` or `https://`
+2. **Direct Download**: Try HTTP GET with content-type validation (must not be text/html)
+   - On success: Save to temp file, process, auto-cleanup via TempInputGuard
+   - On failure: Fall through to yt-dlp
+3. **yt-dlp Fallback**: `yt-dlp -f best -o - <url> | ffmpeg -i pipe: output.mp4`
+   - Handles YouTube, Vimeo, embedded HTML pages
+4. **Local Path**: Use as-is if no URL detected
+
+## Python Engine Flow (ai-engine/engine.py)
+
+1. Validate input file exists, smoothing_window > 0, max_speed > 0
+2. Extract motion signal via frame-to-frame difference (OpenCV)
+3. Smooth signal with scipy.ndimage.uniform_filter1d
+4. Normalize to 0-100 range
+5. Detect peaks/valleys with scipy.signal.find_peaks
+6. Convert to action keyframes (0 and 100 positions at millisecond timestamps)
+7. Apply hardware speed guardrails (e.g., 420 units/sec for The Handy)
+8. Write `.funscript` JSON output
+
+**Input:** `python engine.py <video_path> <output_path> [--smoothing_window N] [--max_speed N]`
+
+**Output:** JSON funscript at output_path
+```json
+{
+  "version": "1.0",
+  "inverted": false,
+  "range": 90,
+  "actions": [
+    {"at": 1000, "pos": 0},
+    {"at": 2500, "pos": 100},
+    {"at": 4000, "pos": 0}
+  ]
+}
+```
+
+## UI/UX Features
+
+### Theme System (saas-web/app/globals.css)
+
+- **Light Mode**: #f4f7fb bg, #0f172a text, #1d4ed8 accent
+- **Dark Mode**: #0b1220 bg, #e5edf8 text, #60a5fa accent
+- **High Contrast**: Uses @media (forced-colors) with system palette
+- **Auto Detect**: Responds to system theme preference (prefers-color-scheme)
+
+CSS Custom Properties:
+```css
+--bg, --text, --border, --accent, --danger, --success, --muted
+```
+
+### Status Panel States
+
+- **Idle**: "Ready to process" (blue)
+- **Queued**: "Waiting for daemon" (blue)
+- **Processing**: "Analyzing video..." with progress % (blue)
+- **Complete**: "Done! Download or process another" (green)
+- **Error**: Red border with error message
+
+### Machine ID Auto-Fill
+
+- Fetches connected daemons every 5 seconds via `/api/jobs/machines`
+- Displays connected IDs in helper text
+- Auto-selects first daemon on load
+- Remembers last successful machine in localStorage
+- Falls back to available daemon if remembered one disconnects
+
+### Form Features
+
+- Image URL or local file input with drag-drop
+- Machine ID dropdown with helper showing connected daemons
+- Real-time preflight checks (yt-dlp availability announcement)
+- Accessible labels with aria-describedby
+- State-aware status messaging with context
+
+## Deployment Checklist
+
+- [ ] Set AUTH_TOKEN env var (both daemon and server must match)
+- [ ] Set OUTPUT_DIR to writable path (for .funscript outputs)
+- [ ] Ensure daemon can reach server WebSocket URL
+- [ ] For embedded videos: Install yt-dlp on daemon machine (`pip install yt-dlp`)
+- [ ] Run `npm run build` on saas-web (generates .next dir)
+- [ ] Start daemon: `./local-daemon` (or `local-daemon.exe` on Windows)
+- [ ] Start web: `npm start` (runs server.js on port 3000)
+- [ ] Test endpoint: `curl http://localhost:3000/api/jobs/machines`
+
+## Common Modifications
+
+### Add a New Status State
+
+1. Edit [saas-web/app/page.js](saas-web/app/page.js): Add case in statusHeadline/statusDetail switch
+2. Edit [saas-web/app/globals.css](saas-web/app/globals.css): Add `.statusPanel--<state>` class with border-color
+3. Edit [saas-web/lib/ws-client-handler.js](saas-web/lib/ws-client-handler.js): Update job.status assignment
+
+### Add Output File Types
+
+1. Edit [local-daemon/src/protocol.rs](local-daemon/src/protocol.rs): Add field to ProcessingComplete
+2. Edit [saas-web/lib/ws-client-handler.js](saas-web/lib/ws-client-handler.js): Capture new field
+3. Edit [saas-web/app/page.js](saas-web/app/page.js): Display new file output
+
+### Adjust Concurrency
+
+Edit [local-daemon/src/engine.rs](local-daemon/src/engine.rs):
+```rust
+let max_concurrent_jobs = 4;  // Change to desired limit
+```
+
+### Change Theme Colors
+
+Edit [saas-web/app/globals.css](saas-web/app/globals.css): Modify `--accent`, `--bg`, `--text` values in `:root` (light) and `@media (prefers-color-scheme: dark)` (dark)
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| "Connection refused" on daemon startup | Verify WS_URL is reachable; check firewall; ensure server is running |
+| "yt-dlp not found" | Install: `pip install yt-dlp` on daemon machine |
+| Embedded videos not working | Run `/api/jobs/preflight` to check yt_dlp_available; ensure yt-dlp is in PATH |
+| Machine ID not auto-filling | Clear browser localStorage; check `/api/jobs/machines` returns non-empty array |
+| Temp files not cleaning up | Verify TempInputGuard is being used in engine.rs; check OS temp dir permissions |
+| Dark theme not applying | Hard refresh browser (Ctrl+Shift+R); verify @media (prefers-color-scheme) in globals.css |
+| Job status stuck on "Queued" | Check daemon logs for JSON parse errors; verify protocol message format in ws-client-handler.js |
+
+## Files Structure Reference
+
+```
+ai-engine/
+  engine.py              # Main video analysis (motion detection → keyframes)
+  requirements.txt       # Python deps: opencv, scipy, numpy, yt-dlp
+
+local-daemon/
+  Cargo.toml            # Rust project manifest
+  src/
+    main.rs             # Entry point
+    daemon.rs           # WebSocket client + connection mgmt
+    engine.rs           # Job runner, video input prep, concurrency control
+    config.rs           # Config loading (env vars)
+    protocol.rs         # Message types (Handshake, Progress, Complete, Error)
+  target/               # Build artifacts (ignore)
+
+saas-web/
+  package.json          # Node dependencies
+  next.config.js        # Next.js config
+  server.js             # Custom Node.js HTTP + WebSocket server
+  app/
+    page.js             # Main React component (form + status)
+    layout.js           # Layout wrapper (imports globals.css)
+    globals.css         # Theme system, colors, responsive layout
+  lib/
+    ws-client-handler.js # WebSocket server logic, job registry, daemon tracking
+  public/
+    aiscripter-logo.svg # Header logo asset
+```
+
+## Key Technical Decisions
+
+1. **Custom Node.js Server**: Allows concurrent WebSocket + REST API (Next.js dev server doesn't support WebSocket)
+2. **Rust for Daemon**: Type safety, async efficiency, easy dependency management (Cargo) for reqwest + tokio
+3. **Python for ML**: Fast prototyping with OpenCV/SciPy; easy integration with hardware control libraries
+4. **CSS Custom Properties**: Maintainable theme system without duplicating values
+5. **localStorage for Machine ID**: Fast, no backend needed; persists across sessions
+6. **5s Polling for Machines List**: Responsive but not chatty; balances UX responsiveness with bandwidth
+7. **RAII Temp File Cleanup**: Prevents disk bloat; automatic even if process crashes
+8. **Capability Negotiation at Connect Time**: Avoids job-time surprises (yt-dlp availability known upfront)
+
+## Testing
+
+### Unit Test Example (Python)
+```bash
+cd ai-engine
+python -m pytest tests/ -v
+```
+
+### Integration Test (Manual)
+1. Start daemon: `./local-daemon`
+2. Start web: `npm start` (in saas-web)
+3. Open http://localhost:3000
+4. Submit a test video from saas-web
+5. Monitor daemon logs for START_PROCESSING → PROCESSING_COMPLETE
+
+### WebSocket Debug
+```bash
+# In saas-web/server.js, add console.log:
+ws.on('message', (msg) => console.log('WS RX:', msg));
+```
+
+---
+
+**Last Updated:** 2026-07-12
+**Build Status:** ✓ All components compile cleanly
