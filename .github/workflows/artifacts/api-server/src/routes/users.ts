@@ -95,23 +95,35 @@ router.post("/users/onboard", async (req: Request, res: Response) => {
   const usernameStr = username as string;
 
   try {
-    // Check uniqueness
-    const { rows: existing } = await pool.query(
-      `SELECT 1 FROM users WHERE username = $1 LIMIT 1`,
-      [usernameStr],
+    // Check if this Clerk user already has a DB row (partial-onboarding recovery).
+    const { rows: existingUser } = await pool.query<{ username: string }>(
+      `SELECT username FROM users WHERE clerk_id = $1 LIMIT 1`,
+      [auth.userId],
     );
-    if (existing.length > 0) {
-      res.status(409).json({ error: "Username is already taken." });
+
+    if (existingUser.length > 0) {
+      // The DB row exists but the onboarded flag was never stamped (or the
+      // client is retrying). Only accept the exact same username to prevent
+      // any accidental hijacking.
+      if (existingUser[0].username !== usernameStr) {
+        res.status(409).json({ error: "A different username is already registered to your account." });
+        return;
+      }
+      // Idempotent recovery: re-stamp the Clerk metadata and return success.
+      await clerkClient.users.updateUserMetadata(auth.userId, {
+        publicMetadata: { onboarded: true },
+      });
+      res.json({ message: "Onboarding complete.", username: usernameStr });
       return;
     }
 
-    // Check if this clerk user already has a row (idempotent protection)
-    const { rows: alreadyOnboarded } = await pool.query(
-      `SELECT 1 FROM users WHERE clerk_id = $1 LIMIT 1`,
-      [auth.userId],
+    // New user path: ensure the username is not taken by anyone else.
+    const { rows: taken } = await pool.query(
+      `SELECT 1 FROM users WHERE username = $1 LIMIT 1`,
+      [usernameStr],
     );
-    if (alreadyOnboarded.length > 0) {
-      res.status(409).json({ error: "User is already onboarded." });
+    if (taken.length > 0) {
+      res.status(409).json({ error: "Username is already taken." });
       return;
     }
 
