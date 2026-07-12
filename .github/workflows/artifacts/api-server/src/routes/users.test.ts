@@ -31,11 +31,13 @@ vi.mock("../lib/logger", () => ({
 
 import { getAuth, clerkClient } from "@clerk/express";
 import { pool } from "../lib/db";
+import { logger } from "../lib/logger";
 import usersRouter from "./users";
 
 const mockGetAuth = vi.mocked(getAuth);
 const mockPoolQuery = vi.mocked(pool.query);
 const mockUpdateUserMetadata = vi.mocked(clerkClient.users.updateUserMetadata);
+const mockLogger = vi.mocked(logger);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -177,5 +179,78 @@ describe("POST /api/users/onboard — age verification guard", () => {
 
     expect(res.status).toBe(401);
     expect(mockPoolQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/users/onboard — Clerk metadata sync correctness", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetAuth.mockReturnValue({ userId: "user_clerktest" } as ReturnType<typeof getAuth>);
+  });
+
+  it("retries Clerk metadata write and returns 200 when the first attempt fails transiently (new user path)", async () => {
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    mockUpdateUserMetadata
+      .mockRejectedValueOnce(new Error("transient network error"))
+      .mockResolvedValueOnce({} as never);
+
+    const app = buildApp();
+    const res = await request(app)
+      .post("/api/users/onboard")
+      .send({ username: "newuser1", ageVerified: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ username: "newuser1" });
+    expect(mockUpdateUserMetadata).toHaveBeenCalledTimes(2);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ attempt: 1 }),
+      expect.stringContaining("retrying"),
+    );
+  });
+
+  it("returns 503 (not 200 or 500) when Clerk always fails after all retries (new user path)", async () => {
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never)
+      .mockResolvedValueOnce({ rows: [] } as never);
+
+    mockUpdateUserMetadata.mockRejectedValue(new Error("Clerk SDK unavailable"));
+
+    const app = buildApp();
+    const res = await request(app)
+      .post("/api/users/onboard")
+      .send({ username: "newuser2", ageVerified: true });
+
+    expect(res.status).toBe(503);
+    expect(res.body).toMatchObject({ error: expect.stringContaining("Clerk metadata") });
+    expect(mockUpdateUserMetadata).toHaveBeenCalledTimes(3);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user_clerktest", username: "newuser2" }),
+      expect.any(String),
+    );
+  });
+
+  it("returns 503 (not 200 or 500) when Clerk always fails after all retries (recovery path)", async () => {
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [{ username: "recuser" }] } as never);
+
+    mockUpdateUserMetadata.mockRejectedValue(new Error("Clerk SDK unavailable"));
+
+    const app = buildApp();
+    const res = await request(app)
+      .post("/api/users/onboard")
+      .send({ username: "recuser", ageVerified: true });
+
+    expect(res.status).toBe(503);
+    expect(res.body).toMatchObject({ error: expect.stringContaining("Clerk metadata") });
+    expect(mockUpdateUserMetadata).toHaveBeenCalledTimes(3);
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user_clerktest", username: "recuser" }),
+      expect.any(String),
+    );
   });
 });
