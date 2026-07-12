@@ -5,6 +5,50 @@ import { logger } from "../lib/logger";
 
 const router = Router();
 
+/**
+ * Retry an async operation up to `maxAttempts` times with exponential backoff.
+ * Only retries on transient-looking errors (network / 5xx); rethrows immediately
+ * on non-retryable errors so callers can distinguish them.
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  {
+    maxAttempts = 3,
+    baseDelayMs = 200,
+    label = "operation",
+  }: { maxAttempts?: number; baseDelayMs?: number; label?: string } = {},
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err: unknown) {
+      lastErr = err;
+      const isRetryable = isTransientError(err);
+      if (!isRetryable || attempt === maxAttempts) {
+        throw err;
+      }
+      const delayMs = baseDelayMs * 2 ** (attempt - 1);
+      logger.warn({ err, attempt, label }, `${label} failed (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms`);
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw lastErr;
+}
+
+function isTransientError(err: unknown): boolean {
+  if (err == null || typeof err !== "object") return true;
+  const e = err as Record<string, unknown>;
+  // Clerk SDK surfaces HTTP status on .status or .statusCode
+  const status = (e.status ?? e.statusCode) as number | undefined;
+  if (typeof status === "number") {
+    // 4xx errors (except 429 rate-limit) are not transient
+    return status === 429 || status >= 500;
+  }
+  // Network-level errors (no status) are assumed transient
+  return true;
+}
+
 const USERNAME_RE = /^[a-zA-Z0-9_-]+$/;
 
 function validateUsername(username: unknown): string | null {
@@ -110,9 +154,22 @@ router.post("/users/onboard", async (req: Request, res: Response) => {
         return;
       }
       // Idempotent recovery: re-stamp the Clerk metadata and return success.
-      await clerkClient.users.updateUserMetadata(auth.userId, {
-        publicMetadata: { onboarded: true },
-      });
+      try {
+        await withRetry(
+          () =>
+            clerkClient.users.updateUserMetadata(auth.userId, {
+              publicMetadata: { onboarded: true },
+            }),
+          { label: "updateUserMetadata (recovery)", maxAttempts: 3, baseDelayMs: 200 },
+        );
+      } catch (clerkErr) {
+        logger.error(
+          { err: clerkErr, userId: auth.userId, username: usernameStr },
+          "Clerk metadata write failed after all retries (recovery path)",
+        );
+        res.status(503).json({ error: "Onboarding DB row exists but Clerk metadata update failed. Please try again." });
+        return;
+      }
       res.json({ message: "Onboarding complete.", username: usernameStr });
       return;
     }
@@ -148,9 +205,23 @@ router.post("/users/onboard", async (req: Request, res: Response) => {
     }
 
     // Mark onboarded in Clerk public metadata
-    await clerkClient.users.updateUserMetadata(auth.userId, {
-      publicMetadata: { onboarded: true },
-    });
+    try {
+      await withRetry(
+        () =>
+          clerkClient.users.updateUserMetadata(auth.userId, {
+            publicMetadata: { onboarded: true },
+          }),
+        { label: "updateUserMetadata (new user)", maxAttempts: 3, baseDelayMs: 200 },
+      );
+    } catch (clerkErr) {
+      logger.error(
+        { err: clerkErr, userId: auth.userId, username: usernameStr },
+        "Clerk metadata write failed after all retries (new user path)",
+      );
+      // DB row was already inserted — client can retry and hit the recovery path.
+      res.status(503).json({ error: "Account created but Clerk metadata update failed. Please try again to complete setup." });
+      return;
+    }
 
     res.json({ message: "Onboarding complete.", username: usernameStr });
   } catch (err) {
