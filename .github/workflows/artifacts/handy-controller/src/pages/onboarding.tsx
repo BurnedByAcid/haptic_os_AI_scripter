@@ -19,6 +19,7 @@ export default function OnboardingPage() {
   const [firstNameError, setFirstNameError] = useState("");
   const [lastNameError, setLastNameError] = useState("");
   const [username, setUsername] = useState("");
+  const [usernameLocked, setUsernameLocked] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
   const [usernameError, setUsernameError] = useState<string>("");
   const [ageVerified, setAgeVerified] = useState(false);
@@ -31,6 +32,11 @@ export default function OnboardingPage() {
     if (!isUserLoaded || !user) return;
     if (user.firstName) setFirstName(user.firstName);
     if (user.lastName) setLastName(user.lastName);
+    if (user.username) {
+      setUsername(user.username);
+      setUsernameLocked(true);
+      setUsernameStatus("available");
+    }
   }, [isUserLoaded, user]);
 
   const USERNAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -45,6 +51,7 @@ export default function OnboardingPage() {
   }
 
   useEffect(() => {
+    if (usernameLocked) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const localError = validateLocalUsername(username);
     if (username.length === 0) {
@@ -224,7 +231,8 @@ export default function OnboardingPage() {
                 onChange={(e) => setUsername(e.target.value.toLowerCase())}
                 placeholder="e.g. cool_user42"
                 maxLength={32}
-                className="bg-[#1E0707] border-[#3D1515] pr-9 focus:border-[#DC2626] focus:ring-[#DC2626]"
+                disabled={usernameLocked}
+                className="bg-[#1E0707] border-[#3D1515] pr-9 focus:border-[#DC2626] focus:ring-[#DC2626] disabled:opacity-60 disabled:cursor-not-allowed"
                 autoComplete="off"
                 spellCheck={false}
               />
@@ -243,7 +251,7 @@ export default function OnboardingPage() {
             {usernameError && (
               <p className="text-xs text-red-400">{usernameError}</p>
             )}
-            {usernameStatus === "available" && (
+            {usernameStatus === "available" && !usernameLocked && (
               <p className="text-xs text-green-400">Username is available.</p>
             )}
             <p className="text-[11px] text-muted-foreground">
