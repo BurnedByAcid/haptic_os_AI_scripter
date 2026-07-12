@@ -73,6 +73,18 @@ router.get("/users/check-username", async (req: Request, res: Response) => {
   }
 
   try {
+    // If the requesting user already has this username set on their Clerk
+    // account (partial-onboard recovery: Clerk write succeeded but DB insert
+    // failed), treat it as available so the form can be re-submitted cleanly.
+    const auth = getAuth(req);
+    if (auth.userId) {
+      const clerkUser = await clerkClient.users.getUser(auth.userId);
+      if (clerkUser.username === username) {
+        res.json({ available: true });
+        return;
+      }
+    }
+
     const { rows } = await pool.query(
       `SELECT 1 FROM users WHERE username = $1 LIMIT 1`,
       [username],

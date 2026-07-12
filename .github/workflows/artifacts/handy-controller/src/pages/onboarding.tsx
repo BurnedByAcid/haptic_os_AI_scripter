@@ -81,7 +81,7 @@ export default function OnboardingPage() {
         setUsernameError("Could not check availability.");
       }
     }, 500);
-  }, [username]);
+  }, [username, usernameLocked]);
 
   function validateNames(): boolean {
     let valid = true;
