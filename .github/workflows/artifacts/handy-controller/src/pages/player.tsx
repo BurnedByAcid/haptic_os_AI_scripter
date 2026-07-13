@@ -296,6 +296,46 @@ export default function Player() {
   // ── Load item passed from Library / Community ──────────────────────────────
   // Runs once on mount.
   useEffect(() => {
+    // ── AIScripter handoff ──────────────────────────────────────────────────
+    const aiScripterRaw = sessionStorage.getItem("aiscripter_player_import");
+    if (aiScripterRaw) {
+      sessionStorage.removeItem("aiscripter_player_import");
+      try {
+        const parsed = JSON.parse(aiScripterRaw) as {
+          funscript?: string;
+          videoUrl?: string;
+          name?: string;
+        };
+        if (parsed.funscript) {
+          try {
+            const script = parseFunscript(JSON.parse(parsed.funscript));
+            setScripts([script, null, null, null]);
+            setActiveScriptIdx(0);
+          } catch { /* ignore invalid */ }
+        }
+        if (parsed.videoUrl) {
+          const raw = parsed.videoUrl;
+          const detected = detectEmbedUrl(raw);
+          if (detected) {
+            if (detected.mode === "url") {
+              setVideoUrl(detected.embedUrl);
+              setEmbedUrl(null);
+              setVideoMode("url");
+              setVideoLabel(parsed.name ?? raw);
+              setVideoLabelIsFile(false);
+            } else {
+              setEmbedUrl(detected.embedUrl);
+              setVideoUrl(null);
+              setVideoMode("embed");
+              setVideoLabel(parsed.name ?? raw);
+              setVideoLabelIsFile(false);
+            }
+          }
+        }
+      } catch { /* ignore malformed */ }
+      return;
+    }
+
     const pendingVideoUrl  = localStorage.getItem("handy_pending_video_url");
     const pendingVideoName = localStorage.getItem("handy_pending_video_name");
     const pendingScript    = localStorage.getItem("handy_pending_script");

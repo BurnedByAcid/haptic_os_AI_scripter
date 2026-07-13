@@ -29,6 +29,7 @@ import Upgrade from "@/pages/upgrade";
 import Admin from "@/pages/admin";
 import HapticAI from "@/pages/haptic-ai";
 import HapticAISoon from "@/pages/haptic-ai-soon";
+import AIScripter from "@/pages/aiscripter";
 
 const queryClient = new QueryClient();
 
@@ -167,6 +168,7 @@ function Router() {
       <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
       <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} adminOnly adminFallback="/haptic-ai-soon" />} />
       <Route path="/haptic-ai-soon" component={() => <ProtectedRoute component={HapticAISoon} />} />
+      <Route path="/aiscripter" component={() => <ProtectedRoute component={AIScripter} />} />
       <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
       <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
       <Route path="/admin"        component={() => <ProtectedRoute component={Admin} adminOnly />} />

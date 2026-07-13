@@ -12,6 +12,7 @@ import scripterSessionsRouter from "./scripter-sessions";
 import analyticsRouter from "./analytics";
 import videoRouter from "./video";
 import hapticaiRouter from "./hapticai";
+import aiscripterRouter from "./aiscripter";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(scripterSessionsRouter);
 router.use(analyticsRouter);
 router.use(videoRouter);
 router.use(hapticaiRouter);
+router.use(aiscripterRouter);
 
 export default router;

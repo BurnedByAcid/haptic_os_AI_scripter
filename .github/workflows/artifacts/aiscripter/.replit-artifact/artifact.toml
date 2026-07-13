@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/aiscripter/"
+title = "AIScripter"
+version = "1.0.0"
+id = "artifacts/aiscripter"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/aiscripter/" ]
+localPort = 21125
+
+[services.development]
+run = "pnpm --filter @workspace/aiscripter run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/aiscripter", "run", "build" ]
+publicDir = "artifacts/aiscripter/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21125"
+BASE_PATH = "/aiscripter/"

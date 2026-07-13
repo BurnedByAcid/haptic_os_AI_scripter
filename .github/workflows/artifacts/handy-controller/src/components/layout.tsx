@@ -3,13 +3,14 @@ import { ToastAction } from "@/components/ui/toast";
 import { useHandy } from "@/hooks/use-handy";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useRetryQueue } from "@/hooks/use-retry-queue";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Settings, Check, WifiOff, Sparkles, type LucideIcon } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Settings, Check, WifiOff, Sparkles, Wand2, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useClerk, useAuth, Show } from "@clerk/react";
 import { HapticAIConsentDialog } from "@/components/haptic-ai-consent-dialog";
+import { AIScripterConsentDialog } from "@/components/aiscripter-consent-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useProfile } from "@/hooks/use-profile";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -96,7 +97,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/",          label: "Dashboard",      icon: Home,      requiresPro: false },
   { href: "/player",    label: "Player",          icon: PlaySquare, requiresPro: false },
   { href: "/scripter",  label: "Scripter",        icon: Mic,       requiresPro: false },
-  { href: "/haptic-ai", label: "HapticAI",        icon: Sparkles,  requiresPro: false, badge: "Beta", preNavWarning: true },
+  { href: "/haptic-ai",   label: "HapticAI",    icon: Sparkles, requiresPro: false, badge: "Beta", preNavWarning: true },
+  { href: "/aiscripter", label: "AIScripter",   icon: Wand2,    requiresPro: false, badge: "Beta", preNavWarning: true },
   { href: "/community", label: "Community",       icon: Users,     requiresPro: false },
   { href: "/control",   label: "Manual Controls", icon: Settings2, requiresPro: false },
   { href: "/games",     label: "Games",           icon: Gamepad2,  requiresPro: true  },
@@ -150,6 +152,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
   // ─── HapticAI consent dialog ──────────────────────────────────────────────
   const [hapticAiConsentOpen, setHapticAiConsentOpen] = useState(false);
   const [hapticAiWarnDismissed, setHapticAiWarnDismissed] = useState<boolean | null>(null);
+
+  // ─── AIScripter consent dialog ────────────────────────────────────────────
+  const [aiScripterConsentOpen, setAIScripterConsentOpen] = useState(false);
+  const [aiScripterWarnDismissed, setAIScripterWarnDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("aiscripter_consent_dismissed") === "true";
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     if (!user?.id) return;
@@ -238,6 +250,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const handleHapticAiConsentCancel = useCallback(() => {
     setHapticAiConsentOpen(false);
+  }, []);
+
+  // ─── AIScripter nav click ──────────────────────────────────────────────────
+  const handleAIScripterNavClick = useCallback(() => {
+    if (aiScripterWarnDismissed) {
+      navigate("/aiscripter");
+    } else {
+      setAIScripterConsentOpen(true);
+    }
+  }, [aiScripterWarnDismissed, navigate]);
+
+  const handleAIScripterConsentConfirm = useCallback((dontShowAgain: boolean) => {
+    setAIScripterConsentOpen(false);
+    if (dontShowAgain) {
+      try {
+        localStorage.setItem("aiscripter_consent_dismissed", "true");
+        setAIScripterWarnDismissed(true);
+      } catch { /* ignore */ }
+    }
+    navigate("/aiscripter");
+  }, [navigate]);
+
+  const handleAIScripterConsentCancel = useCallback(() => {
+    setAIScripterConsentOpen(false);
   }, []);
 
   // ─── Mode selector ────────────────────────────────────────────────────────
@@ -675,6 +711,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
               }
 
               if (item.preNavWarning) {
+                const navHandler =
+                  item.href === "/aiscripter"
+                    ? handleAIScripterNavClick
+                    : handleHapticAiNavClick;
                 return (
                   <button
                     key={item.href}
@@ -687,7 +727,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     }`}
                     title={collapsed ? item.label : undefined}
                     data-testid={`link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                    onClick={handleHapticAiNavClick}
+                    onClick={navHandler}
                   >
                     <Icon size={18} className="flex-shrink-0" />
                     {!collapsed && (
@@ -1079,6 +1119,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         open={hapticAiConsentOpen}
         onConfirm={handleHapticAiConsentConfirm}
         onCancel={handleHapticAiConsentCancel}
+      />
+
+      {/* AIScripter consent dialog */}
+      <AIScripterConsentDialog
+        open={aiScripterConsentOpen}
+        onConfirm={handleAIScripterConsentConfirm}
+        onCancel={handleAIScripterConsentCancel}
       />
     </div>
   );
