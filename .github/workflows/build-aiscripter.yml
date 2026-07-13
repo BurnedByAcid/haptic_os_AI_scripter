@@ -1,0 +1,180 @@
+# ============================================================
+#  AIScripter Build — GitHub Actions (Windows installer)
+# ============================================================
+#
+#  Produces AIScripter-Setup.exe with yt-dlp and ffmpeg bundled,
+#  so end users need nothing preinstalled.
+#
+#  USAGE:
+#  Option A — push a release tag:
+#    git tag aiscripter-v1.0.0 && git push origin aiscripter-v1.0.0
+#    The build runs automatically and publishes a GitHub Release
+#    with AIScripter-Setup.exe attached.
+#
+#  Option B — manual trigger:
+#    Actions → "Build AIScripter" → Run workflow → enter a version.
+#
+#  The HapticOS API server picks up the latest release automatically
+#  (AISCRIPTER_GITHUB_REPO env var must point at this repository).
+#
+# ============================================================
+
+name: Build AIScripter
+
+on:
+  push:
+    tags:
+      - 'aiscripter-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. aiscripter-v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build-windows:
+    name: Build Windows installer
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build Rust daemon
+        working-directory: local-daemon
+        run: cargo build --release
+
+      - name: Install Python build tools
+        working-directory: ai-engine
+        run: |
+          python -m pip install --upgrade pip wheel pyinstaller
+          pip install -r requirements.txt
+
+      - name: Freeze Python engine with PyInstaller
+        working-directory: ai-engine
+        run: |
+          pyinstaller --onedir --name engine --distpath ../local-daemon/dist/engine_dist engine.py
+
+      - name: Assemble staging directory
+        working-directory: local-daemon
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\stage | Out-Null
+          Copy-Item target\release\local-daemon.exe dist\stage\AIScripter.exe
+          Copy-Item -Recurse -Force dist\engine_dist\engine dist\stage\engine
+
+      - name: Bundle yt-dlp and ffmpeg (with checksum verification)
+        working-directory: local-daemon
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $bin = "dist\stage\engine\bin"
+          New-Item -ItemType Directory -Force -Path $bin | Out-Null
+
+          # ── yt-dlp: download exe + the SHA2-256SUMS published in the same release,
+          #    verify before bundling ──────────────────────────────────────────────
+          Write-Host "Downloading yt-dlp.exe..."
+          Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" -OutFile "$bin\yt-dlp.exe"
+          Invoke-WebRequest -Uri "https://github.com/yt-dlp/yt-dlp/releases/latest/download/SHA2-256SUMS" -OutFile "dist\yt-dlp-SHA256SUMS"
+
+          $expected = (Get-Content dist\yt-dlp-SHA256SUMS | Where-Object { $_ -match "yt-dlp\.exe$" }) -split '\s+' | Select-Object -First 1
+          $actual = (Get-FileHash "$bin\yt-dlp.exe" -Algorithm SHA256).Hash.ToLower()
+          if (-not $expected -or $actual -ne $expected.ToLower()) {
+            Write-Error "yt-dlp.exe checksum mismatch (expected=$expected actual=$actual)"
+            exit 1
+          }
+          Write-Host "yt-dlp.exe checksum OK"
+          Remove-Item dist\yt-dlp-SHA256SUMS
+
+          # ── ffmpeg: download gyan.dev essentials build + its .sha256, verify ─────
+          Write-Host "Downloading ffmpeg essentials build..."
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile "dist\ffmpeg.zip"
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip.sha256" -OutFile "dist\ffmpeg.zip.sha256"
+
+          $expected = (Get-Content dist\ffmpeg.zip.sha256 -Raw).Trim() -split '\s+' | Select-Object -First 1
+          $actual = (Get-FileHash dist\ffmpeg.zip -Algorithm SHA256).Hash.ToLower()
+          if (-not $expected -or $actual -ne $expected.ToLower()) {
+            Write-Error "ffmpeg.zip checksum mismatch (expected=$expected actual=$actual)"
+            exit 1
+          }
+          Write-Host "ffmpeg.zip checksum OK"
+
+          Expand-Archive -Force dist\ffmpeg.zip dist\ffmpeg_extract
+          $ffmpeg = Get-ChildItem dist\ffmpeg_extract -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          $ffprobe = Get-ChildItem dist\ffmpeg_extract -Recurse -Filter ffprobe.exe | Select-Object -First 1
+          if (-not $ffmpeg -or -not $ffprobe) {
+            Write-Error "ffmpeg.exe or ffprobe.exe not found inside the ffmpeg archive"
+            exit 1
+          }
+          Copy-Item $ffmpeg.FullName "$bin\ffmpeg.exe"
+          Copy-Item $ffprobe.FullName "$bin\ffprobe.exe"
+
+          Remove-Item dist\ffmpeg.zip, dist\ffmpeg.zip.sha256
+          Remove-Item -Recurse -Force dist\ffmpeg_extract
+
+          Write-Host "Bundled binaries:"
+          Get-ChildItem $bin | ForEach-Object { Write-Host ("  {0}  {1:N0} bytes" -f $_.Name, $_.Length) }
+
+      - name: Verify staged bundle before packaging
+        working-directory: local-daemon
+        shell: pwsh
+        run: |
+          $required = @(
+            "dist\stage\AIScripter.exe",
+            "dist\stage\engine\engine.exe",
+            "dist\stage\engine\bin\yt-dlp.exe",
+            "dist\stage\engine\bin\ffmpeg.exe",
+            "dist\stage\engine\bin\ffprobe.exe"
+          )
+          $missing = $required | Where-Object { -not (Test-Path $_) }
+          if ($missing) {
+            Write-Error ("Missing staged files:`n" + ($missing -join "`n"))
+            exit 1
+          }
+          Write-Host "All staged files present."
+
+      - name: Compile Inno Setup installer
+        working-directory: local-daemon
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $iscc)) {
+            Write-Host "Inno Setup not found — installing via choco..."
+            choco install innosetup --no-progress -y
+          }
+          & $iscc installer.iss
+          if (!(Test-Path "dist\AIScripter-Setup.exe")) {
+            Write-Error "Build failed — dist\AIScripter-Setup.exe not found"
+            exit 1
+          }
+          $size = (Get-Item "dist\AIScripter-Setup.exe").Length
+          Write-Host ("Output: dist\AIScripter-Setup.exe  {0:N0} bytes" -f $size)
+
+      - name: Save installer as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AIScripter-Setup-${{ inputs.version || github.ref_name }}
+          path: local-daemon/dist/AIScripter-Setup.exe
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: AIScripter ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          files: local-daemon/dist/AIScripter-Setup.exe
+          generate_release_notes: true

@@ -7,6 +7,7 @@ AppPublisherURL=https://hapticos.org
 DefaultDirName={autopf}\AIScripter
 DefaultGroupName=AIScripter
 OutputBaseFilename=AIScripter-Setup
+OutputDir=dist
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64

@@ -27,6 +27,7 @@ import argparse
 import json
 import math
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -51,6 +52,55 @@ def progress(pct: int) -> None:
     print(f"PROGRESS:{pct}", file=sys.stderr, flush=True)
 
 
+# ── Bundled tool resolution ───────────────────────────────────────────────────
+#
+# The Windows installer ships yt-dlp.exe / ffmpeg.exe / ffprobe.exe in a `bin`
+# directory next to the frozen engine executable so end users do not need
+# either tool preinstalled. Resolution order:
+#   1. $AISCRIPTER_BIN_DIR (explicit override, set by the daemon or tests)
+#   2. <dir of frozen engine executable>/bin        (installed layout)
+#   3. <dir of engine.py>/bin                       (dev layout)
+#   4. system PATH                                  (last resort)
+
+def _bundled_bin_dirs() -> list[Path]:
+    dirs: list[Path] = []
+    env_dir = os.environ.get("AISCRIPTER_BIN_DIR")
+    if env_dir:
+        dirs.append(Path(env_dir))
+    if getattr(sys, "frozen", False):
+        dirs.append(Path(sys.executable).resolve().parent / "bin")
+    dirs.append(Path(__file__).resolve().parent / "bin")
+    return [d for d in dirs if d.is_dir()]
+
+
+def find_tool(name: str) -> str:
+    """
+    Return the absolute path to a bundled tool (yt-dlp, ffmpeg, ffprobe),
+    preferring the copies shipped with the installer over anything on PATH.
+    Raises RuntimeError when the tool cannot be found anywhere.
+    """
+    exe_name = f"{name}.exe" if os.name == "nt" else name
+    for bin_dir in _bundled_bin_dirs():
+        candidate = bin_dir / exe_name
+        if candidate.exists():
+            return str(candidate)
+    found = shutil.which(name)
+    if found:
+        return found
+    raise RuntimeError(
+        f"{name} not found — bundled copy is missing and it is not on PATH"
+    )
+
+
+def _ffmpeg_location_args() -> list[str]:
+    """Extra yt-dlp args pointing it at the bundled ffmpeg, when present."""
+    try:
+        ffmpeg_path = find_tool("ffmpeg")
+    except RuntimeError:
+        return []
+    return ["--ffmpeg-location", str(Path(ffmpeg_path).parent)]
+
+
 # ── Download helpers ──────────────────────────────────────────────────────────
 
 def download_video(url: str, out_path: str) -> None:
@@ -59,12 +109,13 @@ def download_video(url: str, out_path: str) -> None:
     Uses a format that keeps the file as a single container (mp4/mkv/webm).
     """
     cmd = [
-        "yt-dlp",
+        find_tool("yt-dlp"),
         "--no-playlist",
         "--format", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best",
         "--merge-output-format", "mp4",
         "--output", out_path,
         "--newline",
+        *_ffmpeg_location_args(),
         url,
     ]
     print("[engine] Running yt-dlp for video download...", file=sys.stderr, flush=True)
@@ -78,13 +129,14 @@ def download_audio(url: str, out_wav: str) -> None:
     Fallback: download only audio track to a WAV file using yt-dlp.
     """
     cmd = [
-        "yt-dlp",
+        find_tool("yt-dlp"),
         "--no-playlist",
         "--extract-audio",
         "--audio-format", "wav",
         "--audio-quality", "5",
         "--output", out_wav.replace(".wav", ".%(ext)s"),
         "--newline",
+        *_ffmpeg_location_args(),
         url,
     ]
     result = subprocess.run(cmd, capture_output=False, text=True)
@@ -249,7 +301,7 @@ def compute_rms_envelope(samples: list[float], framerate: int, window_ms: int = 
 def convert_to_wav(src: str, dst: str) -> None:
     """Use ffmpeg to convert audio file to WAV mono 44100 Hz."""
     cmd = [
-        "ffmpeg", "-y", "-i", src,
+        find_tool("ffmpeg"), "-y", "-i", src,
         "-vn", "-ar", "44100", "-ac", "1", "-f", "wav", dst,
     ]
     result = subprocess.run(cmd, capture_output=True)

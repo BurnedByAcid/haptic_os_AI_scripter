@@ -14,8 +14,23 @@ async fn main() {
     // Generate a random session token on startup
     let session_token = Uuid::new_v4().to_string();
 
-    // Check if yt-dlp is available on PATH
-    let yt_dlp_available = tokio::process::Command::new("yt-dlp")
+    // Check if yt-dlp is available: prefer the copy bundled with the installer
+    // (engine/bin/yt-dlp[.exe] next to the daemon executable), fall back to PATH.
+    let bundled_yt_dlp = http_server::bundled_bin_dir().map(|d| {
+        #[cfg(target_os = "windows")]
+        {
+            d.join("yt-dlp.exe")
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            d.join("yt-dlp")
+        }
+    });
+    let yt_dlp_cmd = match bundled_yt_dlp {
+        Some(ref p) if p.exists() => p.to_string_lossy().to_string(),
+        _ => "yt-dlp".to_string(),
+    };
+    let yt_dlp_available = tokio::process::Command::new(&yt_dlp_cmd)
         .arg("--version")
         .output()
         .await

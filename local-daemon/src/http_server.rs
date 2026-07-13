@@ -221,6 +221,21 @@ async fn handle_get_funscript(
 
 // ── Engine runner (calls the Python engine subprocess) ───────────────────────
 
+/// Directory containing the bundled yt-dlp/ffmpeg binaries shipped by the
+/// installer: `<daemon exe dir>/engine/bin`. Returns None when absent
+/// (e.g. running from source in development).
+pub fn bundled_bin_dir() -> Option<std::path::PathBuf> {
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))?;
+    let bin = exe_dir.join("engine").join("bin");
+    if bin.is_dir() {
+        Some(bin)
+    } else {
+        None
+    }
+}
+
 async fn run_engine(state: Arc<AppState>, job_id: String, url: String) {
     use std::process::Stdio;
     use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
@@ -262,10 +277,24 @@ async fn run_engine(state: Arc<AppState>, job_id: String, url: String) {
             )
         };
 
-        let mut child = tokio::process::Command::new(&program)
-            .args(&args)
+        let mut cmd = tokio::process::Command::new(&program);
+        cmd.args(&args)
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        // Point the engine at the bundled yt-dlp/ffmpeg binaries so end users
+        // do not need either tool installed on their system.
+        if let Some(bin_dir) = bundled_bin_dir() {
+            cmd.env("AISCRIPTER_BIN_DIR", &bin_dir);
+            let path_sep = if cfg!(target_os = "windows") { ";" } else { ":" };
+            let current_path = std::env::var("PATH").unwrap_or_default();
+            cmd.env(
+                "PATH",
+                format!("{}{}{}", bin_dir.display(), path_sep, current_path),
+            );
+        }
+
+        let mut child = cmd
             .spawn()
             .map_err(|e| format!("Failed to launch engine: {e}"))?;
 
