@@ -217,6 +217,9 @@ async fn handle_get_funscript(
 // ── Engine runner (calls the Python engine subprocess) ───────────────────────
 
 async fn run_engine(state: Arc<AppState>, job_id: String, url: String) {
+    use std::process::Stdio;
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+
     // Determine engine binary: prefer frozen PyInstaller bundle next to exe,
     // fall back to `python engine.py` in working directory.
     let engine_exe = {
@@ -254,20 +257,59 @@ async fn run_engine(state: Arc<AppState>, job_id: String, url: String) {
             )
         };
 
-        let output = tokio::process::Command::new(&program)
+        let mut child = tokio::process::Command::new(&program)
             .args(&args)
-            .output()
-            .await
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .map_err(|e| format!("Failed to launch engine: {e}"))?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            return Err(format!("Engine exited with error: {stderr}"));
+        // Stream stderr: parse PROGRESS:nn lines to update job percent in real time.
+        let stderr = child.stderr.take().expect("stderr was piped");
+        let state_p = Arc::clone(&state);
+        let id_p = job_id.clone();
+        let stderr_task = tokio::spawn(async move {
+            let mut lines = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                if let Some(rest) = line.strip_prefix("PROGRESS:") {
+                    if let Ok(pct) = rest.trim().parse::<u8>() {
+                        let mut jobs = state_p.jobs.write().await;
+                        if let Some(job) = jobs.get_mut(&id_p) {
+                            if job.status == JobState::Processing {
+                                job.percent = pct;
+                            }
+                        }
+                    }
+                }
+                eprintln!("[engine] {}", line);
+            }
+        });
+
+        // Collect stdout (the funscript JSON written by the engine).
+        let stdout = child.stdout.take().expect("stdout was piped");
+        let mut stdout_buf = Vec::new();
+        BufReader::new(stdout)
+            .read_to_end(&mut stdout_buf)
+            .await
+            .map_err(|e| format!("Failed to read engine stdout: {e}"))?;
+
+        let status = child
+            .wait()
+            .await
+            .map_err(|e| format!("Engine process error: {e}"))?;
+
+        // Wait for stderr drainer to finish before returning.
+        let _ = stderr_task.await;
+
+        if !status.success() {
+            return Err(format!(
+                "Engine exited with code {}",
+                status.code().unwrap_or(-1)
+            ));
         }
 
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        // Engine is expected to write JSON funscript to stdout
-        Ok(stdout.trim().to_string())
+        let json_str = String::from_utf8_lossy(&stdout_buf).trim().to_string();
+        Ok(json_str)
     }
     .await;
 
