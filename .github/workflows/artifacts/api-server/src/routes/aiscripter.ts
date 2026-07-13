@@ -57,6 +57,15 @@ async function fetchLatestRelease(): Promise<AIScripterReleaseCache["data"]> {
   }
 
   const res = await fetch(url, { headers });
+  if (res.status === 404) {
+    return {
+      tag: "coming-soon",
+      exeUrl: null,
+      dmgUrl: null,
+      tarballUrl: null,
+      sizeBytes: 0,
+    };
+  }
   if (!res.ok) {
     throw new Error(`GitHub API responded with ${res.status}`);
   }
