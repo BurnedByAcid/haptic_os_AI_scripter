@@ -31,6 +31,7 @@ pub struct Job {
     pub percent: u8,
     pub error: Option<String>,
     pub funscript: Option<String>,
+    pub script_source: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +68,8 @@ struct JobResponse {
     percent: u8,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    script_source: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -124,6 +127,7 @@ async fn handle_trigger(
         percent: 0,
         error: None,
         funscript: None,
+        script_source: None,
     };
 
     {
@@ -164,6 +168,7 @@ async fn handle_get_job(
                 status: job.status.clone(),
                 percent: job.percent,
                 error: job.error.clone(),
+                script_source: job.script_source.clone(),
             }),
         )
             .into_response(),
@@ -265,6 +270,7 @@ async fn run_engine(state: Arc<AppState>, job_id: String, url: String) {
             .map_err(|e| format!("Failed to launch engine: {e}"))?;
 
         // Stream stderr: parse PROGRESS:nn lines to update job percent in real time.
+        // WARNING: lines are logged prominently so the daemon operator can see fallbacks.
         let stderr = child.stderr.take().expect("stderr was piped");
         let state_p = Arc::clone(&state);
         let id_p = job_id.clone();
@@ -280,6 +286,8 @@ async fn run_engine(state: Arc<AppState>, job_id: String, url: String) {
                             }
                         }
                     }
+                } else if line.starts_with("WARNING:") {
+                    eprintln!("[engine WARNING] {}", line);
                 }
                 eprintln!("[engine] {}", line);
             }
@@ -317,9 +325,26 @@ async fn run_engine(state: Arc<AppState>, job_id: String, url: String) {
     if let Some(job) = jobs.get_mut(&job_id) {
         match result {
             Ok(funscript) => {
+                // Extract metadata.source from the funscript JSON so the UI can
+                // show a warning badge when the audio-RMS fallback was used.
+                let source: Option<String> = serde_json::from_str::<serde_json::Value>(&funscript)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("metadata")
+                            .and_then(|m| m.get("source"))
+                            .and_then(|s| s.as_str())
+                            .map(|s| s.to_string())
+                    });
+                if source.as_deref() == Some("audio_rms") {
+                    eprintln!(
+                        "[daemon WARNING] Job {job_id}: script generated via audio_rms fallback \
+                         (video download or optical-flow failed)"
+                    );
+                }
                 job.status = JobState::Complete;
                 job.percent = 100;
                 job.funscript = Some(funscript);
+                job.script_source = source;
             }
             Err(msg) => {
                 job.status = JobState::Error;

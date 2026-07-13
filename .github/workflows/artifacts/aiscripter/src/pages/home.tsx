@@ -14,6 +14,7 @@ import {
   Loader2,
   PlaySquare,
   RefreshCw,
+  Volume2,
   Wand2,
 } from "lucide-react";
 
@@ -27,7 +28,7 @@ type JobStatus =
   | { state: "idle" }
   | { state: "queued"; jobId: string }
   | { state: "processing"; jobId: string; percent: number }
-  | { state: "complete"; jobId: string; funscriptUrl: string }
+  | { state: "complete"; jobId: string; funscriptUrl: string; scriptSource?: string }
   | { state: "error"; jobId: string; message: string };
 
 function ConnectionIndicator({ status }: { status: "connecting" | "connected" | "unreachable" }) {
@@ -113,6 +114,7 @@ export default function Home() {
         status: "queued" | "processing" | "complete" | "error";
         percent?: number;
         error?: string;
+        script_source?: string;
       };
       if (data.status === "queued") {
         setJobStatus({ state: "queued", jobId });
@@ -120,7 +122,12 @@ export default function Home() {
         setJobStatus({ state: "processing", jobId, percent: data.percent ?? 0 });
       } else if (data.status === "complete") {
         stopPolling();
-        setJobStatus({ state: "complete", jobId, funscriptUrl: `${DAEMON_URL}/api/jobs/${jobId}/funscript` });
+        setJobStatus({
+          state: "complete",
+          jobId,
+          funscriptUrl: `${DAEMON_URL}/api/jobs/${jobId}/funscript`,
+          scriptSource: data.script_source,
+        });
       } else if (data.status === "error") {
         stopPolling();
         setJobStatus({ state: "error", jobId, message: data.error ?? "Unknown error." });
@@ -303,6 +310,7 @@ export default function Home() {
             {jobStatus.state !== "idle" && (
               <StatusPanel
                 status={jobStatus}
+                scriptSource={jobStatus.state === "complete" ? jobStatus.scriptSource : undefined}
                 onDownload={handleDownloadFunscript}
                 onOpenInScripter={handleOpenInScripter}
                 onOpenInPlayer={handleOpenInPlayer}
@@ -318,12 +326,14 @@ export default function Home() {
 
 function StatusPanel({
   status,
+  scriptSource,
   onDownload,
   onOpenInScripter,
   onOpenInPlayer,
   onReset,
 }: {
   status: JobStatus;
+  scriptSource?: string;
   onDownload: () => void;
   onOpenInScripter: () => void;
   onOpenInPlayer: () => void;
@@ -361,6 +371,15 @@ function StatusPanel({
       )}
 
       {status.state === "error" && <p className="text-xs text-destructive">{status.message}</p>}
+
+      {status.state === "complete" && scriptSource === "audio_rms" && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/8 px-3 py-2">
+          <Volume2 className="h-3.5 w-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-600 dark:text-amber-400 leading-snug">
+            <span className="font-semibold">Audio-only script</span> — video couldn't be downloaded (unsupported site, geo-block, or private video). Script was generated from the audio track and may be less accurate.
+          </p>
+        </div>
+      )}
 
       {status.state === "complete" && (
         <div className="flex flex-wrap gap-2">

@@ -345,6 +345,7 @@ def generate_funscript(video_url: str) -> dict:
 
         # ── 2. Optical-flow analysis (primary) ────────────────────────────────
         envelope: list[tuple[float, float]] = []
+        script_source = "optical_flow"
 
         if video_path and os.path.exists(video_path):
             print("[engine] Running optical-flow frame analysis...", file=sys.stderr, flush=True)
@@ -355,6 +356,12 @@ def generate_funscript(video_url: str) -> dict:
 
         # ── 3. Audio RMS fallback if optical flow produced nothing ─────────────
         if not envelope:
+            script_source = "audio_rms"
+            print(
+                "WARNING:video_download_failed — falling back to audio RMS analysis",
+                file=sys.stderr,
+                flush=True,
+            )
             print("[engine] Falling back to audio RMS analysis...", file=sys.stderr, flush=True)
             progress(35)
             audio_stem = os.path.join(tmpdir, "audio")
@@ -390,6 +397,7 @@ def generate_funscript(video_url: str) -> dict:
         funscript["metadata"] = {
             "source_url": video_url,
             "generator": "AIScripter",
+            "source": script_source,
         }
         print(
             f"[engine] Generated {len(funscript['actions'])} actions",
