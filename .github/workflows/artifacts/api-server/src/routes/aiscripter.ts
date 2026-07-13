@@ -21,6 +21,31 @@ interface AIScripterReleaseCache {
 let releaseCache: AIScripterReleaseCache | null = null;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
+/**
+ * Build release data from env-var overrides so the endpoint can serve a
+ * real installer URL even before the GitHub CI pipeline produces its first
+ * release asset.
+ *
+ * Set any combination of:
+ *   AISCRIPTER_DOWNLOAD_URL_WIN=https://…/AIScripter-Setup.exe
+ *   AISCRIPTER_DOWNLOAD_URL_MAC=https://…/AIScripter.dmg
+ *   AISCRIPTER_DOWNLOAD_URL_LINUX=https://…/AIScripter.tar.gz
+ *   AISCRIPTER_VERSION=v1.0.0
+ */
+function getEnvOverrideRelease(): AIScripterReleaseCache["data"] | null {
+  const win = process.env.AISCRIPTER_DOWNLOAD_URL_WIN ?? null;
+  const mac = process.env.AISCRIPTER_DOWNLOAD_URL_MAC ?? null;
+  const linux = process.env.AISCRIPTER_DOWNLOAD_URL_LINUX ?? null;
+  if (!win && !mac && !linux) return null;
+  return {
+    tag: process.env.AISCRIPTER_VERSION ?? "latest",
+    exeUrl: win,
+    dmgUrl: mac,
+    tarballUrl: linux,
+    sizeBytes: 0,
+  };
+}
+
 async function fetchLatestRelease(): Promise<AIScripterReleaseCache["data"]> {
   const url = `https://api.github.com/repos/${AISCRIPTER_GITHUB_REPO}/releases/latest`;
   const headers: Record<string, string> = {
@@ -60,6 +85,31 @@ async function fetchLatestRelease(): Promise<AIScripterReleaseCache["data"]> {
     tarballUrl: tarAsset?.browser_download_url ?? null,
     sizeBytes: primaryAsset?.size ?? 0,
   };
+}
+
+/**
+ * Returns cached release data, preferring env-var overrides over GitHub.
+ * Falls back to stale cache if GitHub is unavailable.
+ */
+async function getRelease(): Promise<AIScripterReleaseCache["data"]> {
+  const envOverride = getEnvOverrideRelease();
+  if (envOverride) return envOverride;
+
+  const now = Date.now();
+  if (releaseCache && now - releaseCache.fetchedAt < CACHE_TTL_MS) {
+    return releaseCache.data;
+  }
+
+  try {
+    const data = await fetchLatestRelease();
+    releaseCache = { data, fetchedAt: now };
+    return data;
+  } catch (err) {
+    if (releaseCache) {
+      return releaseCache.data;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -105,8 +155,18 @@ router.post("/user/aiscripter-agree", async (req: Request, res: Response) => {
 
 /**
  * GET /api/aiscripter/release
- * Proxies the latest GitHub release for AIScripter (cached 1 h).
  * Requires Clerk auth + subscriber plan.
+ *
+ * Two behaviours depending on the `platform` query param:
+ *
+ *   • No `platform`  → returns release metadata JSON
+ *     { tag, sizeBytes, platforms: { windows, macos, linux } }
+ *     Used by the UI to display the version badge and available platforms.
+ *
+ *   • ?platform=windows|macos|linux  → 302 redirect to the real installer
+ *     download URL (GitHub release asset or env-var override).
+ *     This is the primary download path; the redirect target is the actual
+ *     binary so the browser immediately prompts for a file save.
  */
 router.get("/aiscripter/release", async (req: Request, res: Response) => {
   const auth = getAuth(req);
@@ -129,23 +189,111 @@ router.get("/aiscripter/release", async (req: Request, res: Response) => {
     return;
   }
 
-  const now = Date.now();
-  if (releaseCache && now - releaseCache.fetchedAt < CACHE_TTL_MS) {
-    res.json(releaseCache.data);
+  const platform = (req.query.platform as string | undefined)?.toLowerCase();
+
+  if (platform !== undefined) {
+    if (!["windows", "macos", "linux"].includes(platform)) {
+      res.status(400).json({ error: "platform must be windows, macos, or linux." });
+      return;
+    }
+
+    let data: AIScripterReleaseCache["data"];
+    try {
+      data = await getRelease();
+    } catch {
+      res.status(502).json({ error: "Could not fetch release information." });
+      return;
+    }
+
+    const downloadUrl =
+      platform === "windows" ? data.exeUrl :
+      platform === "macos"   ? data.dmgUrl :
+                               data.tarballUrl;
+
+    if (!downloadUrl) {
+      res.status(404).json({
+        error: `No ${platform} installer is available for this release yet.`,
+      });
+      return;
+    }
+
+    res.redirect(302, downloadUrl);
     return;
   }
 
   try {
-    const data = await fetchLatestRelease();
-    releaseCache = { data, fetchedAt: now };
-    res.json(data);
-  } catch (err) {
-    if (releaseCache) {
-      res.json(releaseCache.data);
-      return;
-    }
+    const data = await getRelease();
+    res.json({
+      tag: data.tag,
+      sizeBytes: data.sizeBytes,
+      platforms: {
+        windows: data.exeUrl !== null,
+        macos: data.dmgUrl !== null,
+        linux: data.tarballUrl !== null,
+      },
+    });
+  } catch {
     res.status(502).json({ error: "Could not fetch release information." });
   }
+});
+
+/**
+ * GET /api/aiscripter/release/download?platform=windows|macos|linux
+ * Auth-gated endpoint that returns the signed download URL for the installer.
+ * Requires Clerk auth + subscriber plan.
+ *
+ * Returns { url: string, tag: string } so the client can trigger a real
+ * browser file download without the raw asset URL ever appearing in the
+ * page's JS context before the auth check completes.
+ */
+router.get("/aiscripter/release/download", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    res.status(401).json({ error: "Not authenticated." });
+    return;
+  }
+
+  try {
+    const plan = await getPlan(auth.userId);
+    if (plan === "free") {
+      res.status(403).json({
+        error: "Subscriber plan required.",
+        upgradeUrl: "/upgrade",
+      });
+      return;
+    }
+  } catch {
+    res.status(500).json({ error: "Failed to verify subscription." });
+    return;
+  }
+
+  const platform = (req.query.platform as string | undefined)?.toLowerCase();
+  if (!platform || !["windows", "macos", "linux"].includes(platform)) {
+    res.status(400).json({ error: "platform must be windows, macos, or linux." });
+    return;
+  }
+
+  let data: AIScripterReleaseCache["data"];
+  try {
+    data = await getRelease();
+  } catch {
+    res.status(502).json({ error: "Could not fetch release information." });
+    return;
+  }
+
+  const downloadUrl =
+    platform === "windows" ? data.exeUrl :
+    platform === "macos"   ? data.dmgUrl :
+                             data.tarballUrl;
+
+  if (!downloadUrl) {
+    res.status(404).json({
+      error: `No ${platform} installer is available for this release yet.`,
+    });
+    return;
+  }
+
+  res.json({ url: downloadUrl, tag: data.tag });
 });
 
 export default router;
