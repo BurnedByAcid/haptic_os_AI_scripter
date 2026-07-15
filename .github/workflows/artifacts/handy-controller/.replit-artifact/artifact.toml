@@ -1,103 +1,112 @@
 kind = "web"
-previewPath = "/"
-title = "HapticOS"
-version = "1.0.0"
-id = "artifacts/handy-controller"
-router = "path"
+  previewPath = "/"
+  title = "HapticOS"
+  version = "1.0.0"
+  id = "artifacts/handy-controller"
+  router = "path"
 
-[[integratedSkills]]
-name = "react-vite"
-version = "1.0.0"
+  [[integratedSkills]]
+  name = "react-vite"
+  version = "1.0.0"
 
-[[services]]
-name = "web"
-paths = [ "/" ]
-localPort = 8081
+  [[services]]
+  name = "web"
+  paths = [ "/" ]
+  localPort = 8081
 
-[services.development]
-run = "fuser -k 8081/tcp || true && pnpm --filter @workspace/handy-controller run dev"
+  [services.development]
+  run = "fuser -k 8081/tcp || true && pnpm --filter @workspace/handy-controller run dev"
 
-[services.production]
-build = [ "pnpm", "--filter", "@workspace/handy-controller", "run", "build" ]
-publicDir = ".github/workflows/artifacts/handy-controller/dist/public"
-serve = "static"
+  [services.production]
+  build = [ "pnpm", "--filter", "@workspace/handy-controller", "run", "build" ]
+  publicDir = ".github/workflows/artifacts/handy-controller/dist/public"
+  serve = "static"
 
-[[services.production.rewrites]]
-from = "/"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/player"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/player"
+  to = "/player/index.html"
 
-[[services.production.rewrites]]
-from = "/sign-in"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/player/*"
+  to = "/player/index.html"
 
-[[services.production.rewrites]]
-from = "/sign-in/*"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/sign-in"
+  to = "/sign-in/index.html"
 
-[[services.production.rewrites]]
-from = "/sign-up"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/sign-in/*"
+  to = "/sign-in/index.html"
 
-[[services.production.rewrites]]
-from = "/sign-up/*"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/sign-up"
+  to = "/sign-up/index.html"
 
-[[services.production.rewrites]]
-from = "/onboarding"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/sign-up/*"
+  to = "/sign-up/index.html"
 
-[[services.production.rewrites]]
-from = "/control"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/onboarding"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/local-library"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/control"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/games"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/local-library"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/beat"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/games"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/audio-cleaner"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/beat"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/scripter"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/audio-cleaner"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/haptic-ai"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/scripter"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/haptic-ai-soon"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/haptic-ai"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/aiscripter"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/haptic-ai-soon"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/community"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/aiscripter"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/upgrade"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/community"
+  to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/admin"
-to = "/index.html"
+  [[services.production.rewrites]]
+  from = "/upgrade"
+  to = "/index.html"
 
-[services.env]
-PORT = "8081"
-BASE_PATH = "/"
+  [[services.production.rewrites]]
+  from = "/admin"
+  to = "/index.html"
+
+  [[services.production.rewrites]]
+  from = "/*"
+  to = "/index.html"
+
+  [services.env]
+  PORT = "8081"
+  BASE_PATH = "/"
+  

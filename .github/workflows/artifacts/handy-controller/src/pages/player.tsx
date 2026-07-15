@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@clerk/react";
 import { useFeatureTracking } from "@/hooks/use-analytics";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import { useHandy } from "@/hooks/use-handy";
 import { enqueueRetry } from "@/hooks/use-retry-queue";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -110,6 +111,22 @@ interface FSAFileHandle extends FileSystemFileHandle {
 
 export default function Player() {
   useFeatureTracking("player");
+  usePageMeta({
+    title: "Player — HapticOS",
+    description: "Sync haptic scripts with any video and control your device in real time. Paste a URL or load a local file to get started.",
+    canonical: `${window.location.origin}/player`,
+    og: {
+      title: "HapticOS Player — Sync Scripts with Any Video",
+      description: "Sync haptic scripts with any video and control your device in real time. Paste a URL or load a local file to get started.",
+      type: "website",
+      image: "/og-image.png",
+    },
+    twitter: {
+      title: "HapticOS Player — Sync Scripts with Any Video",
+      description: "Sync haptic scripts with any video and control your device in real time. Paste a URL or load a local file to get started.",
+      image: "/og-image.png",
+    },
+  });
   const { key, connected, recordAppModeChange } = useHandy();
   const { isPro, isLoaded: planLoaded } = useSubscription();
   const { getToken } = useAuth();
