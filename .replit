@@ -85,6 +85,7 @@ VITE_CLERK_PUBLISHABLE_KEY = "pk_test_dXNhYmxlLWdvYmJsZXItNjUuY2xlcmsuYWNjb3VudH
 STRIPE_PRICE_ID = "price_1TTEywLm1BrqnliEgrgiPMZx"
 STRIPE_EARLY_BIRD_COUPON_ID = "HAPTICOS_EARLY_BIRD_50"
 HAPTICAI_GITHUB_REPO = "BurnedByAcid/hapticai-server"
+AISCRIPTER_GITHUB_REPO = "BurnedByAcid/haptic_os_AI_scripter"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-8d0b8bc7-9fdc-457e-96d6-f363f2de9dff"
