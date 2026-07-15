@@ -41,5 +41,8 @@ server: {
 
 **How to apply:** Whenever a new workspace package is added to `.github/workflows/artifacts/` that imports `@workspace/*`, add its alias to both `build.mjs` (api-server) and `vite.config.ts` (frontend).
 
+# Fix for build-time tools (esbuild itself)
+The broken symlink depth also hits regular deps like `esbuild` inside deep packages — deployment installs can leave `api-server/node_modules/esbuild` pointing 3 levels up instead of 5, so `import "esbuild"` in build.mjs fails with ERR_MODULE_NOT_FOUND. Fix: declare esbuild + esbuild-plugin-pino in the ROOT package.json dependencies (root-level links are always correct) and have build.mjs resolve them via createRequire against the package first, then the workspace root as fallback.
+
 # tsconfig.json extends path
 Also broken for the same reason — `"extends": "../../tsconfig.base.json"` should be `"../../../../tsconfig.base.json"` for these deep packages. Same for `references` paths.

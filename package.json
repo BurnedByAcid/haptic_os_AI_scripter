@@ -15,6 +15,8 @@
     "typescript": "~5.9.2"
   },
   "dependencies": {
+    "esbuild": "^0.27.3",
+    "esbuild-plugin-pino": "^2.3.3",
     "stripe": "^22.1.0",
     "stripe-replit-sync": "^1.0.0"
   },

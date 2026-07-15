@@ -1,16 +1,32 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { build as esbuild } from "esbuild";
-import esbuildPluginPino from "esbuild-plugin-pino";
 import { rm } from "node:fs/promises";
-
-// Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
-globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 // Workspace root is 4 levels up: api-server → artifacts → workflows → .github → root
 const workspaceRoot = path.resolve(artifactDir, '../../../../');
+
+// Deeply-nested workspace packages can end up with broken node_modules symlinks
+// (pnpm computes wrong relative depth for packages 4 levels deep). Resolve build
+// tooling from this package first, then fall back to the workspace root, where
+// esbuild + esbuild-plugin-pino are also declared as root dependencies.
+function resolveBuildDep(name) {
+  for (const base of [import.meta.url, path.join(workspaceRoot, "package.json")]) {
+    try {
+      return createRequire(base).resolve(name);
+    } catch {
+      // try next base
+    }
+  }
+  throw new Error(`Cannot resolve '${name}' from ${artifactDir} or ${workspaceRoot}`);
+}
+
+const { build: esbuild } = await import(resolveBuildDep("esbuild"));
+const esbuildPluginPino = (await import(resolveBuildDep("esbuild-plugin-pino"))).default;
+
+// Plugins (e.g. 'esbuild-plugin-pino') may use `require` to resolve dependencies
+globalThis.require = createRequire(path.join(workspaceRoot, "package.json"));
 
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
