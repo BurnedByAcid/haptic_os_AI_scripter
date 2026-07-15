@@ -1,0 +1,130 @@
+
+2026-07-15 02:04:00.41
+772460e6
+User
+{"level":30,"time":1784095440409,"pid":20,"hostname":"localhost","req":{"id":1,"method":"GET","url":"/api/healthz"},"res":{"statusCode":200},"responseTime":17,"msg":"request completed"}
+
+2026-07-15 05:44:21.76
+772460e6
+System
+sending SIGTERM to artifact process artifact=artifacts/api-server
+
+2026-07-15 05:44:21.76
+772460e6
+System
+received signal, shutting down artifact processes signal=terminated
+
+2026-07-15 05:44:21.77
+772460e6
+System
+artifact process exited with error error=signal: terminated artifact=artifacts/api-server
+
+2026-07-15 05:44:21.77
+772460e6
+System
+main done, exiting
+
+2026-07-15 05:44:21.77
+772460e6
+System
+all artifact processes stopped
+
+2026-07-15 05:49:10.72
+772460e6
+System
+starting up user application
+
+2026-07-15 05:49:10.72
+772460e6
+System
+artifact mode enabled runnable=1 static=1
+
+2026-07-15 05:49:10.72
+772460e6
+System
+starting artifact processes for monorepo deployment
+
+2026-07-15 05:49:10.72
+772460e6
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+
+2026-07-15 05:49:10.72
+772460e6
+System
+forwarding local port 0 to external port 80 (mapped as 1104)
+
+2026-07-15 05:49:10.72
+772460e6
+System
+registered static handler for artifact path=/ publicDir=artifacts/handy-controller/dist/public
+
+2026-07-15 05:49:10.72
+772460e6
+System
+waiting for runnable artifact ports ports=[8080]
+
+2026-07-15 05:49:10.72
+772460e6
+System
+baseline ports snapshot before artifact start ports=[1106 1105 1104]
+
+2026-07-15 05:49:10.73
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-15 05:49:10.73
+772460e6
+System
+starting artifact processes count=1
+
+2026-07-15 05:49:10.73
+772460e6
+System
+starting artifact process artifact=artifacts/api-server args=[node --enable-source-maps artifacts/api-server/dist/index.mjs] port=8080
+
+2026-07-15 05:49:10.73
+772460e6
+System
+artifact process started pid=18 artifact=artifacts/api-server
+
+2026-07-15 05:49:10.73
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-15 05:49:10.74
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-15 05:49:10.75
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-15 05:49:10.79
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-15 05:49:10.93
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-15 05:49:11.00
+772460e6
+System
+healthcheck failed error=healthcheck /api returned status 500
+
+2026-07-15 05:49:12.30
+772460e6
+User
+{"level":30,"time":1784108952306,"pid":18,"hostname":"localhost","msg":"Initializing Stripe schema..."}
+
+2026-07-15 05:49:12.31
+772460e6
+User
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
