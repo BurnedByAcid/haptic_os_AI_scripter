@@ -23,7 +23,79 @@ publicDir = ".github/workflows/artifacts/handy-controller/dist/public"
 serve = "static"
 
 [[services.production.rewrites]]
-from = "/*"
+from = "/"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/player"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/sign-in"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/sign-in/*"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/sign-up"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/sign-up/*"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/onboarding"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/control"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/local-library"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/games"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/beat"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/audio-cleaner"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/scripter"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/haptic-ai"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/haptic-ai-soon"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/aiscripter"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/community"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/upgrade"
+to = "/index.html"
+
+[[services.production.rewrites]]
+from = "/admin"
 to = "/index.html"
 
 [services.env]
