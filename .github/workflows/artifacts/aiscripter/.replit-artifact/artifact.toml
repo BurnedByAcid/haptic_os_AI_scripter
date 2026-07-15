@@ -19,7 +19,7 @@ run = "fuser -k 21125/tcp 2>/dev/null || true; pnpm --filter @workspace/aiscript
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/aiscripter", "run", "build" ]
-publicDir = "artifacts/aiscripter/dist/public"
+publicDir = ".github/workflows/artifacts/aiscripter/dist/public"
 serve = "static"
 
 [[services.production.rewrites]]
