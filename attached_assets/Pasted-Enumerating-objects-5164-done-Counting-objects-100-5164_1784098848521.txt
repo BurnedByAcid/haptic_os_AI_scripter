@@ -1,0 +1,41 @@
+Enumerating objects: 5164, done.
+Counting objects: 100% (5164/5164), done.
+Delta compression using up to 2 threads
+Compressing objects: 100% (2127/2127), done.
+Writing objects: 100% (5164/5164), 19.39 MiB | 34.12 MiB/s, done.
+Total 5164 (delta 3535), reused 4427 (delta 2896), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (3535/3535), done.
+remote: error: GH013: Repository rule violations found for refs/heads/main.
+remote: 
+remote: - GITHUB PUSH PROTECTION
+remote:   —————————————————————————————————————————
+remote:     Resolve the following violations before pushing again
+remote: 
+remote:     - Push cannot contain secrets
+remote: 
+remote:     
+remote:      (?) Learn how to resolve a blocked push
+remote:      https://docs.github.com/code-security/secret-scanning/working-with-secret-scanning-and-push-protection/working-with-push-protection-from-the-command-line#resolving-a-blocked-push
+remote:     
+remote:     
+remote:       —— Stripe Test API Secret Key ————————————————————————
+remote:        locations:
+remote:          - commit: 9bd8b574c1b64e78b5a8779016b73630b12a123b
+remote:            path: .replit:48
+remote:          - commit: e28b2e0616e7ef8105fb38ebff7e10c18eb51f97
+remote:            path: .replit:69
+remote:          - commit: d68710a74b8905bd86eea16434cb30f3018b6c92
+remote:            path: .replit:88
+remote:          - commit: 146b3bb142f87d1af3143cad13432feb472417f5
+remote:            path: .replit:88
+remote:          - commit: c768c6feb39b521f6aba4ae8b986228a248821ea
+remote:            path: .replit:88
+remote:     
+remote:        (?) To push, remove secret from commit(s) or follow this URL to allow the secret.
+remote:        https://github.com/BurnedByAcid/haptic_os_AI_scripter/security/secret-scanning/unblock-secret/3GWrq5T1PirJ4cWmO2UMaT4pzLT
+remote:     
+remote: 
+remote: 
+To https://github.com/BurnedByAcid/haptic_os_AI_scripter
+ ! [remote rejected] main -> main (push declined due to repository rule violations)
+error: failed to p
