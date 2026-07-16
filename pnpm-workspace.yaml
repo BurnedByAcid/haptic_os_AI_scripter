@@ -1,5 +1,5 @@
 packages:
-  - .github/workflows/artifacts/*
+  - artifacts/*
   - lib/*
   - lib/integrations/*
   - scripts

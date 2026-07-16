@@ -187,7 +187,7 @@ importers:
         specifier: ~5.9.2
         version: 5.9.3
 
-  .github/workflows/artifacts/aiscripter:
+  artifacts/aiscripter:
     devDependencies:
       '@clerk/react':
         specifier: ^6.4.5
@@ -308,7 +308,7 @@ importers:
         version: 5.1.4(vite@7.3.2(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.47.0)(tsx@4.21.0)(yaml@2.8.4))
       '@workspace/api-client-react':
         specifier: workspace:*
-        version: link:../../../../lib/api-client-react
+        version: link:../../lib/api-client-react
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -382,7 +382,7 @@ importers:
         specifier: 'catalog:'
         version: 3.25.76
 
-  .github/workflows/artifacts/api-server:
+  artifacts/api-server:
     dependencies:
       '@clerk/express':
         specifier: ^2.1.9
@@ -404,13 +404,13 @@ importers:
         version: 2.16.1
       '@workspace/api-zod':
         specifier: workspace:*
-        version: link:../../../../lib/api-zod
+        version: link:../../lib/api-zod
       '@workspace/db':
         specifier: workspace:*
-        version: link:../../../../lib/db
+        version: link:../../lib/db
       '@workspace/validation':
         specifier: workspace:*
-        version: link:../../../../lib/validation
+        version: link:../../lib/validation
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -485,7 +485,7 @@ importers:
         specifier: ^4.1.5
         version: 4.1.5(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.47.0)(tsx@4.21.0)(yaml@2.8.4)
 
-  .github/workflows/artifacts/handy-controller:
+  artifacts/handy-controller:
     dependencies:
       '@clerk/react':
         specifier: ^6.4.5
@@ -643,10 +643,10 @@ importers:
         version: 0.1.69
       '@workspace/api-client-react':
         specifier: workspace:*
-        version: link:../../../../lib/api-client-react
+        version: link:../../lib/api-client-react
       '@workspace/validation':
         specifier: workspace:*
-        version: link:../../../../lib/validation
+        version: link:../../lib/validation
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -738,7 +738,7 @@ importers:
         specifier: 'catalog:'
         version: 3.25.76
 
-  .github/workflows/artifacts/mockup-sandbox:
+  artifacts/mockup-sandbox:
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -3776,10 +3776,6 @@ packages:
 
   has-tostringtag@1.0.2:
     resolution: {integrity: sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw==}
-    engines: {node: '>= 0.4'}
-
-  hasown@2.0.3:
-    resolution: {integrity: sha512-ej4AhfhfL2Q2zpMmLo7U1Uv9+PyhIZpgQLGT1F9miIGmiCJIoCgSmczFdrc97mWT4kVY72KA+WnnhJ5pghSvSg==}
     engines: {node: '>= 0.4'}
 
   hasown@2.0.4:
@@ -8117,7 +8113,7 @@ snapshots:
       has-property-descriptors: 1.0.2
       has-proto: 1.2.0
       has-symbols: 1.1.0
-      hasown: 2.0.3
+      hasown: 2.0.4
       internal-slot: 1.1.0
       is-array-buffer: 3.0.5
       is-callable: 1.2.7
@@ -8165,7 +8161,7 @@ snapshots:
       es-errors: 1.3.0
       get-intrinsic: 1.3.0
       has-tostringtag: 1.0.2
-      hasown: 2.0.3
+      hasown: 2.0.4
 
   es-to-primitive@1.3.0:
     dependencies:
@@ -8359,7 +8355,7 @@ snapshots:
       asynckit: 0.4.0
       combined-stream: 1.0.8
       es-set-tostringtag: 2.1.0
-      hasown: 2.0.3
+      hasown: 2.0.4
       mime-types: 2.1.35
       safe-buffer: 5.2.1
 
@@ -8416,7 +8412,7 @@ snapshots:
       call-bound: 1.0.4
       define-properties: 1.2.1
       functions-have-names: 1.2.3
-      hasown: 2.0.3
+      hasown: 2.0.4
       is-callable: 1.2.7
 
   functions-have-names@1.2.3: {}
@@ -8457,7 +8453,7 @@ snapshots:
       get-proto: 1.0.1
       gopd: 1.2.0
       has-symbols: 1.1.0
-      hasown: 2.0.3
+      hasown: 2.0.4
       math-intrinsics: 1.1.0
 
   get-nonce@1.0.1: {}
@@ -8564,10 +8560,6 @@ snapshots:
     dependencies:
       has-symbols: 1.1.0
 
-  hasown@2.0.3:
-    dependencies:
-      function-bind: 1.1.2
-
   hasown@2.0.4:
     dependencies:
       function-bind: 1.1.2
@@ -8661,7 +8653,7 @@ snapshots:
   internal-slot@1.1.0:
     dependencies:
       es-errors: 1.3.0
-      hasown: 2.0.3
+      hasown: 2.0.4
       side-channel: 1.1.0
 
   internmap@2.0.3: {}
@@ -8697,7 +8689,7 @@ snapshots:
 
   is-core-module@2.16.2:
     dependencies:
-      hasown: 2.0.3
+      hasown: 2.0.4
 
   is-data-view@1.0.2:
     dependencies:
@@ -8756,7 +8748,7 @@ snapshots:
       call-bound: 1.0.4
       gopd: 1.2.0
       has-tostringtag: 1.0.2
-      hasown: 2.0.3
+      hasown: 2.0.4
 
   is-regexp@1.0.0: {}
 

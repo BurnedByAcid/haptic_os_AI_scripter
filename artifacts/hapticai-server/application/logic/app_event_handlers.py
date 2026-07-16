@@ -1,0 +1,444 @@
+from typing import Tuple
+
+
+from application.utils import VideoSegment, _format_time
+from config.constants import DEFAULT_CHAPTER_FPS
+
+
+class AppEventHandlers:
+    def __init__(self, app_logic_instance):
+        self.app = app_logic_instance
+        self.logger = self.app.logger
+
+    def handle_playback_control(self, action_name: str):
+        self.logger.debug(f"Playback control: {action_name}")
+        processor = self.app.processor
+        if not self.app.file_manager.video_path or not processor or not processor.video_info:
+            self.logger.info("No video loaded for playback control.", extra={'status_message': True})
+            return
+
+        total_frames = processor.video_info.get('total_frames', 0)
+        current_frame = processor.current_frame_index
+        fs_proc = self.app.funscript_processor
+        app_state_ui = self.app.app_state_ui
+
+        if action_name == "jump_start":
+            self.seek_video_with_sync(0)
+            return
+        if action_name == "jump_end":
+            self.seek_video_with_sync(total_frames - 1)
+            return
+        if action_name == "prev_frame":
+            self.seek_video_with_sync(max(0, current_frame - 1))
+            return
+        if action_name == "next_frame":
+            self.seek_video_with_sync(min(total_frames - 1, current_frame + 1))
+            return
+        if action_name == "play_pause":
+            is_currently_playing = processor.is_processing and not processor.pause_event.is_set()
+            if is_currently_playing:
+                processor.pause_processing()
+                # Native fullscreen auto-pauses via single FFmpeg dual-output
+            else:
+                # Only start regular video playback, never restart tracking sessions
+                # Tracking sessions should only be started via the control panel
+                processor.start_processing()
+                # Native fullscreen auto-resumes via single FFmpeg dual-output
+            return
+        if action_name == "stop":
+            processor.stop_processing()
+            return
+
+        # After any action other than starting playback, update the displayed frame.
+        is_resuming_or_starting = action_name == "play_pause" and (
+                    processor.is_processing and not processor.pause_event.is_set())
+        if not is_resuming_or_starting:
+            processor.display_current_frame()
+
+        if action_name in ["jump_start", "prev_frame", "stop", "next_frame", "jump_end"]:
+            app_state_ui.force_timeline_pan_to_current_frame = True
+
+        self.app.energy_saver.reset_activity_timer()
+
+    def handle_jump_to_point(self, direction: str):
+        if not self.app.processor or not self.app.processor.is_video_open():
+            self.logger.info("Cannot jump: No video loaded.", extra={'status_message': True})
+            return
+
+        fs = self.app.processor.tracker.funscript
+        if not fs:
+            self.logger.info("Cannot jump: Funscript object not available.", extra={'status_message': True})
+            return
+
+        current_frame = self.app.processor.current_frame_index
+        fps = self.app.processor.fps
+
+        target_frame = None
+        if direction == 'next':
+            target_frame = fs.find_next_jump_frame(current_frame, fps, 'primary')
+        elif direction == 'prev':
+            target_frame = fs.find_prev_jump_frame(current_frame, fps, 'primary')
+
+        if target_frame is not None:
+            total_frames = self.app.processor.total_frames
+            if total_frames > 0:
+                target_frame = min(target_frame, total_frames - 1)
+
+            self.seek_video_with_sync(target_frame)
+            self.app.energy_saver.reset_activity_timer()
+        else:
+            self.logger.info(f"No {direction} point found to jump to.", extra={'status_message': True})
+
+    def handle_abort_process_click(self):
+        stage_processor = self.app.stage_processor
+        if stage_processor.full_analysis_active:
+            stage_processor.abort_stage_processing()
+            self.app.on_processing_stopped() # If aborting stage proc should also check pending app logic actions
+
+        elif self.app.processor and self.app.processor.is_processing:
+            self.app.processor.stop_processing()
+        else:
+            self.logger.info("No process running to abort.", extra={'status_message': False})
+        self.app.energy_saver.reset_activity_timer()
+
+    def handle_start_ai_cv_analysis(self):  # New specific handler for AI CV
+        if not self.app._check_model_paths():
+            return
+        if not self.app.tracker: self.logger.error("Tracker not initialized."); return
+        
+        self.app.tracker.set_tracking_mode("yolo_roi")  # Ensure correct mode
+        self.app.stage_processor.start_full_analysis(processing_mode=self.app.app_state_ui.selected_tracker_name)
+        self.app.energy_saver.reset_activity_timer()
+
+    def handle_start_live_tracker_click(self):
+        if not self.app._check_model_paths():
+            return
+        if not self.app.processor or not self.app.file_manager.video_path:
+            self.logger.info("No video loaded for live tracking.", extra={'status_message': True})
+            return
+        if not self.app.tracker:
+            self.logger.error("Tracker not initialized for live tracking.")
+            return
+
+        # RULE: Desktop live tracking with device control only allowed in REALTIME or SLOW_MOTION modes
+        # Exception: Allow if streamer has control (streamer can handle MAX_SPEED)
+        device_manager = getattr(self.app, 'device_manager', None)
+        if device_manager and device_manager.is_connected():
+            control_source = device_manager.get_active_control_source()
+            # Only block if desktop has control (not if streamer has control)
+            if control_source == 'desktop':
+                from config.constants import ProcessingSpeedMode
+                current_mode = self.app.app_state_ui.selected_processing_speed_mode
+                if current_mode == ProcessingSpeedMode.MAX_SPEED:
+                    self.logger.error("Desktop live tracking with device control is not allowed in MAX SPEED mode. Switch to REALTIME or SLOW-MO mode first.", extra={'status_message': True, 'duration': 5.0})
+                    return
+
+        selected_tracker_name = self.app.app_state_ui.selected_tracker_name
+        
+        # Set tracker using dynamic discovery
+        if selected_tracker_name:
+            self.app.tracker.set_tracking_mode(selected_tracker_name)
+
+        # Use dynamic tracker discovery for logging and validation
+        from application.gui_components.dynamic_tracker_ui import get_dynamic_tracker_ui
+        tracker_ui = get_dynamic_tracker_ui()
+        
+        # Check if selected tracker is valid for live tracking
+        if not selected_tracker_name or not tracker_ui.is_live_tracker(selected_tracker_name):
+            self.logger.error(f"Invalid live tracker selected: {selected_tracker_name}")
+            return
+
+        display_name = tracker_ui.get_tracker_display_name(selected_tracker_name)
+        self.logger.info(f"Starting {display_name} tracking.")
+
+        # Auto-set axis for axis projection trackers if not already set
+        if "axis_projection" in selected_tracker_name:
+            current_tracker = self.app.tracker.get_current_tracker()
+            if current_tracker and hasattr(current_tracker, 'set_axis'):
+                # Check if axis is already set
+                axis_already_set = False
+                if hasattr(current_tracker, 'axis_point_A') and hasattr(current_tracker, 'axis_point_B'):
+                    axis_already_set = (current_tracker.axis_point_A is not None and 
+                                      current_tracker.axis_point_B is not None)
+                
+                if not axis_already_set:
+                    # Set default horizontal axis across middle of frame
+                    margin = 50
+                    width, height = 640, 640  # Processing frame size
+                    axis_A = (margin, height // 2)  # Left side
+                    axis_B = (width - margin, height // 2)  # Right side
+                    result = current_tracker.set_axis(axis_A, axis_B)
+                    self.logger.info(f"Auto-set axis for {selected_tracker_name}: A={axis_A}, B={axis_B}, result={result}")
+
+        # Explicitly start the tracker before starting video processing
+        self.app.tracker.start_tracking()
+        self.app.processor.set_tracker_processing_enabled(True)
+
+        # Auto-skip "Not Relevant" category chapters when starting tracking
+        if self.app.processor and self.app.funscript_processor:
+            from config.constants import POSITION_INFO_MAPPING
+            current_frame = self.app.processor.current_frame_index
+            chapter_at_cursor = self.app.funscript_processor.get_chapter_at_frame(current_frame)
+
+            should_skip = False
+            skip_reason = ""
+
+            # Determine category based on position_short_name (reliable for old and new chapters)
+            if chapter_at_cursor:
+                position_short_name = chapter_at_cursor.position_short_name
+                position_info = POSITION_INFO_MAPPING.get(position_short_name, {})
+                category = position_info.get('category', 'Position')  # Default to Position if not in mapping
+
+                if category == "Not Relevant":
+                    should_skip = True
+                    skip_reason = f"Skipping 'Not Relevant' chapter '{chapter_at_cursor.position_short_name}'"
+
+            if should_skip:
+                # Find next Position category chapter
+                next_chapter = self._find_next_relevant_chapter(current_frame)
+                if next_chapter:
+                    self.logger.info(f"{skip_reason}, seeking to: {next_chapter.position_short_name}",
+                                   extra={'status_message': True})
+                    self.app.processor.seek_video(next_chapter.start_frame_id)
+                    self.app.app_state_ui.force_timeline_pan_to_current_frame = True
+                else:
+                    self.logger.warning(f"{skip_reason}, but no Position chapters found ahead",
+                                      extra={'status_message': True})
+
+        fs_proc = self.app.funscript_processor
+        start_frame = self.app.processor.current_frame_index
+        end_frame = -1
+        if fs_proc.scripting_range_active:
+            start_frame = fs_proc.scripting_start_frame
+            end_frame = fs_proc.scripting_end_frame
+            self.app.processor.seek_video(start_frame)
+
+        # Check if MAX_SPEED mode is selected - if so, use CLI pipeline for maximum performance
+        from config.constants import ProcessingSpeedMode
+        is_max_speed = (hasattr(self.app, 'app_state_ui') and 
+                       hasattr(self.app.app_state_ui, 'selected_processing_speed_mode') and
+                       self.app.app_state_ui.selected_processing_speed_mode == ProcessingSpeedMode.MAX_SPEED)
+        
+        # Normal processing for all modes - let the video processor handle optimizations
+        self.app.processor.start_processing(start_frame=start_frame, end_frame=end_frame)
+            
+        display_name = tracker_ui.get_tracker_display_name(selected_tracker_name)
+        self.logger.info(
+            f"Live tracker ({display_name}) started. Range: {'scripting range' if fs_proc.scripting_range_active else 'full video from current'}",
+            extra={'status_message': True})
+        self.app.energy_saver.reset_activity_timer()
+
+    def handle_reset_live_tracker_click(self):
+        if self.app.processor:
+            # Stop processing and reset tracker state, but preserve the funscript data
+            self.app.processor.stop_processing(join_thread=True)
+            
+            # Reset tracker state but preserve funscript
+            if self.app.tracker:
+                self.app.tracker.reset(reason="stop_preserve_funscript")
+                
+            # Reset processor frame position to current for potential restart
+            # But don't seek to beginning since user might want to continue from current position
+            self.app.processor.enable_tracker_processing = False
+        self.logger.info("Live Tracker reset.", extra={'status_message': True})
+        self.app.energy_saver.reset_activity_timer()
+
+
+    def handle_scripting_range_active_toggle(self, new_active_state: bool):
+        fs_proc = self.app.funscript_processor
+        fs_proc.scripting_range_active = new_active_state
+        if not new_active_state:
+            fs_proc.selected_chapter_for_scripting = None  # Clear chapter selection if range deactivated
+        self.app.project_manager.project_dirty = True
+        self.logger.info(f"Scripting range {'enabled' if new_active_state else 'disabled'}.",
+                         extra={'status_message': True})
+        self.app.energy_saver.reset_activity_timer()
+
+    def handle_scripting_start_frame_input(self, new_start_val: int):
+        fs_proc = self.app.funscript_processor
+        video_total_frames = self.app.processor.total_frames if self.app.processor and self.app.processor.total_frames else 0
+
+        fs_proc.scripting_start_frame = new_start_val
+        if video_total_frames > 0:
+            fs_proc.scripting_start_frame = min(max(0, fs_proc.scripting_start_frame), video_total_frames - 1)
+        else:
+            fs_proc.scripting_start_frame = max(0, fs_proc.scripting_start_frame)
+
+        # If end frame is set (not -1) and start goes past it, adjust end frame
+        if fs_proc.scripting_end_frame != -1 and fs_proc.scripting_start_frame > fs_proc.scripting_end_frame:
+            fs_proc.scripting_end_frame = fs_proc.scripting_start_frame
+        fs_proc.selected_chapter_for_scripting = None
+        self.app.project_manager.project_dirty = True
+        self.logger.debug(f"Scripting start frame updated to: {fs_proc.scripting_start_frame}")
+        self.app.energy_saver.reset_activity_timer()
+
+    def handle_scripting_end_frame_input(self, new_end_val: int):
+        fs_proc = self.app.funscript_processor
+        video_total_frames = self.app.processor.total_frames if self.app.processor and self.app.processor.total_frames else 0
+
+        fs_proc.scripting_end_frame = new_end_val
+        if fs_proc.scripting_end_frame != -1:
+            if video_total_frames > 0:
+                fs_proc.scripting_end_frame = min(max(0, fs_proc.scripting_end_frame), video_total_frames - 1)
+            else:
+                fs_proc.scripting_end_frame = max(0, fs_proc.scripting_end_frame)
+            if fs_proc.scripting_start_frame > fs_proc.scripting_end_frame:
+                fs_proc.scripting_start_frame = fs_proc.scripting_end_frame
+        fs_proc.selected_chapter_for_scripting = None
+        self.app.project_manager.project_dirty = True
+        self.logger.debug(f"Scripting end frame updated to: {fs_proc.scripting_end_frame}")
+        self.app.energy_saver.reset_activity_timer()
+
+    def clear_scripting_range_selection(self):
+        fs_proc = self.app.funscript_processor
+        fs_proc.reset_scripting_range()
+        self.app.project_manager.project_dirty = True
+        self.logger.info("Scripting range cleared.", extra={'status_message': True})
+        self.app.energy_saver.reset_activity_timer()
+
+    def set_selected_axis_for_processing(self, axis: str):
+        fs_proc = self.app.funscript_processor
+        if axis in ['primary', 'secondary']:
+            if fs_proc.selected_axis_for_processing != axis:
+                fs_proc.selected_axis_for_processing = axis
+                fs_proc.current_selection_indices.clear()
+                self.logger.info(f"Target axis for operations set to: {axis.capitalize()}",
+                                 extra={'status_message': True})
+                self.app.energy_saver.reset_activity_timer()
+        else:
+            self.logger.warning(f"Attempt to set invalid axis for processing: {axis}")
+
+    def update_sg_window_length(self, new_val: int):
+        fs_proc = self.app.funscript_processor
+        current_val = max(3, new_val + 1 if new_val % 2 == 0 else new_val)
+        fs_proc.sg_window_length_input = min(99, current_val)
+        if fs_proc.sg_polyorder_input >= fs_proc.sg_window_length_input:
+            fs_proc.sg_polyorder_input = max(1, fs_proc.sg_window_length_input - 1)
+        self.app.energy_saver.reset_activity_timer()
+        # No status message unless it's a significant change or from a settings panel
+
+    def seek_video_with_sync(self, frame_index: int, mark_dirty: bool = True):
+        """
+        Central method for seeking video with guaranteed timeline synchronization.
+        ALWAYS use this method instead of calling processor.seek_video() directly
+        to ensure all UI elements stay synchronized.
+        """
+        if self.app.processor:
+            self.app.processor.seek_video(frame_index)
+            # ALWAYS force timeline synchronization after seeking to ensure all timelines stay in sync
+            # This is critical for maintaining synchronization between video, timeline 1, timeline 2, and any future timelines
+            self.app.app_state_ui.force_timeline_pan_to_current_frame = True
+            # Clear any timeline interaction flag to ensure sync happens immediately
+            self.app.app_state_ui.timeline_interaction_active = False
+            if mark_dirty and self.app.project_manager:
+                self.app.project_manager.project_dirty = True  # Seeking can be considered a change
+            self.app.energy_saver.reset_activity_timer()
+            
+            # Resync Handy device if streaming is active
+            if hasattr(self.app, 'video_display_ui') and self.app.video_display_ui:
+                video_ui = self.app.video_display_ui
+                if hasattr(video_ui, 'handy_streaming_active') and video_ui.handy_streaming_active:
+                    # Trigger Handy resync after seek
+                    self.logger.info("Resyncing Handy after video seek...")
+                    video_ui._resync_handy_after_seek()
+                
+                # Native fullscreen auto-syncs via single FFmpeg dual-output
+                if hasattr(video_ui, 'native_fullscreen') and video_ui.native_fullscreen.is_active():
+                    self.logger.info("🎯 Native fullscreen auto-synced via single FFmpeg dual-output")
+
+    def _sync_fullscreen_pause_state(self, paused: bool):
+        """Legacy method - no longer needed with single FFmpeg dual-output architecture."""
+        # Native fullscreen automatically syncs with main video processing
+        # because both use frames from the same single FFmpeg process
+        pass
+
+    def handle_seek_bar_drag(self, frame_index: int):
+        """Handle seeking from UI elements like the timeline preview bar."""
+        self.seek_video_with_sync(frame_index)
+
+    def handle_chapter_bar_segment_click(self, segment: VideoSegment, is_currently_selected: bool):
+        fs_proc = self.app.funscript_processor
+        app_state_ui = self.app.app_state_ui
+
+        # Determine current FPS for time display, default if not available
+        current_fps = self.app.processor.fps if self.app.processor and self.app.processor.fps > 0 else DEFAULT_CHAPTER_FPS
+        if is_currently_selected:
+            fs_proc.scripting_range_active = False
+            fs_proc.selected_chapter_for_scripting = None
+            self.logger.info(f"Chapter range deselected: {segment.position_long_name}", extra={'status_message': True})
+        else:
+            if fs_proc.scripting_range_active:
+                fs_proc.scripting_start_frame = segment.start_frame_id
+                fs_proc.scripting_end_frame = segment.end_frame_id
+                fs_proc.selected_chapter_for_scripting = segment
+
+                start_t_str = _format_time(fs_proc.app, segment.start_frame_id / current_fps if current_fps > 0 else 0)
+                end_t_str = _format_time(fs_proc.app, segment.end_frame_id / current_fps if current_fps > 0 else 0)
+                self.logger.info(
+                    f"Scripting range updated to chapter: {segment.position_long_name} [{start_t_str} - {end_t_str}]",
+                    extra={'status_message': True})
+
+                # Seek video to start of chapter if video is loaded
+                if self.app.processor and self.app.processor.video_info and self.app.processor.total_frames > 0:
+                    self.app.processor.seek_video(segment.start_frame_id)
+                    app_state_ui.force_timeline_pan_to_current_frame = True
+        self.app.project_manager.project_dirty = True
+        self.app.energy_saver.reset_activity_timer()
+
+    def get_native_fps_info_for_button(self) -> Tuple[str, float]:
+        """Returns display string and value for a 'Set to Native FPS' button."""
+        if self.app.file_manager.video_path and self.app.processor and \
+                self.app.processor.video_info and self.app.processor.video_info.get('fps', 0) > 0:
+            native_fps = self.app.processor.video_info['fps']
+            return f"({native_fps:.2f})", native_fps
+        return "", 0.0
+
+    def handle_interactive_refinement_click(self, chapter: VideoSegment, track_id: int):
+        """
+        This method is called by the UI. It saves the user's choice to the chapter
+        object itself, making the highlight persistent.
+        """
+        if self.app.stage_processor:
+            # Set the persistent attribute on the chapter
+            chapter.refined_track_id = track_id
+            self.app.project_manager.project_dirty = True
+
+            # Start the backend analysis to update the funscript
+            self.app.stage_processor.start_interactive_refinement_analysis(chapter, track_id)
+
+    def _find_next_relevant_chapter(self, current_frame: int):
+        """
+        Find the next chapter that is NOT 'Not Relevant' and exists (is chaptered).
+
+        Args:
+            current_frame: Current frame position
+
+        Returns:
+            Next relevant VideoSegment or None if none found
+        """
+        if not self.app.funscript_processor:
+            return None
+
+        chapters = self.app.funscript_processor.video_chapters
+        if not chapters:
+            return None
+
+        # Sort chapters by start frame
+        sorted_chapters = sorted(chapters, key=lambda c: c.start_frame_id)
+
+        # Find chapters that start after current frame and are relevant (Position category)
+        from config.constants import POSITION_INFO_MAPPING
+        for chapter in sorted_chapters:
+            if chapter.start_frame_id > current_frame:
+                # Determine category based on position_short_name
+                position_info = POSITION_INFO_MAPPING.get(chapter.position_short_name, {})
+                category = position_info.get('category', 'Position')
+
+                # Skip "Not Relevant" category chapters
+                if category == "Not Relevant":
+                    continue
+                # This is a Position category chapter
+                return chapter
+
+        return None
+

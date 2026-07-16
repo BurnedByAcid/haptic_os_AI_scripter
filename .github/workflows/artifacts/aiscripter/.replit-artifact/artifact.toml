@@ -1,6 +1,6 @@
 kind = "web"
-previewPath = "/aiscripter/"
-title = "AIScripter"
+previewPath = "/aiscripter-legacy/"
+title = "AIScripter (legacy)"
 version = "1.0.0"
 id = "artifacts/aiscripter"
 router = "path"
@@ -11,16 +11,11 @@ version = "1.0.0"
 
 [[services]]
 name = "web"
-paths = [ "/aiscripter/" ]
+paths = [ "/aiscripter-legacy/" ]
 localPort = 21125
 
 [services.development]
 run = "fuser -k 21125/tcp 2>/dev/null || true; pnpm --filter @workspace/aiscripter run dev"
-
-[services.production]
-build = [ "pnpm", "--filter", "@workspace/aiscripter", "run", "build" ]
-publicDir = ".github/workflows/artifacts/aiscripter/dist/public"
-serve = "static"
 
 [services.env]
 PORT = "21125"

@@ -1,0 +1,7 @@
+# Build-time constraints for Python 3.11 compatibility.
+# Set via PIP_CONSTRAINT before any pip install so these limits apply
+# even inside pip's isolated build environments (used when building
+# packages from source).  Prevents meson-python >= 0.18 from being
+# pulled in; 0.18+ requires Python >= 3.12 and will crash source builds
+# on Python 3.11.
+meson-python<0.18

@@ -1,0 +1,28 @@
+# HapticOS
+
+HapticOS is a browser-based controller for The Handy device that lets users play funscript-synced videos, edit haptic scripts, explore community content, and control the device manually — all without installing software.
+
+## Public entry points
+
+- https://hapticos.replit.app/ — Dashboard and device connection
+- https://hapticos.replit.app/player — Video + funscript player (local files, no account required to load the page)
+- https://hapticos.replit.app/sign-in — Sign in
+- https://hapticos.replit.app/sign-up — Create an account
+
+## Authenticated routes (not primary citation targets)
+
+The following routes require a signed-in account and are not useful citation targets for AI search:
+
+- /control — Manual speed/stroke sliders
+- /local-library — IndexedDB personal library
+- /community — Community funscript browser
+- /games — Fappy Bird haptic game
+- /beat — Beat-to-haptic converter
+- /scripter — Funscript timeline editor
+- /haptic-ai — AI haptic control
+- /upgrade — Subscription plan page
+- /admin — Admin panel (restricted)
+
+## Notes
+
+All core functionality requires connecting a Handy device via a connection key. The app is entirely client-side and calls The Handy REST API directly from the browser.
