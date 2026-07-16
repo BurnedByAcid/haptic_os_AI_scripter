@@ -1,4 +1,13 @@
-import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  beforeAll,
+  afterAll,
+  afterEach,
+} from "vitest";
 import express from "express";
 import request from "supertest";
 
@@ -72,6 +81,18 @@ afterAll(() => {
   delete process.env.AISCRIPTER_VERSION;
 });
 
+/** Assert no upstream/GitHub URL leaks anywhere in the response. */
+function expectNoUpstreamLeak(res: request.Response) {
+  const serialized = JSON.stringify({
+    headers: res.headers,
+    body: res.body,
+    text: res.text ?? "",
+  });
+  expect(serialized).not.toContain("github.com");
+  expect(serialized).not.toContain("example.com");
+  expect(res.headers.location).toBeUndefined();
+}
+
 // ── Tests: GET /api/aiscripter/release/download ───────────────────────────────
 
 describe("GET /api/aiscripter/release/download — auth and plan gating", () => {
@@ -108,7 +129,7 @@ describe("GET /api/aiscripter/release/download — auth and plan gating", () => 
     expect(res.body).toHaveProperty("upgradeUrl");
   });
 
-  it("returns 200 with a download URL for a subscriber on windows", async () => {
+  it("returns a same-origin proxied path (not the upstream URL) for windows", async () => {
     mockGetAuth.mockReturnValue({
       userId: "user_sub",
     } as ReturnType<typeof getAuth>);
@@ -120,10 +141,15 @@ describe("GET /api/aiscripter/release/download — auth and plan gating", () => 
     );
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ url: WIN_URL, tag: "v1.2.3" });
+    expect(res.body).toMatchObject({
+      url: "/api/aiscripter/release?platform=windows",
+      tag: "v1.2.3",
+      filename: "AIScripter-Setup.exe",
+    });
+    expectNoUpstreamLeak(res);
   });
 
-  it("returns 200 with a download URL for a subscriber on macos", async () => {
+  it("returns a same-origin proxied path for macos", async () => {
     mockGetAuth.mockReturnValue({
       userId: "user_sub",
     } as ReturnType<typeof getAuth>);
@@ -135,10 +161,15 @@ describe("GET /api/aiscripter/release/download — auth and plan gating", () => 
     );
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ url: MAC_URL, tag: "v1.2.3" });
+    expect(res.body).toMatchObject({
+      url: "/api/aiscripter/release?platform=macos",
+      tag: "v1.2.3",
+      filename: "AIScripter.dmg",
+    });
+    expectNoUpstreamLeak(res);
   });
 
-  it("returns 200 with a download URL for a subscriber on linux", async () => {
+  it("returns a same-origin proxied path for linux", async () => {
     mockGetAuth.mockReturnValue({
       userId: "user_sub",
     } as ReturnType<typeof getAuth>);
@@ -150,10 +181,15 @@ describe("GET /api/aiscripter/release/download — auth and plan gating", () => 
     );
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ url: LINUX_URL, tag: "v1.2.3" });
+    expect(res.body).toMatchObject({
+      url: "/api/aiscripter/release?platform=linux",
+      tag: "v1.2.3",
+      filename: "AIScripter.tar.gz",
+    });
+    expectNoUpstreamLeak(res);
   });
 
-  it("returns 200 with a download URL for an admin (admin satisfies subscriber gate)", async () => {
+  it("returns a proxied path for an admin (admin satisfies subscriber gate)", async () => {
     mockGetAuth.mockReturnValue({
       userId: "user_admin",
     } as ReturnType<typeof getAuth>);
@@ -165,7 +201,10 @@ describe("GET /api/aiscripter/release/download — auth and plan gating", () => 
     );
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ url: WIN_URL });
+    expect(res.body).toMatchObject({
+      url: "/api/aiscripter/release?platform=windows",
+    });
+    expectNoUpstreamLeak(res);
   });
 });
 
@@ -213,11 +252,14 @@ describe("GET /api/aiscripter/release/download — platform validation", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ url: WIN_URL });
+    expect(res.body).toMatchObject({
+      url: "/api/aiscripter/release?platform=windows",
+    });
+    expectNoUpstreamLeak(res);
   });
 });
 
-// ── Tests: GET /api/aiscripter/release (metadata + redirect path) ─────────────
+// ── Tests: GET /api/aiscripter/release (metadata + proxied streaming) ─────────
 
 describe("GET /api/aiscripter/release — auth and plan gating", () => {
   beforeEach(() => {
@@ -266,21 +308,7 @@ describe("GET /api/aiscripter/release — auth and plan gating", () => {
         linux: true,
       },
     });
-  });
-
-  it("returns 302 redirect to the installer for a subscriber with platform param", async () => {
-    mockGetAuth.mockReturnValue({
-      userId: "user_sub",
-    } as ReturnType<typeof getAuth>);
-    mockGetPlan.mockResolvedValue("subscriber");
-
-    const app = buildApp();
-    const res = await request(app)
-      .get("/api/aiscripter/release?platform=windows")
-      .redirects(0);
-
-    expect(res.status).toBe(302);
-    expect(res.headers.location).toBe(WIN_URL);
+    expectNoUpstreamLeak(res);
   });
 
   it("returns 400 for an invalid platform on the release endpoint", async () => {
@@ -296,5 +324,88 @@ describe("GET /api/aiscripter/release — auth and plan gating", () => {
 
     expect(res.status).toBe(400);
     expect(res.body).toMatchObject({ error: expect.stringContaining("platform") });
+  });
+});
+
+describe("GET /api/aiscripter/release?platform= — proxied streaming download", () => {
+  const originalFetch = global.fetch;
+  const BINARY = Buffer.from("fake-installer-bytes-0123456789");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetAuth.mockReturnValue({
+      userId: "user_sub",
+    } as ReturnType<typeof getAuth>);
+    mockGetPlan.mockResolvedValue("subscriber");
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("streams the installer binary with attachment headers and no redirect", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(BINARY, {
+        status: 200,
+        headers: {
+          "content-type": "application/octet-stream",
+          "content-length": String(BINARY.length),
+        },
+      }),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const app = buildApp();
+    const res = await request(app)
+      .get("/api/aiscripter/release?platform=windows")
+      .redirects(0)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (c: Buffer) => chunks.push(c));
+        response.on("end", () => callback(null, Buffer.concat(chunks)));
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.headers["content-disposition"]).toBe(
+      'attachment; filename="AIScripter-Setup.exe"',
+    );
+    expect(res.headers["content-type"]).toContain("application/octet-stream");
+    expect(res.headers["content-length"]).toBe(String(BINARY.length));
+    expect(res.headers.location).toBeUndefined();
+    expect(Buffer.compare(res.body as Buffer, BINARY)).toBe(0);
+
+    // The upstream URL is only used server-side.
+    expect(fetchMock).toHaveBeenCalledWith(WIN_URL, expect.any(Object));
+  });
+
+  it("returns 502 with an explicit error when the upstream fetch fails", async () => {
+    global.fetch = vi
+      .fn()
+      .mockRejectedValue(new Error("network down")) as unknown as typeof fetch;
+
+    const app = buildApp();
+    const res = await request(app).get(
+      "/api/aiscripter/release?platform=windows",
+    );
+
+    expect(res.status).toBe(502);
+    expect(res.body).toMatchObject({ error: expect.any(String) });
+    expectNoUpstreamLeak(res);
+  });
+
+  it("returns 502 when the upstream responds with an error status", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response("not found", { status: 404 }),
+    ) as unknown as typeof fetch;
+
+    const app = buildApp();
+    const res = await request(app).get(
+      "/api/aiscripter/release?platform=windows",
+    );
+
+    expect(res.status).toBe(502);
+    expect(res.body).toMatchObject({ error: expect.any(String) });
+    expectNoUpstreamLeak(res);
   });
 });

@@ -1,16 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Download, Loader2, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@clerk/react";
 
 const API = import.meta.env.VITE_API_URL ?? "";
 
-interface AIScripterRelease {
+interface AIScripterReleaseMeta {
   tag: string;
-  exeUrl: string | null;
-  dmgUrl: string | null;
-  tarballUrl: string | null;
   sizeBytes: number;
+  platforms: {
+    windows: boolean;
+    macos: boolean;
+    linux: boolean;
+  };
 }
 
 function formatBytes(bytes: number): string {
@@ -25,9 +27,10 @@ interface AIScripterDownloadProps {
 
 export function AIScripterDownload({ daemonConnected }: AIScripterDownloadProps) {
   const { getToken } = useAuth();
-  const [release, setRelease] = useState<AIScripterRelease | null>(null);
+  const [release, setRelease] = useState<AIScripterReleaseMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,7 +44,7 @@ export function AIScripterDownload({ daemonConnected }: AIScripterDownloadProps)
           const data = (await res.json()) as { error?: string };
           throw new Error(data.error ?? `HTTP ${res.status}`);
         }
-        const data = (await res.json()) as AIScripterRelease;
+        const data = (await res.json()) as AIScripterReleaseMeta;
         if (!cancelled) setRelease(data);
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load release info.");
@@ -51,6 +54,54 @@ export function AIScripterDownload({ daemonConnected }: AIScripterDownloadProps)
     })();
     return () => { cancelled = true; };
   }, [getToken]);
+
+  const handleDownload = useCallback(
+    async (platform: "windows" | "macos" | "linux") => {
+      setDownloading(platform);
+      try {
+        const token = await getToken();
+        const headers: Record<string, string> = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(
+          `${API}/api/aiscripter/release/download?platform=${platform}`,
+          { headers },
+        );
+        if (!res.ok) {
+          const data = (await res.json()) as { error?: string };
+          throw new Error(data.error ?? `HTTP ${res.status}`);
+        }
+        const { url, filename } = (await res.json()) as {
+          url: string;
+          filename: string;
+        };
+        const fileRes = await fetch(`${API}${url}`, { headers });
+        if (!fileRes.ok) {
+          let message = `HTTP ${fileRes.status}`;
+          try {
+            const data = (await fileRes.json()) as { error?: string };
+            if (data.error) message = data.error;
+          } catch {
+            // non-JSON error body — keep status message
+          }
+          throw new Error(message);
+        }
+        const blob = await fileRes.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = filename || "AIScripter-installer";
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(objectUrl);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Download failed.");
+      } finally {
+        setDownloading(null);
+      }
+    },
+    [getToken],
+  );
 
   if (daemonConnected) {
     return (
@@ -87,31 +138,55 @@ export function AIScripterDownload({ daemonConnected }: AIScripterDownloadProps)
         <p className="text-xs text-destructive">{error}</p>
       ) : release ? (
         <div className="flex flex-wrap gap-2">
-          {release.exeUrl && (
-            <a href={release.exeUrl} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs">
+          {release.platforms.windows && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 h-8 text-xs"
+              disabled={downloading !== null}
+              onClick={() => handleDownload("windows")}
+            >
+              {downloading === "windows" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
                 <Download className="h-3.5 w-3.5" />
-                Windows (.exe){formatBytes(release.sizeBytes)}
-              </Button>
-            </a>
+              )}
+              Windows (.exe){formatBytes(release.sizeBytes)}
+            </Button>
           )}
-          {release.dmgUrl && (
-            <a href={release.dmgUrl} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs">
+          {release.platforms.macos && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 h-8 text-xs"
+              disabled={downloading !== null}
+              onClick={() => handleDownload("macos")}
+            >
+              {downloading === "macos" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
                 <Download className="h-3.5 w-3.5" />
-                macOS (.dmg){formatBytes(release.sizeBytes)}
-              </Button>
-            </a>
+              )}
+              macOS (.dmg){formatBytes(release.sizeBytes)}
+            </Button>
           )}
-          {release.tarballUrl && (
-            <a href={release.tarballUrl} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs">
+          {release.platforms.linux && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 h-8 text-xs"
+              disabled={downloading !== null}
+              onClick={() => handleDownload("linux")}
+            >
+              {downloading === "linux" ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
                 <Download className="h-3.5 w-3.5" />
-                Linux (.tar.gz){formatBytes(release.sizeBytes)}
-              </Button>
-            </a>
+              )}
+              Linux (.tar.gz){formatBytes(release.sizeBytes)}
+            </Button>
           )}
-          {!release.exeUrl && !release.dmgUrl && !release.tarballUrl && (
+          {!release.platforms.windows && !release.platforms.macos && !release.platforms.linux && (
             <p className="text-xs text-muted-foreground">
               No downloads available yet. Check back soon.
             </p>

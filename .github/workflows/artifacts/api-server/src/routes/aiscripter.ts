@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { Readable } from "node:stream";
 import { getAuth, clerkClient } from "@clerk/express";
 import { getPlan } from "../lib/getPlan";
 
@@ -7,47 +8,37 @@ const router = Router();
 const AISCRIPTER_GITHUB_REPO =
   process.env.AISCRIPTER_GITHUB_REPO ?? "HapticOS/AIScripter";
 
+/**
+ * Releases in the repo are filtered by this tag prefix so that unrelated
+ * releases (the repo hosts more than one product) are never picked up.
+ */
+const AISCRIPTER_TAG_PREFIX = "aiscripter-";
+
+interface PlatformAsset {
+  /** File name presented to the browser (Content-Disposition). */
+  name: string;
+  /** Upstream URL the server fetches from. Never sent to clients. */
+  url: string;
+  sizeBytes: number;
+}
+
+interface AIScripterReleaseData {
+  tag: string;
+  windows: PlatformAsset | null;
+  macos: PlatformAsset | null;
+  linux: PlatformAsset | null;
+  sizeBytes: number;
+}
+
 interface AIScripterReleaseCache {
-  data: {
-    tag: string;
-    exeUrl: string | null;
-    dmgUrl: string | null;
-    tarballUrl: string | null;
-    sizeBytes: number;
-  };
+  data: AIScripterReleaseData;
   fetchedAt: number;
 }
 
 let releaseCache: AIScripterReleaseCache | null = null;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
-/**
- * Build release data from env-var overrides so the endpoint can serve a
- * real installer URL even before the GitHub CI pipeline produces its first
- * release asset.
- *
- * Set any combination of:
- *   AISCRIPTER_DOWNLOAD_URL_WIN=https://…/AIScripter-Setup.exe
- *   AISCRIPTER_DOWNLOAD_URL_MAC=https://…/AIScripter.dmg
- *   AISCRIPTER_DOWNLOAD_URL_LINUX=https://…/AIScripter.tar.gz
- *   AISCRIPTER_VERSION=v1.0.0
- */
-function getEnvOverrideRelease(): AIScripterReleaseCache["data"] | null {
-  const win = process.env.AISCRIPTER_DOWNLOAD_URL_WIN ?? null;
-  const mac = process.env.AISCRIPTER_DOWNLOAD_URL_MAC ?? null;
-  const linux = process.env.AISCRIPTER_DOWNLOAD_URL_LINUX ?? null;
-  if (!win && !mac && !linux) return null;
-  return {
-    tag: process.env.AISCRIPTER_VERSION ?? "latest",
-    exeUrl: win,
-    dmgUrl: mac,
-    tarballUrl: linux,
-    sizeBytes: 0,
-  };
-}
-
-async function fetchLatestRelease(): Promise<AIScripterReleaseCache["data"]> {
-  const url = `https://api.github.com/repos/${AISCRIPTER_GITHUB_REPO}/releases/latest`;
+function githubHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: "application/vnd.github.v3+json",
     "User-Agent": "HapticOS/1.0",
@@ -55,26 +46,59 @@ async function fetchLatestRelease(): Promise<AIScripterReleaseCache["data"]> {
   if (process.env.GITHUB_TOKEN) {
     headers["Authorization"] = `token ${process.env.GITHUB_TOKEN}`;
   }
+  return headers;
+}
 
-  const res = await fetch(url, { headers });
-  if (res.status === 404) {
-    return {
-      tag: "coming-soon",
-      exeUrl: null,
-      dmgUrl: null,
-      tarballUrl: null,
-      sizeBytes: 0,
-    };
+function fileNameFromUrl(url: string, fallback: string): string {
+  try {
+    const pathname = new URL(url).pathname;
+    const base = pathname.split("/").pop();
+    if (base) return decodeURIComponent(base);
+  } catch {
+    // fall through to fallback
   }
-  if (!res.ok) {
-    throw new Error(`GitHub API responded with ${res.status}`);
-  }
+  return fallback;
+}
 
-  const json = (await res.json()) as {
-    tag_name: string;
-    assets: Array<{ name: string; browser_download_url: string; size: number }>;
+/**
+ * Build release data from env-var overrides so the endpoint can serve a
+ * real installer even before the GitHub CI pipeline produces its first
+ * release asset. The URLs are only ever fetched server-side.
+ *
+ * Set any combination of:
+ *   AISCRIPTER_DOWNLOAD_URL_WIN=https://…/AIScripter-Setup.exe
+ *   AISCRIPTER_DOWNLOAD_URL_MAC=https://…/AIScripter.dmg
+ *   AISCRIPTER_DOWNLOAD_URL_LINUX=https://…/AIScripter.tar.gz
+ *   AISCRIPTER_VERSION=v1.0.0
+ */
+function getEnvOverrideRelease(): AIScripterReleaseData | null {
+  const win = process.env.AISCRIPTER_DOWNLOAD_URL_WIN ?? null;
+  const mac = process.env.AISCRIPTER_DOWNLOAD_URL_MAC ?? null;
+  const linux = process.env.AISCRIPTER_DOWNLOAD_URL_LINUX ?? null;
+  if (!win && !mac && !linux) return null;
+  return {
+    tag: process.env.AISCRIPTER_VERSION ?? "latest",
+    windows: win
+      ? { name: fileNameFromUrl(win, "AIScripter-Setup.exe"), url: win, sizeBytes: 0 }
+      : null,
+    macos: mac
+      ? { name: fileNameFromUrl(mac, "AIScripter.dmg"), url: mac, sizeBytes: 0 }
+      : null,
+    linux: linux
+      ? { name: fileNameFromUrl(linux, "AIScripter.tar.gz"), url: linux, sizeBytes: 0 }
+      : null,
+    sizeBytes: 0,
   };
+}
 
+interface GitHubRelease {
+  tag_name: string;
+  draft: boolean;
+  prerelease: boolean;
+  assets: Array<{ name: string; browser_download_url: string; size: number }>;
+}
+
+function toReleaseData(json: GitHubRelease): AIScripterReleaseData {
   const exeAsset = json.assets.find(
     (a) => a.name === "AIScripter-Setup.exe" || a.name.toLowerCase().endsWith(".exe"),
   );
@@ -87,20 +111,52 @@ async function fetchLatestRelease(): Promise<AIScripterReleaseCache["data"]> {
 
   const primaryAsset = exeAsset ?? dmgAsset ?? tarAsset;
 
+  const toAsset = (
+    a: { name: string; browser_download_url: string; size: number } | undefined,
+  ): PlatformAsset | null =>
+    a ? { name: a.name, url: a.browser_download_url, sizeBytes: a.size } : null;
+
   return {
     tag: json.tag_name,
-    exeUrl: exeAsset?.browser_download_url ?? null,
-    dmgUrl: dmgAsset?.browser_download_url ?? null,
-    tarballUrl: tarAsset?.browser_download_url ?? null,
+    windows: toAsset(exeAsset),
+    macos: toAsset(dmgAsset),
+    linux: toAsset(tarAsset),
     sizeBytes: primaryAsset?.size ?? 0,
   };
+}
+
+/**
+ * Fetch the newest AIScripter release from GitHub.
+ *
+ * The repo may contain releases for other products, so this filters the
+ * release list by the `aiscripter-` tag prefix instead of using
+ * `releases/latest`.
+ */
+async function fetchAIScripterRelease(): Promise<AIScripterReleaseData> {
+  const url = `https://api.github.com/repos/${AISCRIPTER_GITHUB_REPO}/releases?per_page=30`;
+  const res = await fetch(url, { headers: githubHeaders() });
+  if (res.status === 404) {
+    return { tag: "coming-soon", windows: null, macos: null, linux: null, sizeBytes: 0 };
+  }
+  if (!res.ok) {
+    throw new Error(`GitHub API responded with ${res.status}`);
+  }
+
+  const releases = (await res.json()) as GitHubRelease[];
+  const match = releases.find(
+    (r) => !r.draft && r.tag_name.startsWith(AISCRIPTER_TAG_PREFIX),
+  );
+  if (!match) {
+    return { tag: "coming-soon", windows: null, macos: null, linux: null, sizeBytes: 0 };
+  }
+  return toReleaseData(match);
 }
 
 /**
  * Returns cached release data, preferring env-var overrides over GitHub.
  * Falls back to stale cache if GitHub is unavailable.
  */
-async function getRelease(): Promise<AIScripterReleaseCache["data"]> {
+async function getRelease(): Promise<AIScripterReleaseData> {
   const envOverride = getEnvOverrideRelease();
   if (envOverride) return envOverride;
 
@@ -110,7 +166,7 @@ async function getRelease(): Promise<AIScripterReleaseCache["data"]> {
   }
 
   try {
-    const data = await fetchLatestRelease();
+    const data = await fetchAIScripterRelease();
     releaseCache = { data, fetchedAt: now };
     return data;
   } catch (err) {
@@ -119,6 +175,72 @@ async function getRelease(): Promise<AIScripterReleaseCache["data"]> {
     }
     throw err;
   }
+}
+
+function assetForPlatform(
+  data: AIScripterReleaseData,
+  platform: string,
+): PlatformAsset | null {
+  return platform === "windows"
+    ? data.windows
+    : platform === "macos"
+      ? data.macos
+      : data.linux;
+}
+
+/**
+ * Fetch the installer from the upstream URL server-side and stream it to
+ * the client. The upstream URL never appears in any response — no
+ * redirects, no JSON — so the origin of the file stays hidden.
+ */
+async function streamAssetToClient(
+  res: Response,
+  asset: PlatformAsset,
+): Promise<void> {
+  let upstream: globalThis.Response;
+  try {
+    upstream = await fetch(asset.url, {
+      headers: {
+        ...githubHeaders(),
+        Accept: "application/octet-stream",
+      },
+      redirect: "follow",
+    });
+  } catch {
+    res.status(502).json({ error: "Failed to reach the installer host." });
+    return;
+  }
+
+  if (!upstream.ok || !upstream.body) {
+    res.status(502).json({
+      error: `Installer host responded with ${upstream.status}.`,
+    });
+    return;
+  }
+
+  res.setHeader(
+    "Content-Type",
+    upstream.headers.get("content-type") ?? "application/octet-stream",
+  );
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${asset.name.replace(/"/g, "")}"`,
+  );
+  const contentLength = upstream.headers.get("content-length");
+  if (contentLength) {
+    res.setHeader("Content-Length", contentLength);
+  }
+  res.setHeader("Cache-Control", "no-store");
+
+  const nodeStream = Readable.fromWeb(
+    upstream.body as import("node:stream/web").ReadableStream,
+  );
+  nodeStream.on("error", () => {
+    // Headers are already sent mid-stream; destroy so the client sees a
+    // truncated transfer instead of a silently incomplete file.
+    res.destroy();
+  });
+  nodeStream.pipe(res);
 }
 
 /**
@@ -172,10 +294,9 @@ router.post("/user/aiscripter-agree", async (req: Request, res: Response) => {
  *     { tag, sizeBytes, platforms: { windows, macos, linux } }
  *     Used by the UI to display the version badge and available platforms.
  *
- *   • ?platform=windows|macos|linux  → 302 redirect to the real installer
- *     download URL (GitHub release asset or env-var override).
- *     This is the primary download path; the redirect target is the actual
- *     binary so the browser immediately prompts for a file save.
+ *   • ?platform=windows|macos|linux  → streams the installer binary
+ *     through this server (proxied download). The upstream source URL is
+ *     never exposed to the client — no redirects, no URLs in JSON.
  */
 router.get("/aiscripter/release", async (req: Request, res: Response) => {
   const auth = getAuth(req);
@@ -206,7 +327,7 @@ router.get("/aiscripter/release", async (req: Request, res: Response) => {
       return;
     }
 
-    let data: AIScripterReleaseCache["data"];
+    let data: AIScripterReleaseData;
     try {
       data = await getRelease();
     } catch {
@@ -214,19 +335,15 @@ router.get("/aiscripter/release", async (req: Request, res: Response) => {
       return;
     }
 
-    const downloadUrl =
-      platform === "windows" ? data.exeUrl :
-      platform === "macos"   ? data.dmgUrl :
-                               data.tarballUrl;
-
-    if (!downloadUrl) {
+    const asset = assetForPlatform(data, platform);
+    if (!asset) {
       res.status(404).json({
         error: `No ${platform} installer is available for this release yet.`,
       });
       return;
     }
 
-    res.redirect(302, downloadUrl);
+    await streamAssetToClient(res, asset);
     return;
   }
 
@@ -236,9 +353,9 @@ router.get("/aiscripter/release", async (req: Request, res: Response) => {
       tag: data.tag,
       sizeBytes: data.sizeBytes,
       platforms: {
-        windows: data.exeUrl !== null,
-        macos: data.dmgUrl !== null,
-        linux: data.tarballUrl !== null,
+        windows: data.windows !== null,
+        macos: data.macos !== null,
+        linux: data.linux !== null,
       },
     });
   } catch {
@@ -248,12 +365,12 @@ router.get("/aiscripter/release", async (req: Request, res: Response) => {
 
 /**
  * GET /api/aiscripter/release/download?platform=windows|macos|linux
- * Auth-gated endpoint that returns the signed download URL for the installer.
- * Requires Clerk auth + subscriber plan.
+ * Auth-gated endpoint that returns a same-origin proxied download path for
+ * the installer. Requires Clerk auth + subscriber plan.
  *
- * Returns { url: string, tag: string } so the client can trigger a real
- * browser file download without the raw asset URL ever appearing in the
- * page's JS context before the auth check completes.
+ * Returns { url, tag, filename } where `url` is a relative path on this
+ * server (the proxied streaming endpoint). No upstream URL ever appears in
+ * the response.
  */
 router.get("/aiscripter/release/download", async (req: Request, res: Response) => {
   const auth = getAuth(req);
@@ -282,7 +399,7 @@ router.get("/aiscripter/release/download", async (req: Request, res: Response) =
     return;
   }
 
-  let data: AIScripterReleaseCache["data"];
+  let data: AIScripterReleaseData;
   try {
     data = await getRelease();
   } catch {
@@ -290,19 +407,19 @@ router.get("/aiscripter/release/download", async (req: Request, res: Response) =
     return;
   }
 
-  const downloadUrl =
-    platform === "windows" ? data.exeUrl :
-    platform === "macos"   ? data.dmgUrl :
-                             data.tarballUrl;
-
-  if (!downloadUrl) {
+  const asset = assetForPlatform(data, platform);
+  if (!asset) {
     res.status(404).json({
       error: `No ${platform} installer is available for this release yet.`,
     });
     return;
   }
 
-  res.json({ url: downloadUrl, tag: data.tag });
+  res.json({
+    url: `/api/aiscripter/release?platform=${platform}`,
+    tag: data.tag,
+    filename: asset.name,
+  });
 });
 
 export default router;

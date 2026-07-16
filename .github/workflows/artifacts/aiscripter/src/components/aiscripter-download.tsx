@@ -73,14 +73,30 @@ export function AIScripterDownload({ daemonConnected }: AIScripterDownloadProps)
           const data = (await res.json()) as { error?: string };
           throw new Error(data.error ?? `HTTP ${res.status}`);
         }
-        const { url } = (await res.json()) as { url: string };
+        const { url, filename } = (await res.json()) as {
+          url: string;
+          filename: string;
+        };
+        const fileRes = await fetch(`${API}${url}`, { headers });
+        if (!fileRes.ok) {
+          let message = `HTTP ${fileRes.status}`;
+          try {
+            const data = (await fileRes.json()) as { error?: string };
+            if (data.error) message = data.error;
+          } catch {
+            // non-JSON error body — keep status message
+          }
+          throw new Error(message);
+        }
+        const blob = await fileRes.blob();
+        const objectUrl = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = "";
-        anchor.rel = "noopener noreferrer";
+        anchor.href = objectUrl;
+        anchor.download = filename || "AIScripter-installer";
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);
+        URL.revokeObjectURL(objectUrl);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Download failed.");
       } finally {
