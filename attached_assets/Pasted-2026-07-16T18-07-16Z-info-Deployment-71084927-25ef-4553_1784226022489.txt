@@ -1,0 +1,157 @@
+2026-07-16T18:07:16Z info: Deployment: 71084927-25ef-4553-8601-d060c5a39459
+2026-07-16T18:07:16Z info: Build: 1596d915-d2bc-4626-aaf5-8f8b30031bd1
+2026-07-16T18:07:17Z info: Running Security Scan
+2026-07-16T18:07:21Z info: Installing packages
+--> pnpm install
+
+Scope: all 11 workspace projects
+
+
+   ╭──────────────────────────────────────────╮
+   │                                          │
+   │   Update available! 10.26.1 → 11.13.1.   │
+   │   Changelog: https://pnpm.io/v/11.13.1   │
+   │     To update, run: pnpm add -g pnpm     │
+   │                                          │
+   ╰──────────────────────────────────────────╯
+
+
+Lockfile is up to date, resolution step is skipped
+
+Already up to date
+
+ WARN  Failed to create bin at /home/runner/workspace/.github/workflows/artifacts/mockup-sandbox/node_modules/.bin/node. ENOENT: no such file or directory, open '/home/runner/workspace/.github/workflows/artifacts/mockup-sandbox/node_modules/@types/node/bin/node'
+
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac'
+
+. preinstall: Done
+
+ WARN  Failed to create bin at /home/runner/workspace/.github/workflows/artifacts/api-server/node_modules/.bin/node. ENOENT: no such file or directory, open '/home/runner/workspace/.github/workflows/artifacts/api-server/node_modules/@types/node/bin/node'
+
+ WARN  Failed to create bin at /home/runner/workspace/.github/workflows/artifacts/handy-controller/node_modules/.bin/node. ENOENT: no such file or directory, open '/home/runner/workspace/.github/workflows/artifacts/handy-controller/node_modules/@types/node/bin/node'
+
+Done in 5.3s using pnpm v10.26.1
+
+2026-07-16T18:07:27Z info: Starting Build
+
+> @workspace/api-server@0.0.0 build /home/runner/workspace/.github/workflows/artifacts/api-server
+> node ./build.mjs
+
+
+
+  dist/index.mjs                   3.7mb ⚠️
+  dist/pino-worker.mjs           153.8kb
+  dist/pino-file.mjs             142.4kb
+  dist/pino-pretty.mjs           115.0kb
+  dist/thread-stream-worker.mjs    7.3kb
+
+⚡ Done in 784ms
+
+
+> @workspace/aiscripter@0.0.0 build /home/runner/workspace/.github/workflows/artifacts/aiscripter
+> vite build --config vite.config.ts
+
+
+vite v7.3.2 building client environment for production...
+
+transforming...
+
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+✓ 1847 modules transformed.
+
+rendering chunks...
+
+computing gzip size...
+
+dist/public/index.html                   1.90 kB │ gzip:   0.68 kB
+
+dist/public/assets/index-DPYHi19w.css   93.20 kB │ gzip:  15.20 kB
+dist/public/assets/index-DQJlbS8f.js   421.57 kB │ gzip: 128.41 kB
+
+✓ built in 3.56s
+
+
+> @workspace/handy-controller@0.0.0 prebuild /home/runner/workspace/.github/workflows/artifacts/handy-controller
+> node scripts/gen-og-image.mjs
+
+
+PNG generated at /home/runner/workspace/.github/workflows/artifacts/handy-controller/public/og-image.png
+
+
+> @workspace/handy-controller@0.0.0 build /home/runner/workspace/.github/workflows/artifacts/handy-controller
+> vite build --config vite.config.ts
+
+
+vite v7.3.2 building client environment for production...
+
+transforming...
+
+src/components/ui/sonner.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+src/components/ui/progress.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+src/components/ui/dropdown-menu.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+
+✓ 1990 modules transformed.
+
+rendering chunks...
+
+computing gzip size...
+
+dist/public/index.html                                      2.22 kB │ gzip:   0.75 kB
+dist/public/assets/worker-BAOIWoxA.js                       2.53 kB
+
+dist/public/assets/frame-analysis.worker-CNaxkX-x.js       12.86 kB
+dist/public/assets/index-BJ9MFX51.css                     156.38 kB │ gzip:  23.07 kB
+dist/public/assets/workbox-window.prod.es5-BBnX5xw4.js      5.75 kB │ gzip:   2.36 kB
+dist/public/assets/index-jJ6yGJti.js                    1,451.84 kB │ gzip: 429.43 kB
+✓ built in 5.43s
+
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+
+PWA v1.3.0
+mode      generateSW
+precache  14 entries (2259.33 KiB)
+files generated
+  dist/public/sw.js
+  dist/public/workbox-8bb3b1ec.js
+
+
+> @workspace/handy-controller@0.0.0 postbuild /home/runner/workspace/.github/workflows/artifacts/handy-controller
+> node scripts/prerender.mjs
+
+
+prerender: wrote player/index.html
+
+prerender: wrote sign-in/index.html
+
+prerender: wrote sign-up/index.html
+
+prerender: done.
+
+Removed all cached metadata files
+
+Removed 48446 files
+
+Removed 997 packages
+
+2026-07-16T18:07:54Z info: Pushing pid1 binary layer...
+2026-07-16T18:07:55Z info: Created pid1 binary layer
+2026-07-16T18:07:56Z info: Pushing hosting layer...
+2026-07-16T18:07:56Z info: Pushing Repl layer...
+2026-07-16T18:07:56Z info: Created hosting layer
+2026-07-16T18:12:53Z info: Created Repl layer
+2026-07-16T18:12:53Z info: Pushing Repl (cache) layer...
+2026-07-16T18:12:53Z info: Created Repl (cache) layer
+2026-07-16T18:12:56Z info: Pushed image manifest
+2026-07-16T18:12:56Z info: Skipping container streaming artifacts (SOCI/ZTOC) for non-reserved-VM deployment
+2026-07-16T18:17:17Z warn: Security scan skipped: connection lost
+2026-07-16T18:17:20Z info: Creating Autoscale service
