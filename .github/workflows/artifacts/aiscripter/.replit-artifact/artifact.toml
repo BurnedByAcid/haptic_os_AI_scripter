@@ -22,10 +22,6 @@ build = [ "pnpm", "--filter", "@workspace/aiscripter", "run", "build" ]
 publicDir = ".github/workflows/artifacts/aiscripter/dist/public"
 serve = "static"
 
-[[services.production.rewrites]]
-from = "/"
-to = "/index.html"
-
 [services.env]
 PORT = "21125"
 BASE_PATH = "/aiscripter/"

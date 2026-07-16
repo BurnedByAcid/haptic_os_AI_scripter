@@ -1,28 +1,34 @@
 ---
-name: Deployment container silent crash - stale publicDir
-description: How a wrong publicDir in artifact.toml causes the deployment container to crash silently, making the startup probe fail with no logs.
+name: Deployment container silent crash - duplicate rewrites / two static artifacts
+description: Causes and diagnostic for the pid1 silent crash pattern (zero logs after "Creating Autoscale service") that blocks every publish attempt.
 ---
 
-# Deployment container silent crash: stale publicDir in artifact.toml
-
-## The Rule
-When artifacts are moved to a new directory path, every `publicDir` in every `artifact.toml` must be updated to the new path BEFORE publishing. A stale path that doesn't exist in the container causes the Replit pid1 binary to crash at startup before any HTTP server starts.
-
-## Why
-The Replit deployment pid1 binary registers static file handlers for ALL `kind = "web"` artifacts at container startup. If any artifact's `publicDir` doesn't exist in the container image, the pid1 binary crashes silently — no logs, no HTTP server, startup probe gets "connection refused" every time, promote step times out.
+# Deployment container silent crash
 
 ## Diagnostic signature
-- Zero container runtime logs after "Creating Autoscale service" in the deployment build log
-- June 28 successful build had runtime logs like `starting artifact processes for monorepo deployment`, `registered static handler for artifact publicDir=...`
-- Current failing builds end at "Creating Autoscale service" with nothing after it
-- Server works fine locally in production mode
-- Build phase succeeds (dist files are created correctly)
 
-## How to apply
-After any workspace restructuring (moving artifacts to new paths):
-1. Check every `artifact.toml` for `publicDir` entries
-2. Ensure each `publicDir` points to the ACTUAL build output path (e.g., `.github/workflows/artifacts/<name>/dist/public`)
-3. The path is relative to workspace root
+- Build phase succeeds (all artifacts build correctly, image pushed)
+- Last build log line is "Creating Autoscale service" — then complete silence
+- Zero container runtime logs from `fetchDeploymentLogs`
+- `listDeploymentBuilds` shows every build as `failed`
+- Everything works fine in dev / local production simulation
 
-## Root cause in this project
-Workspace was restructured from `artifacts/` → `.github/workflows/artifacts/` (commit 7324020, July 3 2026). The aiscripter artifact.toml retained `publicDir = "artifacts/aiscripter/dist/public"` (old path) when it was added on July 13 2026. Fixed by changing to `.github/workflows/artifacts/aiscripter/dist/public`.
+## Root cause (confirmed July 16 2026)
+
+The Replit pid1 binary crashes silently if **two static artifacts both declare a rewrite with `from = "/"`**. The crash happens before pid1 initializes its logger, producing zero output. The startup probe never gets a response, the Cloud Run service creation times out after ~10 minutes, and the build is marked failed.
+
+This was introduced on July 13 2026 when the aiscripter artifact (`kind = "web"`, `serve = "static"`) was added. Both the aiscripter and the handy-controller had `[[services.production.rewrites]] from = "/" to = "/index.html"`. Pid1 appears to use a global rewrite table (not scoped per artifact), so duplicate `from = "/"` entries trigger a panic.
+
+## Fix applied
+
+Removed the `[[services.production.rewrites]]` block from the aiscripter's `artifact.toml` entirely. The aiscripter's `index.html` is served by default for the root path `/aiscripter/`. Static assets are served normally. Deep links to sub-routes within the aiscripter SPA will not work unless they use hash-based routing.
+
+## How to apply going forward
+
+1. **Only one static artifact may use `from = "/"`** — the primary one (handy-controller in this project)
+2. Secondary static artifacts (e.g. `/aiscripter/`) must either have no rewrites, or use a catch-all like `from = "/*"` scoped to their path prefix (using their full path prefix in the `from` field, e.g. `from = "/aiscripter/*"`)
+3. After adding a new `serve = "static"` artifact, always check that no two artifacts share an identical `from` value in their rewrites
+
+## Previously wrong diagnosis
+
+An earlier session attributed the crash to a stale `publicDir` path (`artifacts/aiscripter/dist/public` instead of `.github/workflows/artifacts/aiscripter/dist/public`). That was NOT the cause — the June 28 successful build had a "wrong" publicDir and still deployed fine. The actual trigger is the duplicate rewrite.
