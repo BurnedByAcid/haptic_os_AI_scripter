@@ -1,17 +1,17 @@
 kind = "design"
-previewPath = "/__mockup"
-title = "Canvas"
+previewPath = "/__mockup-legacy"
+title = "Canvas (legacy)"
 version = "1.0.0"
 id = "XegfDyZt7HqfW2Bb8Ghoy"
 
 [[services]]
 localPort = 20441
 name = "Component Preview Server"
-paths = ["/__mockup"]
+paths = ["/__mockup-legacy"]
 
 [services.env]
 PORT = "20441"
 BASE_PATH = "/__mockup"
 
 [services.development]
-run = "pnpm --filter @workspace/mockup-sandbox run dev"
+run = "echo disabled"
