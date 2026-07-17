@@ -119,6 +119,7 @@ const routes = [
     path: "player",
     transform(html) {
       html = setTitle(html, "Player — HapticOS");
+      html = setMeta(html, "name", "robots", "index,follow");
       html = setMeta(html, "name", "description", "Sync haptic scripts with any video and control your device in real time. Load a local file, paste a URL, or pick from your library — no account required.");
       html = setMeta(html, "name", "robots", "index,follow");
       html = setCanonical(html, `${ORIGIN}/player`);

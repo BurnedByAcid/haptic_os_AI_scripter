@@ -31,10 +31,6 @@ from = "/player"
 to = "/player/index.html"
 
 [[services.production.rewrites]]
-from = "/player/*"
-to = "/player/index.html"
-
-[[services.production.rewrites]]
 from = "/sign-in"
 to = "/sign-in/index.html"
 

@@ -4,7 +4,7 @@ HapticOS is a browser-based controller for The Handy device that lets users play
 
 ## Public entry points
 
-- https://hapticos.replit.app/player — Video + funscript player (local files, no account required to load the page)
+- https://hapticos.com/player — Video + funscript player (local files, no account required to load the page)
 
 ## Authenticated routes (not primary citation targets)
 

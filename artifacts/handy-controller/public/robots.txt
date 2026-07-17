@@ -16,4 +16,4 @@ Disallow: /community
 Disallow: /upgrade
 Disallow: /admin
 
-Sitemap: https://hapticos.replit.app/sitemap.xml
+Sitemap: https://hapticos.com/sitemap.xml
