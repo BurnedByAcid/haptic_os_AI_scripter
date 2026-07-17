@@ -6,7 +6,7 @@ import { getPlan } from "../lib/getPlan";
 const router = Router();
 
 const AISCRIPTER_GITHUB_REPO =
-  process.env.AISCRIPTER_GITHUB_REPO ?? "HapticOS/AIScripter";
+  process.env.AISCRIPTER_GITHUB_REPO ?? "BurnedByAcid/haptic_os_AI_scripter";
 
 /**
  * Releases in the repo are filtered by this tag prefix so that unrelated
