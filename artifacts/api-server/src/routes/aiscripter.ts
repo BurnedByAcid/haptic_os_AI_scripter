@@ -144,13 +144,9 @@ async function fetchAIScripterRelease(): Promise<AIScripterReleaseData> {
   }
 
   const releases = (await res.json()) as GitHubRelease[];
-  // Prefer aiscripter-prefixed tags, but fallback to the newest non-draft release
-  // so manual tags (e.g. V01.00.01) are still picked up.
-  const match =
-    releases.find(
-      (r) => !r.draft && r.tag_name.startsWith(AISCRIPTER_TAG_PREFIX),
-    ) ??
-    releases.find((r) => !r.draft);
+  // Use the newest published release (sorted by created_at descending by GitHub).
+  // The AIScripter repo only contains AIScripter releases, so no prefix filter needed.
+  const match = releases.find((r) => !r.draft && !r.prerelease);
   if (!match) {
     return { tag: "coming-soon", windows: null, macos: null, linux: null, sizeBytes: 0 };
   }
