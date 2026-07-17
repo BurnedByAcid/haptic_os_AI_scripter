@@ -118,7 +118,11 @@ export default defineConfig({
           if (id.includes("node_modules/@tanstack/")) {
             return "tanstack";
           }
-          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom")) {
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/scheduler/")
+          ) {
             return "react-vendor";
           }
         },

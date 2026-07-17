@@ -7,14 +7,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
 import { HandyProvider } from "@/contexts/handy-context";
 import { BlockedReportProvider } from "@/contexts/blocked-report-context";
 import { AppSettingsContext, useAppSettingsProvider } from "@/hooks/use-app-settings";
 import { useSubscription } from "@/hooks/use-subscription";
+
 import Player from "@/pages/player";
 
+const NotFound = lazy(() => import("@/pages/not-found"));
 const Home = lazy(() => import("@/pages/home"));
 const Control = lazy(() => import("@/pages/control"));
 const Library = lazy(() => import("@/pages/library"));
