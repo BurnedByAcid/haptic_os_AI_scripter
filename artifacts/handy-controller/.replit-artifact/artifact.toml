@@ -102,10 +102,6 @@ to = "/index.html"
 from = "/admin"
 to = "/index.html"
 
-[[services.production.rewrites]]
-from = "/*"
-to = "/index.html"
-
 [services.env]
 PORT = "8081"
 BASE_PATH = "/"

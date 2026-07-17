@@ -1,5 +1,9 @@
 User-agent: *
-Allow: /
+Allow: /player
+Disallow: /
+Disallow: /sign-in
+Disallow: /sign-up
+Disallow: /onboarding
 Disallow: /control
 Disallow: /local-library
 Disallow: /games
@@ -11,6 +15,5 @@ Disallow: /aiscripter
 Disallow: /community
 Disallow: /upgrade
 Disallow: /admin
-Disallow: /onboarding
 
 Sitemap: https://hapticos.replit.app/sitemap.xml

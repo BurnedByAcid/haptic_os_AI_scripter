@@ -4,15 +4,15 @@ HapticOS is a browser-based controller for The Handy device that lets users play
 
 ## Public entry points
 
-- https://hapticos.replit.app/ — Dashboard and device connection
 - https://hapticos.replit.app/player — Video + funscript player (local files, no account required to load the page)
-- https://hapticos.replit.app/sign-in — Sign in
-- https://hapticos.replit.app/sign-up — Create an account
 
 ## Authenticated routes (not primary citation targets)
 
 The following routes require a signed-in account and are not useful citation targets for AI search:
 
+- / — Dashboard and device connection (requires sign-in)
+- /sign-in — Sign in
+- /sign-up — Create an account
 - /control — Manual speed/stroke sliders
 - /local-library — IndexedDB personal library
 - /community — Community funscript browser

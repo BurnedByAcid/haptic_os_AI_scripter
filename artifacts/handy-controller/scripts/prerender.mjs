@@ -85,7 +85,7 @@ function setStaticBody(html, bodyHtml) {
   );
 }
 
-const ORIGIN = "https://hapticos.com";
+const ORIGIN = "https://hapticos.replit.app";
 
 const PLAYER_STATIC_BODY = `
 <main style="font-family:system-ui,sans-serif;max-width:960px;margin:0 auto;padding:24px">
@@ -120,6 +120,7 @@ const routes = [
     transform(html) {
       html = setTitle(html, "Player — HapticOS");
       html = setMeta(html, "name", "description", "Sync haptic scripts with any video and control your device in real time. Load a local file, paste a URL, or pick from your library — no account required.");
+      html = setMeta(html, "name", "robots", "index,follow");
       html = setCanonical(html, `${ORIGIN}/player`);
       html = setMeta(html, "property", "og:title", "HapticOS Player — Sync Scripts with Any Video");
       html = setMeta(html, "property", "og:description", "Sync haptic scripts with any video and control your device in real time. Load a local file, paste a URL, or pick from your library — no account required.");

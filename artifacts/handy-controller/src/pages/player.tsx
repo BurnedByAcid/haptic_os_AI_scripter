@@ -114,7 +114,7 @@ export default function Player() {
   usePageMeta({
     title: "Player — HapticOS",
     description: "Sync haptic scripts with any video and control your device in real time. Paste a URL or load a local file to get started.",
-    canonical: `${window.location.origin}/player`,
+    canonical: "https://hapticos.replit.app/player",
     og: {
       title: "HapticOS Player — Sync Scripts with Any Video",
       description: "Sync haptic scripts with any video and control your device in real time. Paste a URL or load a local file to get started.",
