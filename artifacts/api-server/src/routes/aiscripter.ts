@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
-import { Readable } from "node:stream";
+import { Readable, pipeline } from "node:stream";
+import { promisify } from "node:util";
 import { getAuth, clerkClient } from "@clerk/express";
 import { getPlan } from "../lib/getPlan";
 
@@ -143,9 +144,9 @@ async function fetchAIScripterRelease(): Promise<AIScripterReleaseData> {
   }
 
   const releases = (await res.json()) as GitHubRelease[];
-  const match = releases.find(
-    (r) => !r.draft && r.tag_name.startsWith(AISCRIPTER_TAG_PREFIX),
-  );
+  // Use the newest published release (sorted by created_at descending by GitHub).
+  // The AIScripter repo only contains AIScripter releases, so no prefix filter needed.
+  const match = releases.find((r) => !r.draft && !r.prerelease);
   if (!match) {
     return { tag: "coming-soon", windows: null, macos: null, linux: null, sizeBytes: 0 };
   }
@@ -199,9 +200,11 @@ async function streamAssetToClient(
 ): Promise<void> {
   let upstream: globalThis.Response;
   try {
+    // browser_download_url is already signed by GitHub — do NOT forward
+    // Authorization headers or other GH-specific headers because the
+    // actual host is often S3 and rejects them.
     upstream = await fetch(asset.url, {
       headers: {
-        ...githubHeaders(),
         Accept: "application/octet-stream",
       },
       redirect: "follow",
@@ -232,15 +235,18 @@ async function streamAssetToClient(
   }
   res.setHeader("Cache-Control", "no-store");
 
+  // Use Readable.fromWeb + pipeline for robust error handling.
+  // Readable.fromWeb handles Web ReadableStream → Node stream conversion.
+  // pipeline auto-cleans up on errors and avoids memory leaks.
   const nodeStream = Readable.fromWeb(
     upstream.body as import("node:stream/web").ReadableStream,
   );
-  nodeStream.on("error", () => {
-    // Headers are already sent mid-stream; destroy so the client sees a
-    // truncated transfer instead of a silently incomplete file.
-    res.destroy();
-  });
-  nodeStream.pipe(res);
+  const pipe = promisify(pipeline);
+  try {
+    await pipe(nodeStream, res);
+  } catch {
+    // pipeline already destroys both streams on error; no further action needed.
+  }
 }
 
 /**
