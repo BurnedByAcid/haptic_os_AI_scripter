@@ -285,6 +285,35 @@ router.post("/user/aiscripter-agree", async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/aiscripter/release/refresh
+ * Clears the in-memory release cache so the next request re-fetches from
+ * GitHub immediately. Protected by a shared secret supplied in the
+ * Authorization header as a Bearer token.
+ *
+ * Expected env var: RELEASE_REFRESH_SECRET
+ *
+ * Called automatically by the GitHub Actions build workflow after each
+ * new release is published.
+ */
+router.post("/aiscripter/release/refresh", (req: Request, res: Response) => {
+  const secret = process.env.RELEASE_REFRESH_SECRET;
+  if (!secret) {
+    res.status(503).json({ error: "Cache refresh is not configured on this server." });
+    return;
+  }
+
+  const authHeader = req.headers.authorization ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (token !== secret) {
+    res.status(401).json({ error: "Invalid or missing refresh secret." });
+    return;
+  }
+
+  releaseCache = null;
+  res.json({ ok: true, message: "Release cache cleared." });
+});
+
+/**
  * GET /api/aiscripter/release
  * Requires Clerk auth + subscriber plan.
  *

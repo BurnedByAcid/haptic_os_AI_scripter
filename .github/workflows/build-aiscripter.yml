@@ -178,3 +178,23 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-rc') }}
           files: local-daemon/dist/AIScripter-Setup.exe
           generate_release_notes: true
+
+      - name: Bust API release cache
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          HAPTICOS_API_URL: ${{ secrets.HAPTICOS_API_URL }}
+          RELEASE_REFRESH_SECRET: ${{ secrets.RELEASE_REFRESH_SECRET }}
+        run: |
+          if [ -z "$HAPTICOS_API_URL" ] || [ -z "$RELEASE_REFRESH_SECRET" ]; then
+            echo "HAPTICOS_API_URL or RELEASE_REFRESH_SECRET not set — skipping cache bust."
+            exit 0
+          fi
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${HAPTICOS_API_URL}/api/aiscripter/release/refresh" \
+            -H "Authorization: Bearer ${RELEASE_REFRESH_SECRET}" \
+            -H "Content-Type: application/json")
+          echo "Cache refresh responded with HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "Warning: cache refresh returned non-200 ($status). The cache will expire on its normal TTL."
+          fi
