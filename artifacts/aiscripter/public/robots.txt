@@ -1,4 +1,2 @@
 User-agent: *
-Allow: /
-
-Sitemap: https://hapticos.replit.app/aiscripter/sitemap.xml
+Disallow: /

@@ -1,11 +1,11 @@
 # AIScripter
 
-AIScripter is a browser-based AI-powered funscript generation tool. Users describe or upload content and the AI generates haptic scripts compatible with The Handy device and other funscript-capable devices.
+AIScripter is a subscriber-only, browser-based AI-powered funscript generation tool available to HapticOS subscribers. Users describe or upload content and the AI generates haptic scripts compatible with The Handy device and other funscript-capable devices.
 
-## Public entry points
+## Access
 
-- https://hapticos.replit.app/aiscripter/ — AIScripter home (script generation interface)
+AIScripter is a private, gated feature of HapticOS. It requires a HapticOS account and an active subscription. There are no public entry points — the application is not indexed and is not intended to be crawled or linked directly.
 
 ## Notes
 
-AIScripter is served under the /aiscripter/ path. The application is a single-page app — the entry point above is the only public URL. All script generation and AI interactions happen in-browser after loading that page.
+All script generation and AI interactions happen in-browser after authentication. Compliant crawlers are directed not to index this path via the host-level robots policy at https://hapticos.replit.app/robots.txt.
