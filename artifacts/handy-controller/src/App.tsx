@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, lazy, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { ClerkProvider, useAuth, useUser } from "@clerk/react";
 import { publishableKeyFromHost } from "@clerk/react/internal";
@@ -13,23 +13,23 @@ import { HandyProvider } from "@/contexts/handy-context";
 import { BlockedReportProvider } from "@/contexts/blocked-report-context";
 import { AppSettingsContext, useAppSettingsProvider } from "@/hooks/use-app-settings";
 import { useSubscription } from "@/hooks/use-subscription";
-
-import Home from "@/pages/home";
 import Player from "@/pages/player";
-import Control from "@/pages/control";
-import Library from "@/pages/library";
-import Games from "@/pages/games";
-import Beat from "@/pages/beat";
-import Scripter from "@/pages/scripter";
-import SignInPage from "@/pages/sign-in";
-import SignUpPage from "@/pages/sign-up";
-import OnboardingPage from "@/pages/onboarding";
-import Community from "@/pages/community";
-import Upgrade from "@/pages/upgrade";
-import Admin from "@/pages/admin";
-import HapticAI from "@/pages/haptic-ai";
-import HapticAISoon from "@/pages/haptic-ai-soon";
-import AIScripter from "@/pages/aiscripter";
+
+const Home = lazy(() => import("@/pages/home"));
+const Control = lazy(() => import("@/pages/control"));
+const Library = lazy(() => import("@/pages/library"));
+const Games = lazy(() => import("@/pages/games"));
+const Beat = lazy(() => import("@/pages/beat"));
+const Scripter = lazy(() => import("@/pages/scripter"));
+const SignInPage = lazy(() => import("@/pages/sign-in"));
+const SignUpPage = lazy(() => import("@/pages/sign-up"));
+const OnboardingPage = lazy(() => import("@/pages/onboarding"));
+const Community = lazy(() => import("@/pages/community"));
+const Upgrade = lazy(() => import("@/pages/upgrade"));
+const Admin = lazy(() => import("@/pages/admin"));
+const HapticAI = lazy(() => import("@/pages/haptic-ai"));
+const HapticAISoon = lazy(() => import("@/pages/haptic-ai-soon"));
+const AIScripter = lazy(() => import("@/pages/aiscripter"));
 
 const queryClient = new QueryClient();
 
@@ -147,34 +147,36 @@ function ProtectedRoute({
 
 function Router() {
   return (
-    <Switch>
-      {/* Public: player works without an account */}
-      <Route path="/player" component={Player} />
+    <Suspense fallback={null}>
+      <Switch>
+        {/* Public: player works without an account */}
+        <Route path="/player" component={Player} />
 
-      {/* Auth pages */}
-      <Route path="/sign-in/*?" component={SignInPage} />
-      <Route path="/sign-up/*?" component={SignUpPage} />
+        {/* Auth pages */}
+        <Route path="/sign-in/*?" component={SignInPage} />
+        <Route path="/sign-up/*?" component={SignUpPage} />
 
-      {/* Onboarding: only for signed-in users who haven't completed it */}
-      <Route path="/onboarding" component={OnboardingPage} />
+        {/* Onboarding: only for signed-in users who haven't completed it */}
+        <Route path="/onboarding" component={OnboardingPage} />
 
-      {/* Everything else requires login + onboarding */}
-      <Route path="/"          component={() => <ProtectedRoute component={Home} />} />
-      <Route path="/control"   component={() => <ProtectedRoute component={Control} />} />
-      <Route path="/local-library" component={() => <ProtectedRoute component={Library} />} />
-      <Route path="/games"     component={() => <ProtectedRoute component={Games} />} />
-      <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
-      <Route path="/audio-cleaner" component={() => <Redirect to="/beat?tab=cleaner" />} />
-      <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
-      <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} adminOnly adminFallback="/haptic-ai-soon" />} />
-      <Route path="/haptic-ai-soon" component={() => <ProtectedRoute component={HapticAISoon} />} />
-      <Route path="/aiscripter" component={() => <ProtectedRoute component={AIScripter} />} />
-      <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
-      <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
-      <Route path="/admin"        component={() => <ProtectedRoute component={Admin} adminOnly />} />
+        {/* Everything else requires login + onboarding */}
+        <Route path="/"          component={() => <ProtectedRoute component={Home} />} />
+        <Route path="/control"   component={() => <ProtectedRoute component={Control} />} />
+        <Route path="/local-library" component={() => <ProtectedRoute component={Library} />} />
+        <Route path="/games"     component={() => <ProtectedRoute component={Games} />} />
+        <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
+        <Route path="/audio-cleaner" component={() => <Redirect to="/beat?tab=cleaner" />} />
+        <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
+        <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} adminOnly adminFallback="/haptic-ai-soon" />} />
+        <Route path="/haptic-ai-soon" component={() => <ProtectedRoute component={HapticAISoon} />} />
+        <Route path="/aiscripter" component={() => <ProtectedRoute component={AIScripter} />} />
+        <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
+        <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />
+        <Route path="/admin"        component={() => <ProtectedRoute component={Admin} adminOnly />} />
 
-      <Route component={NotFound} />
-    </Switch>
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 

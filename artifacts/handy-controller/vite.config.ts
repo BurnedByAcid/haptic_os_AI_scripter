@@ -102,6 +102,28 @@ export default defineConfig({
     esbuild: {
       drop: ["console", "debugger"],
     },
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (
+            id.includes("@ffmpeg/") ||
+            id.includes("@tensorflow/") ||
+            id.includes("@tensorflow-models/")
+          ) {
+            return "heavy-optional";
+          }
+          if (id.includes("node_modules/@clerk/")) {
+            return "clerk";
+          }
+          if (id.includes("node_modules/@tanstack/")) {
+            return "tanstack";
+          }
+          if (id.includes("node_modules/react") || id.includes("node_modules/react-dom")) {
+            return "react-vendor";
+          }
+        },
+      },
+    },
   },
   server: {
     port,
