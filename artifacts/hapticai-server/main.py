@@ -236,6 +236,7 @@ def main():
     parser.add_argument('--no-copy', action='store_false', dest='copy', help='Do not save a copy of the final funscript next to the video file (will save to output folder only).')
     parser.add_argument('--generate-roll', action='store_true', help='Generate secondary axis (.roll.funscript) file for supported multi-axis devices.')
     parser.add_argument('--recursive', '-r', action='store_true', help='If input_path is a folder, process it recursively.')
+    parser.add_argument('--max-travel', type=int, default=300, help='Maximum stroke distance between high and low points (200–500, default 300).')
 
     args = parser.parse_args()
 

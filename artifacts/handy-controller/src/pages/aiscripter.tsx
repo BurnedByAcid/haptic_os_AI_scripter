@@ -100,6 +100,10 @@ export default function AIScripter() {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Generation settings ────────────────────────────────────────────────────
+  const [maxTravel, setMaxTravel] = useState(300);
+  const [videoName, setVideoName] = useState<string>("aiscripter-output");
+
   // ── Job state ──────────────────────────────────────────────────────────────
   const [jobStatus, setJobStatus] = useState<JobStatus>({ state: "idle" });
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -169,8 +173,18 @@ export default function AIScripter() {
           ...(sessionToken ? { "X-AIScripter-Token": sessionToken } : {}),
         },
         mode: "cors",
-        body: JSON.stringify({ url: videoUrl.trim() }),
+        body: JSON.stringify({ url: videoUrl.trim(), max_travel: maxTravel }),
       });
+      // Extract video name from URL for the download filename
+      try {
+        const u = new URL(videoUrl.trim());
+        const pathParts = u.pathname.split("/").filter(Boolean);
+        const lastPart = pathParts[pathParts.length - 1] || "";
+        const cleanName = lastPart.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9\-_\s]/g, "_");
+        if (cleanName) setVideoName(cleanName);
+      } catch {
+        /* ignore URL parse errors */
+      }
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
         setJobStatus({
@@ -225,7 +239,7 @@ export default function AIScripter() {
             ...(sessionToken ? { "X-AIScripter-Token": sessionToken } : {}),
           },
           mode: "cors",
-          body: JSON.stringify({ job_id: jobId }),
+          body: JSON.stringify({ job_id: jobId, max_travel: maxTravel }),
         });
         if (!processRes.ok) {
           const data = (await processRes.json()) as { error?: string };
@@ -245,7 +259,7 @@ export default function AIScripter() {
         });
       }
     },
-    [daemonStatus, sessionToken, stopPolling, startPolling],
+    [daemonStatus, sessionToken, stopPolling, startPolling, maxTravel],
   );
 
   const handleGenerate = useCallback(() => {
@@ -292,12 +306,13 @@ export default function AIScripter() {
     [sessionToken],
   );
 
-  const downloadFunscript = useCallback((funscript: string) => {
+  const downloadFunscript = useCallback((funscript: string, name?: string) => {
     const blob = new Blob([funscript], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "aiscripter-output.funscript";
+    const safeName = (name || "aiscripter-output").replace(/[^a-zA-Z0-9\-_\s]/g, "_");
+    a.download = `${safeName}.funscript`;
     a.click();
     URL.revokeObjectURL(url);
   }, []);
@@ -325,9 +340,9 @@ export default function AIScripter() {
     setShowSaveDialog(false);
     const funscript = await fetchFunscript(jobStatus.funscriptUrl);
     if (!funscript) return;
-    downloadFunscript(funscript);
+    downloadFunscript(funscript, videoName);
     openInScripter(funscript);
-  }, [jobStatus, fetchFunscript, downloadFunscript, openInScripter]);
+  }, [jobStatus, fetchFunscript, downloadFunscript, openInScripter, videoName]);
 
   const handleOpenScripterOnly = useCallback(async () => {
     if (jobStatus.state !== "complete") return;
@@ -340,8 +355,8 @@ export default function AIScripter() {
     if (jobStatus.state !== "complete") return;
     setShowSaveDialog(false);
     const funscript = await fetchFunscript(jobStatus.funscriptUrl);
-    if (funscript) downloadFunscript(funscript);
-  }, [jobStatus, fetchFunscript, downloadFunscript]);
+    if (funscript) downloadFunscript(funscript, videoName);
+  }, [jobStatus, fetchFunscript, downloadFunscript, videoName]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   const isBusy =
@@ -453,7 +468,13 @@ export default function AIScripter() {
                   type="file"
                   accept="video/mp4,video/x-matroska,video/avi,video/quicktime,video/webm,video/x-msvideo,.mp4,.mkv,.avi,.mov,.wmv,.webm,.m4v"
                   className="hidden"
-                  onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setSelectedFile(file);
+                    if (file) {
+                      setVideoName(file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9\-_\s]/g, "_"));
+                    }
+                  }}
                 />
                 <div
                   className={`relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer select-none transition-all ${
@@ -501,6 +522,40 @@ export default function AIScripter() {
                 </div>
               </div>
             )}
+
+            {/* Maximum Travel slider */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-muted-foreground font-medium">
+                  Maximum Travel
+                </label>
+                <span className="text-xs font-semibold text-foreground tabular-nums">
+                  {maxTravel}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={200}
+                max={500}
+                step={50}
+                value={maxTravel}
+                onChange={(e) => setMaxTravel(Number(e.target.value))}
+                disabled={isBusy}
+                className="w-full accent-primary h-1.5 rounded-lg appearance-none bg-border cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>200</span>
+                <span>250</span>
+                <span>300</span>
+                <span>350</span>
+                <span>400</span>
+                <span>450</span>
+                <span>500</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Controls the maximum stroke distance between high and low points. Lower = gentler, higher = more intense.
+              </p>
+            </div>
 
             {/* Generate button */}
             <Button onClick={handleGenerate} disabled={!canGenerate} className="w-full gap-1.5">

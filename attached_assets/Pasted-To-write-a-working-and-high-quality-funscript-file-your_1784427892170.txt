@@ -1,0 +1,73 @@
+To write a **working and high-quality** `.funscript` file, your script must satisfy two levels of rules: **Technical/Syntactic rules** (ensuring the code validates and does not crash the playback engine) and **Kinematic/Mechanical rules** (ensuring the resulting physical movement makes sense for a hardware device).
+
+---
+
+## 1. Technical & Syntactic Rules (The JSON Schema)
+
+A `.funscript` file is fundamentally a structured **JSON (JavaScript Object Notation)** text file. It must strictly follow standard JSON syntax rules (no comments, quoted keys, exact punctuation) and include a set of universally recognized root properties.
+
+### Core Requirements
+
+* **`version`** *(string)*: Tells the player what specification version to use. The global standard is `"1.0"`.
+* **`inverted`** *(boolean)*: Dictates if the device should physically flip the stroke mapping. It is usually set to `false`.
+* **`range`** *(integer)*: Sets the active physical range boundary of the hardware (default standard is `90` or `100`).
+* **`actions`** *(array of objects)*: This is the critical array containing all the individual timestamped movements.
+
+### The Structure of an Action Entry
+
+Inside the `actions` array, every single position instruction must contain exactly two parameters:
+
+1. **`at`** *(integer)*: The exact **timestamp in milliseconds** relative to the beginning of the video file.
+2. **`pos`** *(integer)*: The target **shuttle or actuator position**, restricted strictly to an integer scale between **`0` and `100**` (where `0` is entirely retracted/bottomed out and `100` is fully extended).
+
+### Minimal Valid Example
+
+```json
+{
+  "version": "1.0",
+  "inverted": false,
+  "range": 90,
+  "actions": [
+    { "at": 1000, "pos": 0 },
+    { "at": 1500, "pos": 100 },
+    { "at": 2000, "pos": 0 }
+  ]
+}
+
+```
+
+---
+
+## 2. Kinematic & Hardware Rules (The Motion Physics)
+
+A `.funscript` file can be syntactically flawless JSON but still be a non-working file if it commands a physical motor to do something impossible. Hardware devices read a `.funscript` by **interpolating values between sequential timestamps**. Because physical shuttles are bound by the laws of inertia, acceleration, and distance, you must obey the following scripting guidelines:
+
+### The Rule of Alternating Peaks and Valleys
+
+Hardware players read an entry as a target destination. If you script two low points sequentially (e.g., `pos: 10` followed by `pos: 12`), the machine doesn't travel a stroke; it just creeps forward or pauses. For a stroke to feel right, **the position values must alternate high and low** (e.g., `10 -> 90 -> 15 -> 95`).
+
+### Speed and Intensity Thresholds
+
+Hardware engines calculate the speed required using the distance traveled over time. The basic formula for intensity is:
+
+
+$$\text{Intensity} = \frac{500 \times \vert{}pos_2 - pos_1\vert{}}{\vert{}at_2 - at_1\vert{}}$$
+
+* **The Hardware Limitation:** Most consumer tele-dildonic devices cannot physically travel from `0` to `100` in fewer than **100–120 milliseconds** without skipping steps, stalling out, or severely lagging behind the script timeline.
+* **Scripting Limit:** Gaps narrower than ~100ms for a full stroke will cause a hardware delay or desynchronization.
+
+### Directional Trajectory Over Gaps
+
+If there is an intentional pause or dead space in a scene, the device stays at the last instructed `pos` value until the next timestamp hits.
+
+* **The Trap:** If you leave a device at `pos: 100` (extended), stop scripting for 10 seconds, and then place a point at `at: +10 seconds, pos: 0`, the device will spend the entire 10 seconds moving incredibly slowly to `0`.
+* **The Fix:** If the actor stops moving, place a point immediately after the final action to lock the device in place, and then place a new starting point right before the next sequence of movement begins.
+
+---
+
+## 3. Ecosystem & Deployment Rules
+
+Even if the content inside the file is mapped perfectly, your playback software won't acknowledge it unless external operating parameters match:
+
+* **Strict Naming Alignment:** The filename of the script must explicitly match the corresponding video file down to the exact character case, differing only by the extension (e.g., `video_file.mp4` and `video_file.funscript`). They must also reside in the same local directory folder.
+* **Single-Axis vs. Multi-Axis Allocation:** A standard single `.funscript` file maps directly to a linear up-and-down stroke (the primary axis). If you are scripting advanced tracks for hardware that handles secondary rotations (pitch, roll, yaw, or twist), you do not put them in one file. Instead, you must write separate independent files named using standard extensions (e.g., `video.stroke.funscript`, `video.pitch.funscript`, `video.roll.funscript`) so compatible multi-axis readers can parse them concurrently.

@@ -44,6 +44,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Write funscript to this file instead of stdout",
     )
+    parser.add_argument(
+        "--max-travel",
+        type=int,
+        default=300,
+        help="Maximum stroke distance between high and low points (200–500, default 300)",
+    )
     return parser.parse_args()
 
 
@@ -313,16 +319,32 @@ def convert_to_wav(src: str, dst: str) -> None:
 
 # ── Funscript generation ──────────────────────────────────────────────────────
 
-def envelope_to_funscript(envelope: list[tuple[float, float]]) -> dict:
+def envelope_to_funscript(
+    envelope: list[tuple[float, float]],
+    max_travel: int = 300,
+) -> dict:
     """
-    Convert a motion/amplitude envelope to a funscript.
+    Convert a motion/amplitude envelope to a proper funscript.
 
-    Strategy:
-    - Normalise values to [0, 100] stroke range.
-    - Alternate between high (motion crest) and low (motion trough) positions
-      each time the normalised value crosses a midpoint threshold, creating a
-      reciprocating pattern driven by motion energy.
-    - Decimate to at most one action per 150 ms to stay within device limits.
+    Rules enforced:
+    1. Alternating peaks / valleys — every action alternates between a
+       high position and a low position around the midpoint (50).
+    2. Speed limit — full 0→100 stroke takes at least ~120 ms (the fastest
+       realistic device limit).  We clamp per-segment speed to MAX_SPEED.
+    3. Max travel (stroke) — the distance between peak and valley never
+       exceeds max_travel, and adapts per-peak based on local marker density
+       (mirrors the Scripter Dynamic tool behaviour).
+    4. Rest at end — the script always returns to position 0 on the final
+       action so the device is not left at an extreme.
+
+    Algorithm:
+    - Detect local maxima (peaks) in the envelope where the value rises above
+      the 65th percentile and is locally maximal.
+    - For each detected peak, compute an adaptive stroke that respects
+      max_travel and the local density of peaks (dense regions get smaller
+      strokes so the device can keep up).
+    - Alternate high / low positions around midpoint 50 using that stroke.
+    - Clamp speed between consecutive actions using MAX_SPEED.
     """
     if not envelope:
         return {"version": "1.0", "inverted": False, "range": 90, "actions": []}
@@ -332,34 +354,111 @@ def envelope_to_funscript(envelope: list[tuple[float, float]]) -> dict:
     v_min = min(vals)
     v_range = v_max - v_min or 1.0
 
-    actions = []
-    last_pos = 0
-    last_action_ms = -999
-    threshold_high = 0.6
-    threshold_low = 0.3
-    state_high = False
-
-    for t, v in envelope:
-        norm = (v - v_min) / v_range  # 0.0 – 1.0
-        pos = int(norm * 90)           # 0 – 90
-        at_ms = int(t * 1000)
-
-        # Rate-limit: at most one action per 150 ms
-        if at_ms - last_action_ms < 150:
-            continue
-
-        if not state_high and norm > threshold_high:
-            state_high = True
-            pos = max(50, pos)
-        elif state_high and norm < threshold_low:
-            state_high = False
-            pos = min(30, pos)
+    # Step 1: detect local maxima above the 65th percentile threshold
+    threshold = v_min + 0.65 * v_range
+    peaks: list[tuple[float, float]] = []
+    i = 0
+    n = len(envelope)
+    while i < n:
+        t, v = envelope[i]
+        if v >= threshold:
+            # consume the whole above-threshold run, taking the highest point
+            run_start = i
+            best_idx = i
+            best_val = v
+            while i < n and envelope[i][1] >= threshold:
+                if envelope[i][1] > best_val:
+                    best_val = envelope[i][1]
+                    best_idx = i
+                i += 1
+            # Require a local maximum (higher than neighbours)
+            left = envelope[best_idx - 1][1] if best_idx > 0 else v_min
+            right = envelope[best_idx + 1][1] if best_idx + 1 < n else v_min
+            if best_val >= left and best_val >= right:
+                peaks.append(envelope[best_idx])
         else:
-            pos = int(last_pos * 0.6 + pos * 0.4)
+            i += 1
 
-        actions.append({"at": at_ms, "pos": pos})
-        last_pos = pos
-        last_action_ms = at_ms
+    if not peaks:
+        # No strong peaks found — fall back to simple threshold-crossing
+        for t, v in envelope:
+            if v >= threshold:
+                peaks.append((t, v))
+        # deduplicate by time
+        seen: set[int] = set()
+        uniq: list[tuple[float, float]] = []
+        for t, v in peaks:
+            key = int(t * 1000) // 200
+            if key not in seen:
+                seen.add(key)
+                uniq.append((t, v))
+        peaks = uniq
+
+    if not peaks:
+        return {"version": "1.0", "inverted": False, "range": 90, "actions": []}
+
+    peak_times = [t for t, _ in peaks]
+
+    # Step 2: adaptive stroke per peak based on local density (mirror of
+    # Scripter's computeAdaptivePositions logic).
+    # For each peak, count how many other peaks fall within a 1-second window.
+    # More peaks in that window = smaller stroke so the device can keep up.
+    limit_clamped = max(0, min(100, max_travel))
+    target_strokes: list[int] = []
+    for i, t in enumerate(peak_times):
+        # count peaks in [t-0.5s, t+0.5s]
+        count = sum(1 for pt in peak_times if abs(pt - t) <= 0.5)
+        transitions = max(1, count - 1)
+        stroke = min(100, max(5, limit_clamped // transitions))
+        target_strokes.append(stroke)
+
+    # Step 3: smooth stroke changes with a bidirectional ramp (max ±20 per step)
+    RAMP_STEP = 20
+    strokes = list(target_strokes)
+    for i in range(1, len(strokes)):
+        strokes[i] = min(strokes[i], strokes[i - 1] + RAMP_STEP)
+    for i in range(len(strokes) - 2, -1, -1):
+        strokes[i] = min(strokes[i], strokes[i + 1] + RAMP_STEP)
+
+    # Step 4: alternating hi / lo around midpoint 50
+    # Even indices = high, odd = low  (starts high)
+    raw_actions: list[dict] = []
+    for idx, ((t, _), stroke) in enumerate(zip(peaks, strokes)):
+        at_ms = int(round(t * 1000))
+        half = round(stroke / 2)
+        lo = max(0, 50 - half)
+        hi = min(100, 50 + (stroke - half))
+        pos = hi if idx % 2 == 0 else lo
+        raw_actions.append({"at": at_ms, "pos": int(pos)})
+
+    # Step 5: speed clamp — ensure we never exceed MAX_SPEED
+    # A full 0→100 stroke should take at least ~100 ms at realistic limits.
+    MAX_SPEED = 800.0  # pos units per second (100% stroke / 125ms = 800)
+    actions: list[dict] = []
+    if raw_actions:
+        actions.append(raw_actions[0])
+        for i in range(1, len(raw_actions)):
+            prev = actions[-1]
+            cur = raw_actions[i]
+            dt = cur["at"] - prev["at"]
+            if dt <= 0:
+                # Skip overlapping / duplicate timestamps
+                continue
+            dp = abs(cur["pos"] - prev["pos"])
+            speed = (dp / dt) * 1000.0  # pos units per second
+            if speed > MAX_SPEED and dp > 0:
+                # Clamp: extend dt so speed = MAX_SPEED
+                min_dt = int(round((dp / MAX_SPEED) * 1000))
+                cur = {"at": prev["at"] + min_dt, "pos": cur["pos"]}
+            actions.append(cur)
+
+    # Step 6: ensure script ends at rest (pos 0)
+    if actions:
+        last_t = actions[-1]["at"]
+        # Add a short rest (at least 200 ms after last action)
+        rest_t = max(last_t + 200, int(envelope[-1][0] * 1000) + 100)
+        if actions[-1]["pos"] != 0:
+            actions.append({"at": rest_t, "pos": 0})
 
     return {
         "version": "1.0",
@@ -371,7 +470,7 @@ def envelope_to_funscript(envelope: list[tuple[float, float]]) -> dict:
 
 # ── Main pipeline ─────────────────────────────────────────────────────────────
 
-def generate_funscript(video_url: str) -> dict:
+def generate_funscript(video_url: str, max_travel: int = 300) -> dict:
     """
     Full pipeline: download → optical-flow analysis → funscript.
     Falls back to audio RMS analysis if OpenCV is unavailable.
@@ -445,7 +544,7 @@ def generate_funscript(video_url: str) -> dict:
         # ── 4. Build funscript ────────────────────────────────────────────────
         progress(90)
         print("[engine] Building funscript...", file=sys.stderr, flush=True)
-        funscript = envelope_to_funscript(envelope)
+        funscript = envelope_to_funscript(envelope, max_travel=max_travel)
         funscript["metadata"] = {
             "source_url": video_url,
             "generator": "AIScripter",
@@ -463,7 +562,7 @@ def generate_funscript(video_url: str) -> dict:
 def main() -> None:
     args = parse_args()
     try:
-        funscript = generate_funscript(args.url)
+        funscript = generate_funscript(args.url, max_travel=args.max_travel)
         output_json = json.dumps(funscript, indent=2)
         if args.output:
             with open(args.output, "w", encoding="utf-8") as f:

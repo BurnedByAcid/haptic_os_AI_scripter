@@ -32,6 +32,7 @@ pub struct Job {
     pub error: Option<String>,
     pub funscript: Option<String>,
     pub script_source: Option<String>,
+    pub max_travel: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +48,8 @@ pub struct AppState {
 #[derive(Deserialize)]
 struct TriggerRequest {
     url: String,
+    #[serde(default)]
+    max_travel: i32,
 }
 
 #[derive(Serialize)]
@@ -120,6 +123,7 @@ async fn handle_trigger(
     }
 
     let job_id = Uuid::new_v4().to_string();
+    let max_travel = body.max_travel.max(0);
     let job = Job {
         id: job_id.clone(),
         url: body.url.clone(),
@@ -128,6 +132,7 @@ async fn handle_trigger(
         error: None,
         funscript: None,
         script_source: None,
+        max_travel,
     };
 
     {
@@ -140,7 +145,7 @@ async fn handle_trigger(
     let url = body.url.clone();
     let id = job_id.clone();
     tokio::spawn(async move {
-        run_engine(state_clone, id, url).await;
+        run_engine(state_clone, id, url, max_travel).await;
     });
 
     (StatusCode::OK, Json(TriggerResponse { job_id })).into_response()
@@ -236,7 +241,7 @@ pub fn bundled_bin_dir() -> Option<std::path::PathBuf> {
     }
 }
 
-async fn run_engine(state: Arc<AppState>, job_id: String, url: String) {
+async fn run_engine(state: Arc<AppState>, job_id: String, url: String, max_travel: i32) {
     use std::process::Stdio;
     use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 
@@ -265,6 +270,11 @@ async fn run_engine(state: Arc<AppState>, job_id: String, url: String) {
     }
 
     let result: Result<String, String> = async {
+        let mt_arg = if max_travel > 0 {
+            vec!["--max-travel".to_string(), max_travel.to_string()]
+        } else {
+            vec![]
+        };
         let (program, args) = if let Some(ref exe) = engine_exe {
             (
                 exe.to_string_lossy().to_string(),
@@ -276,6 +286,7 @@ async fn run_engine(state: Arc<AppState>, job_id: String, url: String) {
                 vec!["engine.py".to_string(), "--url".to_string(), url.clone()],
             )
         };
+        let args = [args, mt_arg].concat();
 
         let mut cmd = tokio::process::Command::new(&program);
         cmd.args(&args)

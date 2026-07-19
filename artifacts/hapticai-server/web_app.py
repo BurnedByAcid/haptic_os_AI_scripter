@@ -1203,6 +1203,9 @@ def start_processing():
     job = jobs[job_id]
     mode = data.get("mode", "3-stage")
     settings = data.get("settings", {})
+    # Allow top-level max_travel to be merged into settings for convenience
+    if "max_travel" in data:
+        settings["max_travel"] = data["max_travel"]
 
     job["status"] = "processing"
     job["mode"] = mode
@@ -1270,6 +1273,9 @@ def build_cli_args(filepath, mode, settings, output_dir):
         args.append("--no-autotune")
     if settings.get("generate_roll"):
         args.append("--generate-roll")
+    max_travel = settings.get("max_travel")
+    if max_travel is not None:
+        args.extend(["--max-travel", str(max_travel)])
     return args
 
 
@@ -1338,6 +1344,7 @@ def _run_hapticai_inprocess(job_id, filepath, mode, settings, output_dir):
         recursive=False,
         funscript_mode=False,
         filter=None,
+        max_travel=settings.get("max_travel", 300),
     )
 
     os.environ["HAPTICAI_OUTPUT_DIR"] = str(output_dir)
@@ -1375,6 +1382,9 @@ def _run_hapticai_subprocess(job_id, filepath, mode, settings, output_dir):
         cmd.append("--generate-roll")
     if settings.get("overwrite"):
         cmd.append("--overwrite")
+    max_travel = settings.get("max_travel")
+    if max_travel is not None:
+        cmd.extend(["--max-travel", str(max_travel)])
 
     env = os.environ.copy()
     env["HAPTICAI_OUTPUT_DIR"] = str(output_dir)
