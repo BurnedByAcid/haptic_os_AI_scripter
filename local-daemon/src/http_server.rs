@@ -400,6 +400,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
     let cors = CorsLayer::new()
         .allow_origin([
             "https://hapticos.org".parse().unwrap(),
+            "https://www.hapticos.org".parse().unwrap(),
             "http://localhost:7860".parse().unwrap(),
             "http://127.0.0.1:7860".parse().unwrap(),
         ])

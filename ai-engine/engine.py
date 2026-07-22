@@ -107,6 +107,42 @@ def _ffmpeg_location_args() -> list[str]:
     return ["--ffmpeg-location", str(Path(ffmpeg_path).parent)]
 
 
+# ── yt-dlp self-update ────────────────────────────────────────────────────────
+
+_yt_dlp_updated = False
+
+
+def try_update_yt_dlp() -> None:
+    """
+    Attempt to self-update the bundled yt-dlp binary to the latest stable
+    release before downloading.  This means existing installs automatically
+    get extractor fixes (e.g. broken RedTube support) without a full
+    application reinstall.
+
+    Runs once per engine process invocation; silently skips on any failure
+    (network unavailable, permission error, etc.) so the job still proceeds
+    with the current version.
+    """
+    global _yt_dlp_updated
+    if _yt_dlp_updated:
+        return
+    _yt_dlp_updated = True
+    try:
+        yt_dlp = find_tool("yt-dlp")
+        print("[engine] Checking for yt-dlp updates...", file=sys.stderr, flush=True)
+        result = subprocess.run(
+            [yt_dlp, "--update-to", "stable"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        output = (result.stdout + result.stderr).strip()
+        first_line = output.splitlines()[0] if output else "no output"
+        print(f"[engine] yt-dlp update: {first_line}", file=sys.stderr, flush=True)
+    except Exception as exc:
+        print(f"[engine] yt-dlp self-update skipped ({exc}); continuing with bundled version", file=sys.stderr, flush=True)
+
+
 # ── Download helpers ──────────────────────────────────────────────────────────
 
 def download_video(url: str, out_path: str) -> None:
@@ -114,40 +150,61 @@ def download_video(url: str, out_path: str) -> None:
     Download the best video+audio to out_path using yt-dlp.
     Uses a format that keeps the file as a single container (mp4/mkv/webm).
     """
+    yt_dlp = find_tool("yt-dlp")
     cmd = [
-        find_tool("yt-dlp"),
+        yt_dlp,
         "--no-playlist",
         "--format", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]/best",
         "--merge-output-format", "mp4",
         "--output", out_path,
         "--newline",
+        "--no-warnings",
         *_ffmpeg_location_args(),
         url,
     ]
     print("[engine] Running yt-dlp for video download...", file=sys.stderr, flush=True)
-    result = subprocess.run(cmd, capture_output=False, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
+    if result.stdout.strip():
+        for line in result.stdout.strip().splitlines()[-5:]:
+            print(f"[engine] yt-dlp: {line}", file=sys.stderr, flush=True)
     if result.returncode != 0:
-        raise RuntimeError(f"yt-dlp exited with code {result.returncode}")
+        stderr_tail = result.stderr.strip().splitlines()
+        err_lines = [l for l in stderr_tail if "ERROR:" in l or "error" in l.lower()]
+        detail = err_lines[-1] if err_lines else (stderr_tail[-1] if stderr_tail else "")
+        if detail:
+            print(f"[engine] yt-dlp error detail: {detail}", file=sys.stderr, flush=True)
+        msg = f"yt-dlp exited with code {result.returncode}"
+        if "Unable to extract" in detail or "unsupported URL" in detail.lower():
+            msg += " — this site is not currently supported by yt-dlp"
+        raise RuntimeError(msg)
 
 
 def download_audio(url: str, out_wav: str) -> None:
     """
     Fallback: download only audio track to a WAV file using yt-dlp.
     """
+    yt_dlp = find_tool("yt-dlp")
     cmd = [
-        find_tool("yt-dlp"),
+        yt_dlp,
         "--no-playlist",
         "--extract-audio",
         "--audio-format", "wav",
         "--audio-quality", "5",
         "--output", out_wav.replace(".wav", ".%(ext)s"),
         "--newline",
+        "--no-warnings",
         *_ffmpeg_location_args(),
         url,
     ]
-    result = subprocess.run(cmd, capture_output=False, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
     if result.returncode != 0:
-        raise RuntimeError(f"yt-dlp (audio) exited with code {result.returncode}")
+        stderr_tail = result.stderr.strip().splitlines()
+        err_lines = [l for l in stderr_tail if "ERROR:" in l or "error" in l.lower()]
+        detail = err_lines[-1] if err_lines else (stderr_tail[-1] if stderr_tail else "")
+        msg = f"yt-dlp (audio) exited with code {result.returncode}"
+        if "Unable to extract" in detail or "unsupported URL" in detail.lower():
+            msg += " — this site is not currently supported by yt-dlp"
+        raise RuntimeError(msg)
 
 
 def find_downloaded_file(stem: str, extensions: tuple) -> str:
@@ -475,6 +532,8 @@ def generate_funscript(video_url: str, max_travel: int = 300) -> dict:
     Full pipeline: download → optical-flow analysis → funscript.
     Falls back to audio RMS analysis if OpenCV is unavailable.
     """
+    try_update_yt_dlp()
+
     with tempfile.TemporaryDirectory() as tmpdir:
         # ── 1. Download video ──────────────────────────────────────────────────
         progress(10)

@@ -370,7 +370,16 @@ function StatusPanel({
         </div>
       )}
 
-      {status.state === "error" && <p className="text-xs text-destructive">{status.message}</p>}
+      {status.state === "error" && (
+        <div className="space-y-1.5">
+          <p className="text-xs text-destructive">{status.message}</p>
+          {(status.message?.includes("not currently supported") || status.message?.includes("code 1")) && (
+            <p className="text-xs text-muted-foreground">
+              Some sites (e.g. RedTube) have broken extractors in older versions of yt-dlp. The daemon auto-updates yt-dlp on each job — if this persists, try downloading the video manually and uploading it instead.
+            </p>
+          )}
+        </div>
+      )}
 
       {status.state === "complete" && scriptSource === "audio_rms" && (
         <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/8 px-3 py-2">
