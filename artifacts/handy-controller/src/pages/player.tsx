@@ -401,6 +401,23 @@ export default function Player() {
       return;
     }
 
+    // Raw <iframe src="…"> embed code — extract src and go straight to embed mode
+    const iframeMatch = pendingVideoUrl.match(/src=["']([^"']+)["']/i);
+    if (iframeMatch) {
+      const src = iframeMatch[1].trim();
+      try {
+        const parsed = new URL(src);
+        if (["https:", "http:"].includes(parsed.protocol)) {
+          setEmbedUrl(src);
+          setVideoUrl(null);
+          setVideoMode("embed");
+          setVideoLabel(src);
+          setVideoLabelIsFile(false);
+          return;
+        }
+      } catch { /* ignore malformed src */ }
+    }
+
     const detected = detectEmbedUrl(pendingVideoUrl);
     if (!detected) return; // malformed URL
 

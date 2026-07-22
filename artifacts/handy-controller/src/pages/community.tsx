@@ -23,6 +23,12 @@ import { parseTagsFilter, MAX_TAG_FILTERS, type LibraryTag } from "@workspace/va
 const API = import.meta.env.VITE_API_URL ?? "";
 const PAGE_SIZE = 20;
 
+/** Extract a plain URL from either a bare URL or an <iframe src="…"> embed code. */
+function normalizeVideoInput(raw: string): string {
+  const m = raw.match(/src=["']([^"']+)["']/i);
+  return m ? m[1].trim() : raw.trim();
+}
+
 interface CommunityScript {
   id: number;
   user_id: string;
@@ -305,7 +311,8 @@ export default function Community() {
   const submitMutation = useMutation({
     mutationFn: async () => {
       if (!scriptFile) throw new Error("No script file selected.");
-      const urlErr = validateVideoUrl(form.video_url.trim());
+      const normalized = normalizeVideoInput(form.video_url);
+      const urlErr = validateVideoUrl(normalized);
       if (urlErr) throw new Error(urlErr.message);
       const script = await validateAndParseFunscriptFile(scriptFile);
       const headers = await authHeaders();
@@ -315,7 +322,7 @@ export default function Community() {
         body: JSON.stringify({
           title: form.title,
           description: form.description,
-          video_url: form.video_url,
+          video_url: normalized,
           tags: form.tags,
           funscript: JSON.stringify(script),
         }),
@@ -428,7 +435,7 @@ export default function Community() {
       const data = await res.json() as CommunityScript & { funscript: string };
       localStorage.setItem("handy_pending_script", data.funscript);
       localStorage.setItem("handy_pending_script_name", s.title);
-      localStorage.setItem("handy_pending_video_url", s.video_url);
+      localStorage.setItem("handy_pending_video_url", normalizeVideoInput(s.video_url));
       setLocation("/player");
     } catch {
       toast({ title: "Could not load into player", variant: "destructive" });
@@ -531,9 +538,9 @@ export default function Community() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground font-medium">Video URL *</label>
+                <label className="text-xs text-muted-foreground font-medium">Video URL or Embed Code *</label>
                 <Input
-                  placeholder="https://…"
+                  placeholder='https://… or <iframe src="…">'
                   value={form.video_url}
                   onChange={(e) => setForm((f) => ({ ...f, video_url: e.target.value }))}
                   className="bg-background/50"
