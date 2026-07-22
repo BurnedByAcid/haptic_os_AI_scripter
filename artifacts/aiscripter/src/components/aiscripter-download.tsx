@@ -61,38 +61,37 @@ export function AIScripterDownload({ daemonConnected }: AIScripterDownloadProps)
   const handleDownload = useCallback(
     async (platform: "windows" | "macos" | "linux") => {
       setDownloading(platform);
+      setError(null);
       try {
         const token = await getToken();
         const headers: Record<string, string> = {};
         if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        // Single request — server validates auth + streams file directly
         const res = await fetch(
           `${API}/api/aiscripter/release/download?platform=${platform}`,
           { headers },
         );
         if (!res.ok) {
-          const data = (await res.json()) as { error?: string };
-          throw new Error(data.error ?? `HTTP ${res.status}`);
-        }
-        const { url, filename } = (await res.json()) as {
-          url: string;
-          filename: string;
-        };
-        const fileRes = await fetch(`${API}${url}`, { headers });
-        if (!fileRes.ok) {
-          let message = `HTTP ${fileRes.status}`;
+          let message = `HTTP ${res.status}`;
           try {
-            const data = (await fileRes.json()) as { error?: string };
+            const data = (await res.json()) as { error?: string };
             if (data.error) message = data.error;
-          } catch {
-            // non-JSON error body — keep status message
-          }
+          } catch { /* non-JSON body */ }
           throw new Error(message);
         }
-        const blob = await fileRes.blob();
+
+        const filename =
+          res.headers
+            .get("content-disposition")
+            ?.match(/filename="?([^"]+)"?/i)?.[1] ??
+          `AIScripter-Setup-${platform}.exe`;
+
+        const blob = await res.blob();
         const objectUrl = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = objectUrl;
-        anchor.download = filename || "AIScripter-installer";
+        anchor.download = filename;
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);

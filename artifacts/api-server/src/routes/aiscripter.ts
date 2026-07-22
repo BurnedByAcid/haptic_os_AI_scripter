@@ -400,12 +400,10 @@ router.get("/aiscripter/release", async (req: Request, res: Response) => {
 
 /**
  * GET /api/aiscripter/release/download?platform=windows|macos|linux
- * Auth-gated endpoint that returns a same-origin proxied download path for
- * the installer. Requires Clerk auth + subscriber plan.
+ * Auth-gated endpoint that streams the installer binary directly.
+ * Requires Clerk auth + subscriber plan.
  *
- * Returns { url, tag, filename } where `url` is a relative path on this
- * server (the proxied streaming endpoint). No upstream URL ever appears in
- * the response.
+ * Streams the file in a single request — no second round-trip needed.
  */
 router.get("/aiscripter/release/download", async (req: Request, res: Response) => {
   const auth = getAuth(req);
@@ -450,11 +448,7 @@ router.get("/aiscripter/release/download", async (req: Request, res: Response) =
     return;
   }
 
-  res.json({
-    url: `/api/aiscripter/release?platform=${platform}`,
-    tag: data.tag,
-    filename: asset.name,
-  });
+  await streamAssetToClient(res, asset);
 });
 
 export default router;
