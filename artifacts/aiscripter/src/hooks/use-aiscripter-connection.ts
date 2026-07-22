@@ -13,18 +13,35 @@ export interface AIScripterConnection {
   info: AIScripterInfo;
   sessionToken: string;
   ytDlpAvailable: boolean;
+  updateAvailable: boolean;
+  latestVersion: string;
   retry: () => void;
 }
 
 const DAEMON_URL = "http://localhost:7860";
 const POLL_INTERVAL_MS = 3000;
 const TIMEOUT_MS = 2500;
+const API = import.meta.env.VITE_API_URL ?? "";
+
+function semverGt(a: string, b: string): boolean {
+  const parse = (v: string) =>
+    v
+      .replace(/[^0-9.]/g, "")
+      .split(".")
+      .map((n) => parseInt(n, 10) || 0);
+  const [aMaj = 0, aMin = 0, aPatch = 0] = parse(a);
+  const [bMaj = 0, bMin = 0, bPatch = 0] = parse(b);
+  if (aMaj !== bMaj) return aMaj > bMaj;
+  if (aMin !== bMin) return aMin > bMin;
+  return aPatch > bPatch;
+}
 
 export function useAIScripterConnection(): AIScripterConnection {
   const [status, setStatus] = useState<AIScripterStatus>("connecting");
   const [info, setInfo] = useState<AIScripterInfo>({});
   const [sessionToken, setSessionToken] = useState<string>("");
   const [ytDlpAvailable, setYtDlpAvailable] = useState<boolean>(false);
+  const [latestVersion, setLatestVersion] = useState<string>("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
 
@@ -66,10 +83,28 @@ export function useAIScripterConnection(): AIScripterConnection {
     };
   }, [poll]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API}/api/aiscripter/version`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { version?: string } | null) => {
+        if (!cancelled && d?.version) setLatestVersion(d.version);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   const retry = useCallback(() => {
     setStatus("connecting");
     poll();
   }, [poll]);
 
-  return { status, info, sessionToken, ytDlpAvailable, retry };
+  const daemonVersion = info.version ?? "";
+  const updateAvailable =
+    status === "connected" &&
+    !!latestVersion &&
+    !!daemonVersion &&
+    semverGt(latestVersion, daemonVersion);
+
+  return { status, info, sessionToken, ytDlpAvailable, updateAvailable, latestVersion, retry };
 }

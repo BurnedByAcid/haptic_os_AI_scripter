@@ -51,6 +51,15 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Stamp daemon version from release tag
+        working-directory: local-daemon
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.version || github.ref_name }}"
+          $ver = $tag -replace '^aiscripter-v', ''
+          (Get-Content Cargo.toml -Raw) -replace '(?m)^version = "[^"]*"', "version = `"$ver`"" | Set-Content Cargo.toml
+          Write-Host "Stamped daemon version: $ver"
+
       - name: Build Rust daemon
         working-directory: local-daemon
         run: cargo build --release

@@ -250,6 +250,23 @@ async function streamAssetToClient(
 }
 
 /**
+ * GET /api/aiscripter/version
+ * Public endpoint — returns just the latest AIScripter version string
+ * (e.g. "1.0.4") so connected daemons can check for updates without
+ * requiring auth. Version is derived from the release tag by stripping
+ * the "aiscripter-v" prefix.
+ */
+router.get("/aiscripter/version", async (_req: Request, res: Response) => {
+  try {
+    const data = await getRelease();
+    const version = data.tag.replace(/^aiscripter-v/i, "");
+    res.json({ version });
+  } catch {
+    res.status(502).json({ error: "Could not fetch release information." });
+  }
+});
+
+/**
  * GET /api/user/aiscripter-status
  * Returns whether the current user has accepted the AIScripter EUA.
  */

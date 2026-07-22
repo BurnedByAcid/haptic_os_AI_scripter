@@ -55,7 +55,7 @@ function ConnectionIndicator({ status }: { status: "connecting" | "connected" | 
 
 export default function Home() {
   const { getToken } = useAuth();
-  const { status: daemonStatus, sessionToken } = useAIScripterConnection();
+  const { status: daemonStatus, sessionToken, updateAvailable, latestVersion, info: daemonInfo } = useAIScripterConnection();
 
   const [planState, setPlanState] = useState<PlanState>("loading");
   const [agreementState, setAgreementState] = useState<AgreementState>("loading");
@@ -272,6 +272,20 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {updateAvailable && (
+          <div className="flex items-start gap-2.5 rounded-lg border border-amber-500/40 bg-amber-500/8 px-3.5 py-3">
+            <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                Update available — AIScripter {latestVersion}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                You're running {daemonInfo.version}. Download the latest installer to get extractor fixes and improvements.
+              </p>
+            </div>
+          </div>
+        )}
 
         <AIScripterDownload daemonConnected={daemonStatus === "connected"} />
 
