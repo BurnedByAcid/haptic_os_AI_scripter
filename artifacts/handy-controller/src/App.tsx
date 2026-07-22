@@ -168,8 +168,8 @@ function Router() {
         <Route path="/beat"      component={() => <ProtectedRoute component={Beat} />} />
         <Route path="/audio-cleaner" component={() => <Redirect to="/beat?tab=cleaner" />} />
         <Route path="/scripter"  component={() => <ProtectedRoute component={Scripter} />} />
-        <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} adminOnly adminFallback="/haptic-ai-soon" />} />
-        <Route path="/haptic-ai-soon" component={() => <ProtectedRoute component={HapticAISoon} />} />
+        <Route path="/haptic-ai" component={() => <ProtectedRoute component={HapticAI} />} />
+        <Route path="/haptic-ai-soon" component={() => <Redirect to="/haptic-ai" />} />
         <Route path="/aiscripter" component={() => <ProtectedRoute component={AIScripter} />} />
         <Route path="/community"    component={() => <ProtectedRoute component={Community} />} />
         <Route path="/upgrade"      component={() => <ProtectedRoute component={Upgrade} />} />

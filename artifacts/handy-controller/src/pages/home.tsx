@@ -4,7 +4,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Activity, Crown, Gamepad2, Lock, Mic, PlaySquare, Settings2, Users } from "lucide-react";
+import { Activity, Bot, Brain, Crown, Gamepad2, Library, Lock, Mic, PlaySquare, Settings2, Users } from "lucide-react";
 import { useAuth } from "@clerk/react";
 import { useState, useEffect } from "react";
 
@@ -13,12 +13,15 @@ const API_BASE = import.meta.env.VITE_API_URL ?? "";
 type CardState = "available" | "premium" | "coming-soon";
 
 const ALL_CARDS: { href: string; label: string; desc: string; icon: typeof PlaySquare; state: CardState }[] = [
-  { href: "/player",    label: "Video Player",   desc: "Sync local videos with scripts",   icon: PlaySquare, state: "available" },
-  { href: "/scripter",  label: "Scripter",       desc: "Create and edit Funscripts",       icon: Mic,        state: "available" },
-  { href: "/community", label: "Community",      desc: "Share and discover Funscripts",    icon: Users,      state: "premium"   },
-  { href: "/control",   label: "Manual Controls", desc: "Direct slider control",           icon: Settings2,  state: "available" },
-  { href: "/games",     label: "Games",          desc: "Play games with haptic feedback",  icon: Gamepad2,   state: "premium"   },
-  { href: "/beat",      label: "Live Audio",     desc: "Audio-reactive haptics",           icon: Activity,   state: "premium"   },
+  { href: "/player",         label: "Video Player",    desc: "Sync local videos with scripts",                    icon: PlaySquare, state: "available" },
+  { href: "/local-library",  label: "Private Library", desc: "Save videos & scripts locally, share to community", icon: Library,    state: "available" },
+  { href: "/scripter",       label: "Scripter",        desc: "Create and edit Funscripts",                        icon: Mic,        state: "available" },
+  { href: "/aiscripter",     label: "AIScripter",      desc: "AI-generate haptic scripts from any video",         icon: Bot,        state: "premium"   },
+  { href: "/haptic-ai",      label: "HapticAI",        desc: "AI-driven haptic control and scene generation",     icon: Brain,      state: "available" },
+  { href: "/community",      label: "Community",       desc: "Share and discover Funscripts",                     icon: Users,      state: "premium"   },
+  { href: "/control",        label: "Manual Controls", desc: "Direct slider control",                             icon: Settings2,  state: "available" },
+  { href: "/games",          label: "Games",           desc: "Play games with haptic feedback",                   icon: Gamepad2,   state: "premium"   },
+  { href: "/beat",           label: "Live Audio",      desc: "Audio-reactive haptics",                            icon: Activity,   state: "premium"   },
 ];
 
 export default function Home() {

@@ -212,16 +212,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [navigate, toast]);
 
   const handleHapticAiNavClick = useCallback(() => {
-    if (!isAdmin) {
-      navigate("/haptic-ai-soon");
-      return;
-    }
     if (hapticAiWarnDismissed) {
       navigate("/haptic-ai");
     } else {
       setHapticAiConsentOpen(true);
     }
-  }, [isAdmin, hapticAiWarnDismissed, navigate]);
+  }, [hapticAiWarnDismissed, navigate]);
 
   const handleHapticAiConsentConfirm = useCallback(async (dontShowAgain: boolean) => {
     setHapticAiConsentOpen(false);
