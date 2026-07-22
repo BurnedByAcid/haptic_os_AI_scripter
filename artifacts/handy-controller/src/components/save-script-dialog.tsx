@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/react";
 import { useSubscription } from "@/hooks/use-subscription";
 import { Button } from "@/components/ui/button";
@@ -10,13 +10,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Download, Globe, Loader2, Crown, Check } from "lucide-react";
+import { Download, Globe, Library, Loader2, Crown, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { isRemoteUrl } from "@/lib/file-handle-store";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { addEntry } from "@/lib/db";
 
 const API = import.meta.env.VITE_API_URL ?? "";
+
+type SaveMode = "idle" | "library" | "community";
 
 interface SaveScriptDialogProps {
   open: boolean;
@@ -31,9 +34,9 @@ interface SaveScriptDialogProps {
   /** Called after a successful Save-to-Library or Share-to-Community write
    * so the parent can clear its dirty/unsaved-work flag. */
   onSavedSuccess?: () => void;
+  /** Open directly in this mode, skipping the idle picker. */
+  initialMode?: SaveMode;
 }
-
-type SaveMode = "idle" | "community";
 
 export function SaveScriptDialog({
   open,
@@ -44,6 +47,7 @@ export function SaveScriptDialog({
   suggestedTitle = "",
   onDownload,
   onSavedSuccess,
+  initialMode = "idle",
 }: SaveScriptDialogProps) {
   const { getToken } = useAuth();
   const { isPro, isLoaded: planLoaded } = useSubscription();
@@ -51,14 +55,24 @@ export function SaveScriptDialog({
   const { scriptOutputFiletype } = useAppSettings();
   const exportExt = scriptOutputFiletype === "csv" ? "csv" : "funscript";
 
-  const [mode, setMode] = useState<SaveMode>("idle");
+  const [mode, setMode] = useState<SaveMode>(initialMode);
   const [title, setTitle] = useState(suggestedTitle);
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  /** True when the current video source is a real remote HTTPS/HTTP URL. */
   const remoteSource = isRemoteUrl(videoUrl);
+  const localSource = videoUrl && !remoteSource;
+
+  useEffect(() => {
+    if (open) {
+      setMode(initialMode);
+      setTitle(suggestedTitle);
+      setSaved(false);
+      setSaving(false);
+      setDescription("");
+    }
+  }, [open, initialMode, suggestedTitle]);
 
   async function authHeaders(): Promise<Record<string, string>> {
     const token = await getToken();
@@ -67,17 +81,46 @@ export function SaveScriptDialog({
     return headers;
   }
 
+  async function handleSaveToLibrary() {
+    if (!title.trim()) { toast({ title: "Name required", variant: "destructive" }); return; }
+    setSaving(true);
+    try {
+      const blob = new Blob([scriptJson], { type: "application/json" });
+      const name = title.trim().endsWith(".funscript")
+        ? title.trim()
+        : `${title.trim()}.funscript`;
+      await addEntry({
+        id: crypto.randomUUID(),
+        name,
+        type: "funscript",
+        blob,
+        addedAt: Date.now(),
+      });
+      setSaved(true);
+      onSavedSuccess?.();
+      toast({ title: "Saved to Library!", description: `"${name}" added to your Private Library.` });
+      setTimeout(() => { setSaved(false); onClose(); }, 1200);
+    } catch (err) {
+      toast({
+        title: "Could not save",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleShareToCommunity() {
     if (!title.trim()) { toast({ title: "Title required", variant: "destructive" }); return; }
     if (!remoteSource) {
       toast({
         title: "Remote URL required for community sharing",
-        description: "Only scripts with an https:// video URL can be shared publicly. Local-file scripts cannot be shared.",
+        description: "Only scripts with an https:// video URL can be shared publicly.",
         variant: "destructive",
       });
       return;
     }
-
     setSaving(true);
     try {
       const headers = await authHeaders();
@@ -98,7 +141,7 @@ export function SaveScriptDialog({
       setSaved(true);
       onSavedSuccess?.();
       toast({ title: "Shared to Community!", description: `"${title.trim()}" is now live.` });
-      setTimeout(() => { setSaved(false); onClose(); setMode("idle"); }, 1200);
+      setTimeout(() => { setSaved(false); onClose(); }, 1200);
     } catch (err) {
       toast({
         title: "Could not share",
@@ -112,32 +155,35 @@ export function SaveScriptDialog({
 
   function handleClose() {
     onClose();
-    setMode("idle");
     setSaved(false);
     setSaving(false);
-    setTitle(suggestedTitle);
-    setDescription("");
   }
+
+  const dialogTitle =
+    mode === "library"   ? "Save to Library" :
+    mode === "community" ? "Share to Community" :
+                          "Save Script";
+
+  const dialogDesc =
+    mode === "library"   ? "Save this script to your Private Library." :
+    mode === "community" ? "Publish this script so others can find and use it." :
+                          "Choose how you'd like to save your funscript.";
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Save Script</DialogTitle>
-          <DialogDescription>
-            Choose how you'd like to save your funscript.
-          </DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDesc}</DialogDescription>
         </DialogHeader>
 
+        {/* ── Idle: show all options ── */}
         {mode === "idle" && (
           <div className="flex flex-col gap-3 pt-1">
             <Button
               variant="outline"
               className="h-auto py-4 flex flex-col items-start gap-1 text-left"
-              onClick={() => {
-                onDownload();
-                handleClose();
-              }}
+              onClick={() => { onDownload(); handleClose(); }}
             >
               <div className="flex items-center gap-2 font-semibold">
                 <Download className="h-4 w-4 text-primary" />
@@ -145,6 +191,20 @@ export function SaveScriptDialog({
               </div>
               <span className="text-xs text-muted-foreground font-normal">
                 Save the file directly to your computer.
+              </span>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="h-auto py-4 flex flex-col items-start gap-1 text-left"
+              onClick={() => setMode("library")}
+            >
+              <div className="flex items-center gap-2 font-semibold">
+                <Library className="h-4 w-4 text-primary" />
+                Save to Library
+              </div>
+              <span className="text-xs text-muted-foreground font-normal">
+                Keep this script in your Private Library for later.
               </span>
             </Button>
 
@@ -189,8 +249,52 @@ export function SaveScriptDialog({
           </div>
         )}
 
+        {/* ── Save to Library ── */}
+        {mode === "library" && (
+          <div className="flex flex-col gap-4 pt-1">
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-medium">Script Name *</label>
+              <Input
+                placeholder="My awesome script…"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter" && !saving && !saved && title.trim()) handleSaveToLibrary(); }}
+              />
+            </div>
+            <div className="flex gap-2">
+              {initialMode === "idle" && (
+                <Button variant="outline" size="sm" onClick={() => setMode("idle")} disabled={saving}>
+                  Back
+                </Button>
+              )}
+              <Button
+                size="sm"
+                className="flex-1 gap-2"
+                disabled={saving || saved || !title.trim()}
+                onClick={handleSaveToLibrary}
+              >
+                {saved ? (
+                  <><Check className="h-4 w-4" /> Saved!</>
+                ) : saving ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</>
+                ) : (
+                  <><Library className="h-4 w-4" /> Save to Library</>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Share to Community ── */}
         {mode === "community" && (
           <div className="flex flex-col gap-4 pt-1">
+            {!isPro && planLoaded && (
+              <div className="rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-400">
+                Community sharing requires a Pro subscription.{" "}
+                <Link href="/upgrade" onClick={handleClose} className="underline font-semibold">Upgrade →</Link>
+              </div>
+            )}
             <div className="space-y-1.5">
               <label className="text-xs text-muted-foreground font-medium">Script Title *</label>
               <Input
@@ -198,38 +302,39 @@ export function SaveScriptDialog({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus
+                disabled={!isPro}
               />
             </div>
-
             <div className="space-y-1.5">
               <label className="text-xs text-muted-foreground font-medium">Description (optional)</label>
               <Input
                 placeholder="Brief description…"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                disabled={!isPro}
               />
             </div>
-
-            {!remoteSource && (
+            {!remoteSource && isPro && (
               <p className="text-xs text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-md px-3 py-2">
                 Community sharing requires an https:// video URL. Local-file scripts cannot be shared publicly.
               </p>
             )}
-
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setMode("idle")} disabled={saving}>
-                Back
-              </Button>
+              {initialMode === "idle" && (
+                <Button variant="outline" size="sm" onClick={() => setMode("idle")} disabled={saving}>
+                  Back
+                </Button>
+              )}
               <Button
                 size="sm"
                 className="flex-1 gap-2"
-                disabled={saving || saved || !title.trim() || !remoteSource}
+                disabled={saving || saved || !title.trim() || !remoteSource || !isPro}
                 onClick={handleShareToCommunity}
               >
                 {saved ? (
-                  <><Check className="h-4 w-4" /> Saved!</>
+                  <><Check className="h-4 w-4" /> Shared!</>
                 ) : saving ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Saving…</>
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Sharing…</>
                 ) : (
                   <><Globe className="h-4 w-4" /> Share to Community</>
                 )}

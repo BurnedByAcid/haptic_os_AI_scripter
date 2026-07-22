@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2, BookmarkPlus, Link2, Activity } from "lucide-react";
+import { Trash2, Download, FilePlus, Upload, Mic, Square, ChevronDown, ChevronUp, ZoomIn, ZoomOut, Copy, Scissors, Clipboard, Wrench, X, ChevronRight, Lock, Crown, Loader2, BookmarkPlus, Link2, Activity, Library, Globe } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -141,6 +141,7 @@ export default function Scripter() {
 
   // ─── Save dialog ───
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveDialogMode, setSaveDialogMode] = useState<"idle" | "library" | "community">("idle");
 
   const { toast } = useToast();
 
@@ -2748,8 +2749,23 @@ export default function Scripter() {
           >
             <FilePlus className="mr-1.5 h-3.5 w-3.5" /> New Script
           </Button>
-          <Button size="sm" onClick={() => setSaveDialogOpen(true)} disabled={points.length === 0} data-testid="button-export-script" title={`Export as .${scriptOutputFiletype}`}>
-            <BookmarkPlus className="mr-1.5 h-3.5 w-3.5" /> Export <span className="ml-1 opacity-60 font-mono text-[0.7em]">.{scriptOutputFiletype}</span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={points.length === 0}
+            onClick={() => { setSaveDialogMode("library"); setSaveDialogOpen(true); }}
+            title="Save to your Private Library"
+          >
+            <Library className="mr-1.5 h-3.5 w-3.5" /> Save to Library
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={points.length === 0}
+            onClick={() => { setSaveDialogMode("community"); setSaveDialogOpen(true); }}
+            title="Share to Community"
+          >
+            <Globe className="mr-1.5 h-3.5 w-3.5" /> Share to Community
           </Button>
         </div>
       </div>
@@ -4159,9 +4175,8 @@ export default function Scripter() {
             videoFileName={videoFileName}
             suggestedTitle={baseName}
             onDownload={() => { exportScript(); setSaveDialogOpen(false); }}
-            onSavedSuccess={() => {
-              markClean();
-            }}
+            onSavedSuccess={markClean}
+            initialMode={saveDialogMode}
           />
         );
       })()}
