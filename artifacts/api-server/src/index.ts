@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync } from "./lib/stripeClient";
+import { pool } from "./lib/db";
 
 const rawPort = process.env["PORT"];
 
@@ -15,6 +16,18 @@ const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
+}
+
+async function runLocalMigrations() {
+  try {
+    await pool.query(`
+      ALTER TABLE community_scripts
+      ADD COLUMN IF NOT EXISTS cached_video_size_bytes BIGINT
+    `);
+    logger.info("Local migrations applied");
+  } catch (err) {
+    logger.error({ err }, "Failed to apply local migrations — continuing");
+  }
 }
 
 async function initStripe() {
@@ -54,8 +67,12 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 
-  // Initialize Stripe after the port is open so the startup health probe
-  // can succeed immediately without waiting for migrations / webhook setup.
+  // Run local DB migrations, then Stripe — both after the port is open so
+  // the startup health probe can succeed immediately.
+  runLocalMigrations().catch((err) => {
+    logger.error({ err }, "Local migrations failed");
+  });
+
   initStripe().catch((err) => {
     logger.error({ err }, "Stripe initialization failed");
   });

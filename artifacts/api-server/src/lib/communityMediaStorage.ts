@@ -8,6 +8,19 @@ import { logger } from "./logger";
 
 const VIDEO_MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
 const MAX_REDIRECTS = 5;
+const DEFAULT_CACHE_MAX_TOTAL_BYTES = 100 * 1024 * 1024 * 1024; // 100 GB
+
+function getCacheMaxTotalBytes(): number {
+  const raw = process.env.COMMUNITY_CACHE_MAX_TOTAL_BYTES?.trim();
+  if (!raw) return DEFAULT_CACHE_MAX_TOTAL_BYTES;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    logger.warn({ raw }, "Invalid COMMUNITY_CACHE_MAX_TOTAL_BYTES; using 100 GB default");
+    return DEFAULT_CACHE_MAX_TOTAL_BYTES;
+  }
+  return parsed;
+}
+
 export const MEDIA_KEY_PREFIX = "media/community";
 
 // ─── Token store for unauthenticated streaming ────────────────────────────────
@@ -162,11 +175,35 @@ function fetchStream(
  * Download the video at `videoUrl` and stream it into GCS under the
  * `media/community/<scriptId>` key.
  *
- * Safety: DNS/SSRF check, redirect following, 2 GB cap, race-safe DB update.
+ * Safety: DNS/SSRF check, redirect following, 2 GB per-file cap,
+ * platform-wide COMMUNITY_CACHE_MAX_TOTAL_BYTES cap, race-safe DB update.
  * Fire-and-forget after INSERT.
  */
 export async function cacheVideoInBackground(scriptId: number, videoUrl: string): Promise<void> {
   try {
+    // ── Platform-wide storage cap check ─────────────────────────────────────
+    // Query the sum of all successfully cached video sizes. If adding a new
+    // video (up to VIDEO_MAX_BYTES worst-case) would exceed the ceiling, skip
+    // caching rather than risk runaway storage costs.
+    const capBytes = getCacheMaxTotalBytes();
+    const { rows: sumRows } = await pool.query<{ total: string }>(
+      `SELECT COALESCE(SUM(cached_video_size_bytes), 0) AS total
+       FROM community_scripts
+       WHERE cache_status = 'cached' AND cached_video_size_bytes IS NOT NULL`,
+    );
+    const currentTotalBytes = Number(sumRows[0]?.total ?? 0);
+    if (currentTotalBytes + VIDEO_MAX_BYTES > capBytes) {
+      logger.warn(
+        { scriptId, currentTotalBytes, capBytes },
+        "Platform cache cap would be exceeded; skipping video cache",
+      );
+      await pool.query(
+        `UPDATE community_scripts SET cache_status = 'skipped' WHERE id = $1`,
+        [scriptId],
+      ).catch(() => undefined);
+      return;
+    }
+
     const parsed = new URL(videoUrl);
     await assertHostIsPublic(parsed.hostname);
 
@@ -203,11 +240,14 @@ export async function cacheVideoInBackground(scriptId: number, videoUrl: string)
       return;
     }
 
-    // Store the GCS object key (not a public URL). Access is controlled via
-    // the short-lived token endpoint GET /api/community/cached-video/:token.
+    // Store the GCS object key (not a public URL) and the actual byte count.
+    // Access is controlled via the short-lived token endpoint
+    // GET /api/community/cached-video/:token.
     await pool.query(
-      `UPDATE community_scripts SET cache_status = 'cached', cached_video_url = $1 WHERE id = $2`,
-      [storageKey, scriptId],
+      `UPDATE community_scripts
+       SET cache_status = 'cached', cached_video_url = $1, cached_video_size_bytes = $2
+       WHERE id = $3`,
+      [storageKey, bytesWritten, scriptId],
     );
     logger.info({ scriptId, storageKey, bytes: bytesWritten }, "Community video cached successfully");
   } catch (err) {

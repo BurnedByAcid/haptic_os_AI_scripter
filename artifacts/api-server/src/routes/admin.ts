@@ -227,7 +227,11 @@ router.get("/admin/analytics", async (req: Request, res: Response) => {
           (SELECT COALESCE(SUM(view_count),0) FROM community_scripts) AS community_views,
           (SELECT COUNT(*) FROM community_ratings)    AS community_ratings,
           (SELECT COUNT(*) FROM community_favorites)  AS community_favorites,
-          0                                           AS library_entries
+          0                                           AS library_entries,
+          (SELECT COALESCE(SUM(cached_video_size_bytes), 0)
+           FROM community_scripts
+           WHERE cache_status = 'cached' AND cached_video_size_bytes IS NOT NULL
+          )                                           AS cached_video_total_bytes
       `),
       // Feature usage (all time and last 30 days)
       pool.query<{ feature: string; total: string; last_30: string }>(`
@@ -282,6 +286,13 @@ router.get("/admin/analytics", async (req: Request, res: Response) => {
     const c = content.rows[0];
     const nu = newUsers.rows[0] as unknown as { last_7: string; last_30: string };
 
+    const cachedVideoCapBytes = (() => {
+      const raw = process.env.COMMUNITY_CACHE_MAX_TOTAL_BYTES?.trim();
+      if (!raw) return 100 * 1024 * 1024 * 1024;
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 100 * 1024 * 1024 * 1024;
+    })();
+
     res.json({
       users: {
         total: totalUsers,
@@ -290,12 +301,14 @@ router.get("/admin/analytics", async (req: Request, res: Response) => {
         newLast30Days: parseInt(nu.last_30, 10),
       },
       content: {
-        scripterSessions:      parseInt(c.scripter_sessions, 10),
-        communityScripts:      parseInt(c.community_scripts, 10),
-        communityViews:        parseInt(c.community_views, 10),
-        communityRatings:      parseInt(c.community_ratings, 10),
-        communityFavorites:    parseInt(c.community_favorites, 10),
-        libraryEntries:        parseInt(c.library_entries, 10),
+        scripterSessions:       parseInt(c.scripter_sessions, 10),
+        communityScripts:       parseInt(c.community_scripts, 10),
+        communityViews:         parseInt(c.community_views, 10),
+        communityRatings:       parseInt(c.community_ratings, 10),
+        communityFavorites:     parseInt(c.community_favorites, 10),
+        libraryEntries:         parseInt(c.library_entries, 10),
+        cachedVideoTotalBytes:  Number(c.cached_video_total_bytes ?? 0),
+        cachedVideoCapBytes,
       },
       features,
       earlyBird,
