@@ -65,6 +65,7 @@
               <div class="input-mode-tabs">
                 <button class="input-tab active" id="tab-upload-mode">Upload File</button>
                 <button class="input-tab" id="tab-local-mode">Local Path</button>
+                <button class="input-tab" id="tab-url-mode">URL / Embed</button>
               </div>
 
               <!-- Upload mode -->
@@ -89,6 +90,24 @@
                   <button class="btn btn-outline" id="btn-local-load">Load</button>
                 </div>
                 <p class="field-hint" id="local-path-hint"></p>
+              </div>
+
+              <!-- URL / Embed mode -->
+              <div id="url-mode" style="display:none">
+                <p>Paste a video page URL or an embed code. yt-dlp will download it to your computer.</p>
+                <div class="field-row" style="margin-top:12px">
+                  <input type="text" class="field-input" id="url-input" placeholder="https://… or &lt;iframe src=&quot;…&quot;&gt;" />
+                  <button class="btn btn-outline" id="btn-url-load">Download</button>
+                </div>
+                <p class="field-hint" id="url-hint"></p>
+                <div id="url-progress" style="display:none;margin-top:10px">
+                  <div class="file-info">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span id="url-filename">Downloading…</span>
+                  </div>
+                  <div class="progress-bar"><div class="progress-fill" id="url-fill" style="width:0%"></div></div>
+                  <p class="field-hint" id="url-progress-hint">Starting download…</p>
+                </div>
               </div>
 
               <div class="upload-progress" id="upload-progress" style="display:none">

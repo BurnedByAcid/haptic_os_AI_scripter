@@ -1189,6 +1189,142 @@ def import_local_video():
     return jsonify({"job_id": job_id, "filename": video_path.name, "size": video_path.stat().st_size})
 
 
+@app.route("/api/import-url", methods=["POST"])
+def import_url():
+    """
+    POST /api/import-url  { "url": "https://..." }
+    Downloads a video from a URL via yt-dlp in a background thread.
+    Creates a job entry immediately and returns { job_id }.
+    Poll GET /api/job/<job_id> for status (downloading → uploaded or error).
+    Embed codes (<iframe src="...">) are accepted; the src is extracted server-side.
+    """
+    err, code = _require_trusted_request()
+    if err is not None:
+        return err, code
+
+    data = request.json or {}
+    raw_url = str(data.get("url", "")).strip()
+    if not raw_url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    # Extract src from embed codes (<iframe src="...">)
+    import re as _re2
+    embed_match = _re2.search(r'src=["\']([^"\']+)["\']', raw_url, _re2.IGNORECASE)
+    if embed_match:
+        raw_url = embed_match.group(1)
+
+    # Basic URL validation
+    from urllib.parse import urlparse as _urlparse2
+    try:
+        parsed = _urlparse2(raw_url)
+        if parsed.scheme not in ("http", "https"):
+            return jsonify({"error": "Only http/https URLs are supported"}), 400
+    except Exception:
+        return jsonify({"error": "Invalid URL"}), 400
+
+    _cleanup_stale_uploads()
+    job_id = str(uuid.uuid4())[:8]
+    jobs[job_id] = {
+        "id": job_id,
+        "filename": "Downloading…",
+        "filepath": "",
+        "status": "downloading",
+        "progress": 0,
+        "stage": 0,
+        "log": [f"Starting download: {raw_url}"],
+        "output_files": [],
+        "_created_at": time.time(),
+    }
+
+    def _download_thread(jid, url):
+        import shutil
+        import subprocess as _sp
+        job = jobs.get(jid)
+        if not job:
+            return
+
+        ytdlp = shutil.which("yt-dlp") or shutil.which("yt_dlp")
+        if not ytdlp:
+            # Try common portable locations
+            for candidate in [
+                str(Path.home() / ".local" / "bin" / "yt-dlp"),
+                "/usr/local/bin/yt-dlp",
+                "/usr/bin/yt-dlp",
+            ]:
+                if Path(candidate).exists():
+                    ytdlp = candidate
+                    break
+        if not ytdlp:
+            job["status"] = "error"
+            job["error"] = "yt-dlp not found — please install it (pip install yt-dlp)"
+            job["log"].append("Error: yt-dlp not found")
+            return
+
+        out_tmpl = str(UPLOAD_FOLDER / f"{jid}.%(ext)s")
+        cmd = [
+            ytdlp,
+            "--no-playlist",
+            "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+            "--output", out_tmpl,
+            "--socket-timeout", "20",
+            "--newline",
+            url,
+        ]
+        try:
+            proc = _sp.Popen(cmd, stdout=_sp.PIPE, stderr=_sp.STDOUT, text=True)
+            for line in proc.stdout:
+                line = line.strip()
+                if not line:
+                    continue
+                job["log"].append(line)
+                # Parse [download] X.X% lines for progress reporting
+                dl_match = _re2.search(r'\[download\]\s+(\d+(?:\.\d+)?)%', line)
+                if dl_match:
+                    job["progress"] = float(dl_match.group(1)) * 0.9  # reserve 10% for final steps
+            proc.wait()
+            if proc.returncode != 0:
+                job["status"] = "error"
+                job["error"] = "yt-dlp download failed (unsupported site or network error)"
+                job["log"].append("Error: download failed")
+                return
+        except Exception as exc:
+            job["status"] = "error"
+            job["error"] = str(exc)
+            job["log"].append(f"Error: {exc}")
+            return
+
+        # Find the downloaded file
+        downloaded = None
+        allowed = {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".m4v"}
+        for f in UPLOAD_FOLDER.iterdir():
+            if f.stem == jid and f.suffix.lower() in allowed:
+                downloaded = f
+                break
+        # Fallback: any file whose stem starts with jid
+        if not downloaded:
+            for f in UPLOAD_FOLDER.iterdir():
+                if f.stem.startswith(jid) and f.suffix.lower() in allowed:
+                    downloaded = f
+                    break
+
+        if not downloaded or not downloaded.exists():
+            job["status"] = "error"
+            job["error"] = "Downloaded file not found"
+            job["log"].append("Error: downloaded file not found")
+            return
+
+        job["filename"] = downloaded.name
+        job["filepath"] = str(downloaded)
+        job["status"] = "uploaded"
+        job["progress"] = 100
+        job["log"].append(f"Download complete: {downloaded.name}")
+
+    thread = threading.Thread(target=_download_thread, args=(job_id, raw_url), daemon=True)
+    thread.start()
+
+    return jsonify({"job_id": job_id})
+
+
 @app.route("/api/process", methods=["POST"])
 def start_processing():
     err, code = _require_trusted_request()

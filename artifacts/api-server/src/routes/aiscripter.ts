@@ -3,6 +3,10 @@ import { Readable, pipeline } from "node:stream";
 import { promisify } from "node:util";
 import { getAuth, clerkClient } from "@clerk/express";
 import { getPlan } from "../lib/getPlan";
+import multer from "multer";
+import os from "node:os";
+import path from "node:path";
+import fs from "node:fs";
 
 const router = Router();
 
@@ -467,5 +471,101 @@ router.get("/aiscripter/release/download", async (req: Request, res: Response) =
 
   await streamAssetToClient(res, asset);
 });
+
+/**
+ * POST /api/aiscripter/upload
+ * Requires Clerk auth + subscriber plan.
+ *
+ * Accepts a multipart video or audio file upload.  The file is saved to a
+ * temporary directory and its absolute path is returned so the AIScripter
+ * daemon (running locally on the user's machine) can open it directly.
+ *
+ * Files are scheduled for deletion after 2 hours.
+ */
+
+const UPLOAD_TEMP_DIR = path.join(os.tmpdir(), "hapticos-aiscripter-uploads");
+try { fs.mkdirSync(UPLOAD_TEMP_DIR, { recursive: true }); } catch { /* already exists */ }
+
+// Schedule cleanup of temp uploads after 2 hours
+setInterval(() => {
+  const cutoffMs = 2 * 60 * 60 * 1000;
+  try {
+    const now = Date.now();
+    for (const entry of fs.readdirSync(UPLOAD_TEMP_DIR)) {
+      const p = path.join(UPLOAD_TEMP_DIR, entry);
+      try {
+        const stat = fs.statSync(p);
+        if (now - stat.mtimeMs > cutoffMs) fs.unlinkSync(p);
+      } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
+}, 30 * 60 * 1000).unref();
+
+const aiscripterUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOAD_TEMP_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || ".bin";
+      cb(null, `${crypto.randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 * 1024 }, // 2 GB
+  fileFilter: (_req, file, cb) => {
+    const allowed = new Set([
+      "video/mp4", "video/x-matroska", "video/x-msvideo", "video/quicktime",
+      "video/x-ms-wmv", "video/webm", "video/x-m4v",
+      "audio/mpeg", "audio/wav", "audio/ogg", "audio/aac", "audio/flac",
+      "audio/x-flac", "audio/mp4",
+    ]);
+    // Also allow by extension if MIME is generic
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExts = new Set([
+      ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".webm", ".m4v",
+      ".mp3", ".wav", ".ogg", ".aac", ".flac", ".m4a",
+    ]);
+    if (allowed.has(file.mimetype) || allowedExts.has(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Unsupported file type. Upload a video or audio file."));
+    }
+  },
+});
+
+// Auth + plan gate runs BEFORE multer so unauthenticated requests never write to disk.
+async function requireAiscripterUploadAuth(req: Request, res: Response, next: () => void) {
+  const auth = getAuth(req);
+  if (!auth.userId) {
+    res.status(401).json({ error: "Not authenticated." });
+    return;
+  }
+  try {
+    const plan = await getPlan(auth.userId);
+    if (plan === "free") {
+      res.status(403).json({ error: "Subscriber plan required." });
+      return;
+    }
+  } catch {
+    res.status(500).json({ error: "Failed to verify subscription." });
+    return;
+  }
+  next();
+}
+
+router.post(
+  "/aiscripter/upload",
+  requireAiscripterUploadAuth as Parameters<typeof router.post>[1],
+  aiscripterUpload.single("file"),
+  (req: Request, res: Response) => {
+    if (!req.file) {
+      res.status(400).json({ error: "No file provided. Include a 'file' field in the multipart body." });
+      return;
+    }
+    res.json({
+      path: req.file.path,
+      filename: req.file.originalname,
+      sizeBytes: req.file.size,
+    });
+  },
+);
 
 export default router;

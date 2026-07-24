@@ -121,18 +121,116 @@ document.getElementById('btn-save-output').addEventListener('click', () => {
   });
 });
 
-// ── Input mode toggle (Upload / Local Path) ───────────────────────────────────
-document.getElementById('tab-upload-mode').addEventListener('click', () => {
-  document.getElementById('tab-upload-mode').classList.add('active');
-  document.getElementById('tab-local-mode').classList.remove('active');
-  document.getElementById('upload-mode').style.display = 'block';
-  document.getElementById('local-mode').style.display = 'none';
-});
-document.getElementById('tab-local-mode').addEventListener('click', () => {
-  document.getElementById('tab-local-mode').classList.add('active');
-  document.getElementById('tab-upload-mode').classList.remove('active');
-  document.getElementById('local-mode').style.display = 'block';
-  document.getElementById('upload-mode').style.display = 'none';
+// ── Input mode toggle (Upload / Local Path / URL·Embed) ───────────────────────
+function setInputMode(mode) {
+  const modes = ['upload', 'local', 'url'];
+  modes.forEach(m => {
+    const tab = document.getElementById('tab-' + m + '-mode');
+    const panel = document.getElementById(m + '-mode');
+    if (tab) tab.classList.toggle('active', m === mode);
+    if (panel) panel.style.display = m === mode ? 'block' : 'none';
+  });
+}
+
+document.getElementById('tab-upload-mode').addEventListener('click', () => setInputMode('upload'));
+document.getElementById('tab-local-mode').addEventListener('click', () => setInputMode('local'));
+document.getElementById('tab-url-mode').addEventListener('click', () => setInputMode('url'));
+
+// ── URL / Embed import ────────────────────────────────────────────────────────
+let _urlPollInterval = null;
+
+function stopUrlPolling() {
+  if (_urlPollInterval !== null) {
+    clearInterval(_urlPollInterval);
+    _urlPollInterval = null;
+  }
+}
+
+function importUrl() {
+  const raw = document.getElementById('url-input').value.trim();
+  const hint = document.getElementById('url-hint');
+  if (!raw) return;
+
+  hint.textContent = '';
+  hint.style.color = '';
+
+  // Extract src from embed codes (<iframe src="...">)
+  const embedMatch = raw.match(/src=["']([^"']+)["']/i);
+  const url = embedMatch ? embedMatch[1] : raw;
+
+  // Basic validation
+  try { new URL(url); } catch {
+    hint.style.color = '#ef4444';
+    hint.textContent = '✗ That does not look like a valid URL';
+    return;
+  }
+
+  document.getElementById('url-progress').style.display = 'block';
+  document.getElementById('url-filename').textContent = 'Downloading…';
+  document.getElementById('url-fill').style.width = '0%';
+  document.getElementById('url-progress-hint').textContent = 'Starting download…';
+  document.getElementById('btn-url-load').disabled = true;
+
+  stopUrlPolling();
+
+  fetch('/api/import-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  }).then(r => r.json()).then(res => {
+    if (res.error) {
+      hint.style.color = '#ef4444';
+      hint.textContent = '✗ ' + res.error;
+      document.getElementById('url-progress').style.display = 'none';
+      document.getElementById('btn-url-load').disabled = false;
+      return;
+    }
+    const jobId = res.job_id;
+    _urlPollInterval = setInterval(async () => {
+      try {
+        const pr = await fetch('/api/job/' + jobId);
+        if (!pr.ok) return;
+        const job = await pr.json();
+
+        const pct = Math.round(job.progress || 0);
+        document.getElementById('url-fill').style.width = pct + '%';
+
+        if (job.status === 'downloading') {
+          document.getElementById('url-progress-hint').textContent = 'Downloading… ' + pct + '%';
+        } else if (job.status === 'uploaded') {
+          stopUrlPolling();
+          document.getElementById('url-fill').style.width = '100%';
+          document.getElementById('url-filename').textContent = job.filename || 'video';
+          document.getElementById('url-progress-hint').textContent = '✓ Download complete';
+          currentJobId = jobId;
+          if (selectedMode) document.getElementById('btn-generate').disabled = false;
+          showToast('Video downloaded: ' + (job.filename || 'video'));
+          // Mirror the upload-progress panel
+          document.getElementById('upload-progress').style.display = 'block';
+          document.getElementById('upload-filename').textContent = job.filename || 'video';
+          document.getElementById('upload-size').textContent = '';
+          document.getElementById('upload-fill').style.width = '100%';
+          document.getElementById('btn-url-load').disabled = false;
+        } else if (job.status === 'error') {
+          stopUrlPolling();
+          hint.style.color = '#ef4444';
+          hint.textContent = '✗ ' + (job.error || 'Download failed');
+          document.getElementById('url-progress').style.display = 'none';
+          document.getElementById('btn-url-load').disabled = false;
+        }
+      } catch (_e) { /* network blip */ }
+    }, 1500);
+  }).catch(e => {
+    hint.style.color = '#ef4444';
+    hint.textContent = '✗ ' + e.message;
+    document.getElementById('url-progress').style.display = 'none';
+    document.getElementById('btn-url-load').disabled = false;
+  });
+}
+
+document.getElementById('btn-url-load').addEventListener('click', importUrl);
+document.getElementById('url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') importUrl();
 });
 
 // ── Local path import ─────────────────────────────────────────────────────────

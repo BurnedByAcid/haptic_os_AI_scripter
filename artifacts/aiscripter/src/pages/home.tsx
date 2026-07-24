@@ -12,8 +12,10 @@ import {
   Download,
   FileCode,
   Loader2,
+  Link2,
   PlaySquare,
   RefreshCw,
+  Upload,
   Volume2,
   Wand2,
 } from "lucide-react";
@@ -96,6 +98,12 @@ export default function Home() {
   }, [getToken]);
 
   const [videoUrl, setVideoUrl] = useState("");
+  const [inputMode, setInputMode] = useState<"url" | "file">("url");
+  const [embedDetected, setEmbedDetected] = useState(false);
+  const [fileUploadState, setFileUploadState] = useState<"idle" | "uploading" | "ready">("idle");
+  const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [jobStatus, setJobStatus] = useState<JobStatus>({ state: "idle" });
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -135,10 +143,66 @@ export default function Home() {
     } catch { }
   }, [sessionToken, stopPolling]);
 
+  const handleVideoUrlChange = useCallback((value: string) => {
+    setVideoUrl(value);
+    // Detect embed code and show a notice
+    const isEmbed = /src=["'][^"']+["']/i.test(value);
+    setEmbedDetected(isEmbed);
+  }, []);
+
+  const handleFileUpload = useCallback(async (file: File) => {
+    setUploadError(null);
+    setFileUploadState("uploading");
+    setUploadedFilePath(null);
+    setUploadedFileName(null);
+    try {
+      const token = await getToken();
+      const form = new FormData();
+      form.append("file", file);
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(`${API}/api/aiscripter/upload`, {
+        method: "POST",
+        headers,
+        body: form,
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        setUploadError(data.error ?? `Upload failed (HTTP ${res.status})`);
+        setFileUploadState("idle");
+        return;
+      }
+      const data = (await res.json()) as { path: string; filename: string };
+      setUploadedFilePath(data.path);
+      setUploadedFileName(data.filename);
+      setFileUploadState("ready");
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed.");
+      setFileUploadState("idle");
+    }
+  }, [getToken]);
+
   const handleSubmit = useCallback(async () => {
-    if (!videoUrl.trim() || daemonStatus !== "connected") return;
+    const isFileMode = inputMode === "file";
+    if (isFileMode && fileUploadState !== "ready") return;
+    if (!isFileMode && !videoUrl.trim()) return;
+    if (daemonStatus !== "connected") return;
     stopPolling();
     setJobStatus({ state: "queued", jobId: "" });
+
+    // Resolve the URL to send to the daemon:
+    // - File mode: send the server-side file path
+    // - URL mode: extract embed src if present, then send the URL
+    let resolvedUrl: string;
+    if (isFileMode) {
+      resolvedUrl = uploadedFilePath ?? "";
+    } else {
+      let trimmed = videoUrl.trim();
+      const embedMatch = trimmed.match(/src=["']([^"']+)["']/i);
+      if (embedMatch) trimmed = embedMatch[1];
+      resolvedUrl = trimmed;
+    }
+
     try {
       const res = await fetch(`${DAEMON_URL}/api/jobs/trigger`, {
         method: "POST",
@@ -147,7 +211,7 @@ export default function Home() {
           ...(sessionToken ? { "X-AIScripter-Token": sessionToken } : {}),
         },
         mode: "cors",
-        body: JSON.stringify({ url: videoUrl.trim() }),
+        body: JSON.stringify({ url: resolvedUrl }),
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
@@ -161,7 +225,7 @@ export default function Home() {
     } catch (err) {
       setJobStatus({ state: "error", jobId: "", message: err instanceof Error ? err.message : "Failed to start job." });
     }
-  }, [videoUrl, daemonStatus, sessionToken, stopPolling, pollJob]);
+  }, [videoUrl, inputMode, fileUploadState, uploadedFilePath, daemonStatus, sessionToken, stopPolling, pollJob]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
 
@@ -292,21 +356,100 @@ export default function Home() {
         {daemonStatus === "connected" && (
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <h3 className="font-semibold text-sm text-foreground">Generate Script</h3>
-            <div className="space-y-2">
-              <label className="text-xs text-muted-foreground font-medium">Video URL</label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="https://…"
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                  disabled={jobStatus.state === "queued" || jobStatus.state === "processing"}
-                  className="flex-1 text-sm"
-                />
+
+            {/* Input mode tabs */}
+            <div className="flex gap-1 p-0.5 bg-muted rounded-lg">
+              <button
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${inputMode === "url" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setInputMode("url")}
+              >
+                <Link2 className="h-3.5 w-3.5" />URL / Embed
+              </button>
+              <button
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md text-xs font-medium transition-colors ${inputMode === "file" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setInputMode("file")}
+              >
+                <Upload className="h-3.5 w-3.5" />Local File
+              </button>
+            </div>
+
+            {inputMode === "url" ? (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Paste a video URL or embed code…"
+                    value={videoUrl}
+                    onChange={(e) => handleVideoUrlChange(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && void handleSubmit()}
+                    disabled={jobStatus.state === "queued" || jobStatus.state === "processing"}
+                    className="flex-1 text-sm"
+                  />
+                  <Button
+                    onClick={() => void handleSubmit()}
+                    disabled={!videoUrl.trim() || jobStatus.state === "queued" || jobStatus.state === "processing"}
+                    className="gap-1.5"
+                  >
+                    {jobStatus.state === "queued" || jobStatus.state === "processing" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-4 w-4" />
+                    )}
+                    Generate
+                  </Button>
+                </div>
+                {embedDetected && (
+                  <div className="flex items-center gap-2 text-[11px] text-primary bg-primary/8 border border-primary/20 rounded-md px-2.5 py-1.5">
+                    <Link2 className="h-3 w-3 flex-shrink-0" />
+                    Embedded video detected — the src URL will be extracted automatically.
+                  </div>
+                )}
+                <p className="text-[11px] text-muted-foreground">
+                  Paste a video URL or an embed code. The daemon downloads and analyses it locally.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {fileUploadState === "ready" && uploadedFileName ? (
+                  <div className="flex items-center gap-2.5 rounded-lg border border-green-500/30 bg-green-500/5 px-3 py-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate">{uploadedFileName}</p>
+                      <p className="text-[10px] text-muted-foreground">Ready to generate</p>
+                    </div>
+                    <button
+                      className="text-muted-foreground hover:text-foreground text-[10px]"
+                      onClick={() => { setFileUploadState("idle"); setUploadedFilePath(null); setUploadedFileName(null); }}
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg py-6 cursor-pointer transition-colors ${fileUploadState === "uploading" ? "border-primary/40 bg-primary/5" : "border-border hover:border-primary/40 hover:bg-primary/5"}`}>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="video/*,audio/*"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) void handleFileUpload(f); }}
+                      disabled={fileUploadState === "uploading"}
+                    />
+                    {fileUploadState === "uploading" ? (
+                      <>
+                        <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                        <span className="text-xs text-primary">Uploading…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-6 w-6 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Click to select a video or audio file</span>
+                      </>
+                    )}
+                  </label>
+                )}
+                {uploadError && <p className="text-[11px] text-destructive">{uploadError}</p>}
                 <Button
-                  onClick={handleSubmit}
-                  disabled={!videoUrl.trim() || jobStatus.state === "queued" || jobStatus.state === "processing"}
-                  className="gap-1.5"
+                  onClick={() => void handleSubmit()}
+                  disabled={fileUploadState !== "ready" || jobStatus.state === "queued" || jobStatus.state === "processing"}
+                  className="w-full gap-1.5"
                 >
                   {jobStatus.state === "queued" || jobStatus.state === "processing" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -315,11 +458,11 @@ export default function Home() {
                   )}
                   Generate
                 </Button>
+                <p className="text-[11px] text-muted-foreground">
+                  Upload a local video or audio file. It is sent to your machine's daemon for analysis.
+                </p>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                Paste a video URL. The AIScripter daemon will download and analyse it locally on your machine.
-              </p>
-            </div>
+            )}
 
             {jobStatus.state !== "idle" && (
               <StatusPanel

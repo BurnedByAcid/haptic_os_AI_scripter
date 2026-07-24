@@ -232,6 +232,12 @@ export default function Scripter() {
   const [urlInput, setUrlInput] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const [urlResolving, setUrlResolving] = useState(false);
+
+  // Beat Detector — URL/embed input state
+  const [bdUrlOpen, setBdUrlOpen] = useState(false);
+  const [bdUrlInput, setBdUrlInput] = useState("");
+  const [bdUrlError, setBdUrlError] = useState<string | null>(null);
+  const [bdUrlResolving, setBdUrlResolving] = useState(false);
   const { openBlockedReport } = useBlockedReport();
   const [currentTime, setCurrentTime] = useState(0);
   // Tracks how many times each base filename has been exported this session
@@ -630,6 +636,8 @@ export default function Scripter() {
   const bdVideoCtxRef  = useRef<AudioContext | null>(null);
   const bdVideoSrcRef  = useRef<MediaElementAudioSourceNode | null>(null);
   const bdRafRef = useRef<number | null>(null);
+  /** Set to true when a URL-loaded HLS source needs bdStartVideo() once the video element fires canplay. */
+  const bdStartVideoOnLoadRef = useRef(false);
   const bdLastBeatRef = useRef(0);
   const bdEnergyHistoryRef = useRef<number[]>([]);
   const bdBeatIntervalHistoryRef = useRef<number[]>([]);
@@ -1096,6 +1104,64 @@ export default function Scripter() {
       setBdFromCleaner(null);
     } catch (err) { console.error(err); }
   }, [checkAndRecordGeneration, bdLoop, bdBuildFilters]);
+
+  /** Resolve a video URL / embed code via the API, then load the audio track. */
+  const bdHandleUrlLoad = useCallback(async () => {
+    let trimmed = bdUrlInput.trim();
+    if (!trimmed) { setBdUrlError("Please paste a video URL or embed code."); return; }
+
+    // Extract src from embed codes
+    const embedMatch = trimmed.match(/src=["']([^"']+)["']/i);
+    if (embedMatch) {
+      trimmed = embedMatch[1];
+      try { new URL(trimmed); } catch {
+        setBdUrlError("Could not extract a valid URL from that embed code."); return;
+      }
+    }
+
+    try { new URL(trimmed); } catch {
+      setBdUrlError("That doesn't look like a valid URL."); return;
+    }
+
+    setBdUrlResolving(true);
+    setBdUrlError(null);
+    try {
+      const token = await getToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch(
+        `${API_BASE}/api/video/resolve?url=${encodeURIComponent(trimmed)}`,
+        { headers }
+      );
+      const data = await res.json() as { token?: string; title?: string; isHls?: boolean; cdnUrl?: string; error?: string };
+      if (!res.ok || !data.token) {
+        const fallback = "Could not resolve that URL. Download the video and use 'Upload Audio File' instead.";
+        setBdUrlError(data.error ?? fallback);
+        return;
+      }
+      setBdUrlOpen(false);
+      setBdUrlInput("");
+      setBdUrlError(null);
+
+      if (data.isHls) {
+        // HLS: route through the manifest proxy (same as Video tab).
+        // decodeAudioData() cannot process m3u8 text, so we load the source
+        // into the shared <video> element and tap it via MediaElementAudioSourceNode.
+        const hlsUrl = `${API_BASE}/api/video/hls/${data.token}/manifest.m3u8`;
+        bdStartVideoOnLoadRef.current = true;
+        setVideoUrl(hlsUrl);
+        setVideoFileName(data.title ?? "video");
+      } else {
+        // Non-HLS: fetch raw bytes through the stream proxy → decodeAudioData.
+        const streamUrl = `${API_BASE}/api/video/stream/${data.token}`;
+        await bdLoadFromUrl(streamUrl);
+      }
+    } catch {
+      setBdUrlError("Network error resolving URL. Please try again.");
+    } finally {
+      setBdUrlResolving(false);
+    }
+  }, [bdUrlInput, getToken, bdLoadFromUrl]);
 
   const bdStop = useCallback(() => {
     setBdIsActive(false);
@@ -2861,6 +2927,12 @@ export default function Scripter() {
             crossOrigin="anonymous"
             className="w-full h-full object-contain"
             preload="auto"
+            onCanPlay={() => {
+              if (bdStartVideoOnLoadRef.current) {
+                bdStartVideoOnLoadRef.current = false;
+                void bdStartVideo();
+              }
+            }}
             onLoadedData={e => { const v = e.currentTarget; v.currentTime = 0; v.pause(); }}
             onLoadedMetadata={e => { const dur = e.currentTarget.duration; if (isFinite(dur)) { setVtVideoDuration(dur); setVtEndTime(Math.round(dur)); } else { setVtVideoDuration(null); } }}
             onError={(e) => {
@@ -3100,6 +3172,35 @@ export default function Scripter() {
                       <Upload className="mr-2 h-3.5 w-3.5" /><span>Upload Audio File</span>
                       <input type="file" accept="audio/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={bdStartFile} />
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => { setBdUrlOpen(o => !o); setBdUrlError(null); }}
+                    >
+                      <Link2 className="mr-2 h-3.5 w-3.5" />Load from URL
+                    </Button>
+                    {bdUrlOpen && (
+                      <div className="space-y-1.5 pt-1">
+                        <Input
+                          placeholder="Paste a video URL or embed code…"
+                          value={bdUrlInput}
+                          onChange={e => { setBdUrlInput(e.target.value); if (bdUrlError) setBdUrlError(null); }}
+                          onKeyDown={e => { if (e.key === "Enter") void bdHandleUrlLoad(); }}
+                          disabled={bdUrlResolving}
+                          className="text-xs h-8"
+                        />
+                        {bdUrlError && <p className="text-[10px] text-destructive">{bdUrlError}</p>}
+                        <Button
+                          size="sm"
+                          className="w-full h-7 text-xs"
+                          onClick={() => void bdHandleUrlLoad()}
+                          disabled={bdUrlResolving || !bdUrlInput.trim()}
+                        >
+                          {bdUrlResolving ? <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" />Resolving…</> : "Load Audio"}
+                        </Button>
+                      </div>
+                    )}
                     {!videoUrl && (
                       <p className="text-[10px] text-muted-foreground/50 text-center">
                         Load a video in the Player to use video audio
