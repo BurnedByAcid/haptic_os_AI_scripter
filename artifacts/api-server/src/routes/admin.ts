@@ -3,7 +3,7 @@ import { getAuth, clerkClient } from "@clerk/express";
 import { pool } from "../lib/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { logger } from "../lib/logger";
-import { deleteCachedVideo } from "../lib/communityMediaStorage";
+import { deleteCachedVideo, getEffectiveCacheCapBytes, setCacheCapOverride } from "../lib/communityMediaStorage";
 
 const router: IRouter = Router();
 
@@ -288,12 +288,7 @@ router.get("/admin/analytics", async (req: Request, res: Response) => {
     const c = content.rows[0];
     const nu = newUsers.rows[0] as unknown as { last_7: string; last_30: string };
 
-    const cachedVideoCapBytes = (() => {
-      const raw = process.env.COMMUNITY_CACHE_MAX_TOTAL_BYTES?.trim();
-      if (!raw) return 100 * 1024 * 1024 * 1024;
-      const parsed = Number(raw);
-      return Number.isFinite(parsed) && parsed > 0 ? parsed : 100 * 1024 * 1024 * 1024;
-    })();
+    const cachedVideoCapBytes = await getEffectiveCacheCapBytes();
 
     res.json({
       users: {
@@ -395,6 +390,73 @@ router.get("/admin/hapticai/releases", async (req: Request, res: Response) => {
   } catch (err) {
     logger.error({ err }, "Failed to load hapticai releases");
     res.status(500).json({ error: "Failed to load releases." });
+  }
+});
+
+/**
+ * GET /api/admin/config/cache-cap
+ *
+ * Returns the current effective cache cap (bytes) and whether a DB override
+ * is set. Requires admin plan.
+ */
+router.get("/admin/config/cache-cap", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const caller = await clerkClient.users.getUser(auth.userId);
+  if ((caller.publicMetadata as Record<string, unknown>)?.plan !== "admin") {
+    res.status(403).json({ error: "Admin access required" }); return;
+  }
+
+  try {
+    const { rows } = await pool.query<{ value: string }>(
+      `SELECT value FROM platform_config WHERE key = 'community_cache_max_total_bytes'`,
+    );
+    const overrideBytes = rows.length > 0 ? Number(rows[0].value) : null;
+    const effectiveBytes = await getEffectiveCacheCapBytes();
+    res.json({ effectiveBytes, overrideBytes });
+  } catch (err) {
+    logger.error({ err }, "Failed to read cache cap config");
+    res.status(500).json({ error: "Failed to read config" });
+  }
+});
+
+/**
+ * PUT /api/admin/config/cache-cap
+ *
+ * Sets (or clears) the DB override for the community video cache cap.
+ * Body: { bytes: number | null }
+ *   - number: new cap in bytes (must be > 0)
+ *   - null:   removes the override; reverts to COMMUNITY_CACHE_MAX_TOTAL_BYTES env var / 100 GB default
+ * Requires admin plan.
+ */
+router.put("/admin/config/cache-cap", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const caller = await clerkClient.users.getUser(auth.userId);
+  if ((caller.publicMetadata as Record<string, unknown>)?.plan !== "admin") {
+    res.status(403).json({ error: "Admin access required" }); return;
+  }
+
+  const { bytes } = req.body as { bytes?: unknown };
+
+  if (bytes !== null && bytes !== undefined) {
+    const num = Number(bytes);
+    if (!Number.isFinite(num) || num <= 0) {
+      res.status(400).json({ error: "bytes must be a positive number or null" });
+      return;
+    }
+  }
+
+  try {
+    await setCacheCapOverride(bytes === null || bytes === undefined ? null : Number(bytes));
+    const effectiveBytes = await getEffectiveCacheCapBytes();
+    logger.info({ adminUserId: auth.userId, bytes, effectiveBytes }, "Admin updated community video cache cap");
+    res.json({ ok: true, effectiveBytes, overrideBytes: bytes === null || bytes === undefined ? null : Number(bytes) });
+  } catch (err) {
+    logger.error({ err }, "Failed to update cache cap config");
+    res.status(500).json({ error: "Failed to update config" });
   }
 });
 

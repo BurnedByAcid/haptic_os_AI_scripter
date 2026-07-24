@@ -9,6 +9,7 @@ import { logger } from "./logger";
 const VIDEO_MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
 const MAX_REDIRECTS = 5;
 const DEFAULT_CACHE_MAX_TOTAL_BYTES = 100 * 1024 * 1024 * 1024; // 100 GB
+const CONFIG_KEY_CACHE_CAP = "community_cache_max_total_bytes";
 
 // ─── Upload concurrency gate ──────────────────────────────────────────────────
 // Prevents a flood of simultaneous GCS uploads when many 'skipped' scripts
@@ -18,7 +19,7 @@ const DEFAULT_CACHE_MAX_TOTAL_BYTES = 100 * 1024 * 1024 * 1024; // 100 GB
 const MAX_CONCURRENT_UPLOADS = 3;
 let activeUploads = 0;
 
-function getCacheMaxTotalBytes(): number {
+function getEnvCacheMaxTotalBytes(): number {
   const raw = process.env.COMMUNITY_CACHE_MAX_TOTAL_BYTES?.trim();
   if (!raw) return DEFAULT_CACHE_MAX_TOTAL_BYTES;
   const parsed = Number(raw);
@@ -27,6 +28,51 @@ function getCacheMaxTotalBytes(): number {
     return DEFAULT_CACHE_MAX_TOTAL_BYTES;
   }
   return parsed;
+}
+
+/**
+ * Returns the effective cache cap in bytes.
+ * DB override (platform_config) takes precedence over the env var.
+ * Falls back to env var or 100 GB default if the table doesn't exist yet.
+ */
+async function getCacheMaxTotalBytes(): Promise<number> {
+  try {
+    const { rows } = await pool.query<{ value: string }>(
+      `SELECT value FROM platform_config WHERE key = $1`,
+      [CONFIG_KEY_CACHE_CAP],
+    );
+    if (rows.length > 0) {
+      const parsed = Number(rows[0].value);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+  } catch {
+    // Table may not exist yet on first startup — fall through to env var.
+  }
+  return getEnvCacheMaxTotalBytes();
+}
+
+/**
+ * Exported for use in admin routes and analytics — reads the effective cap.
+ */
+export async function getEffectiveCacheCapBytes(): Promise<number> {
+  return getCacheMaxTotalBytes();
+}
+
+/**
+ * Persist a new cache cap override to the DB.
+ * Pass null to remove the override (revert to env var / default).
+ */
+export async function setCacheCapOverride(bytes: number | null): Promise<void> {
+  if (bytes === null) {
+    await pool.query(`DELETE FROM platform_config WHERE key = $1`, [CONFIG_KEY_CACHE_CAP]);
+  } else {
+    await pool.query(
+      `INSERT INTO platform_config (key, value)
+       VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [CONFIG_KEY_CACHE_CAP, String(bytes)],
+    );
+  }
 }
 
 export const MEDIA_KEY_PREFIX = "media/community";
@@ -59,7 +105,7 @@ setInterval(() => {
 // allowing them to be picked up on the next incoming request.
 setInterval(async () => {
   try {
-    const capBytes = getCacheMaxTotalBytes();
+    const capBytes = await getCacheMaxTotalBytes();
     const { rows: sumRows } = await pool.query<{ total: string }>(
       `SELECT COALESCE(SUM(cached_video_size_bytes), 0) AS total
        FROM community_scripts
@@ -250,7 +296,7 @@ export async function cacheVideoInBackground(scriptId: number, videoUrl: string)
     // VIDEO_MAX_BYTES each — the worst-case size — so the headroom calculation
     // is always pessimistic.  The lock is released automatically when the
     // transaction commits or rolls back.
-    const capBytes = getCacheMaxTotalBytes();
+    const capBytes = await getCacheMaxTotalBytes();
 
     // Fixed advisory-lock key: crc32-like integer scoped to this cap check.
     // Any stable non-zero bigint works; pick something unlikely to collide.

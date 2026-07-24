@@ -24,6 +24,12 @@ async function runLocalMigrations() {
       ALTER TABLE community_scripts
       ADD COLUMN IF NOT EXISTS cached_video_size_bytes BIGINT
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS platform_config (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    `);
     logger.info("Local migrations applied");
   } catch (err) {
     logger.error({ err }, "Failed to apply local migrations — continuing");

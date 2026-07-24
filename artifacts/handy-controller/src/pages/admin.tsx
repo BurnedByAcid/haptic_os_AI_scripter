@@ -236,6 +236,10 @@ export default function Admin() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [capEditGb, setCapEditGb] = useState("");
+  const [capSaving, setCapSaving] = useState(false);
+  const [capError, setCapError] = useState<string | null>(null);
+
   const handleUpload = async () => {
     if (!uploadFile || !uploadVersion.trim()) return;
     setUploadProgress(0);
@@ -321,6 +325,36 @@ export default function Admin() {
       </div>
     );
   }
+
+  const handleSaveCap = async () => {
+    const gb = parseFloat(capEditGb);
+    if (!capEditGb.trim() || isNaN(gb) || gb <= 0) {
+      setCapError("Enter a positive number of GB.");
+      return;
+    }
+    setCapSaving(true);
+    setCapError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${API_BASE}/api/admin/config/cache-cap`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ bytes: Math.round(gb * 1024 * 1024 * 1024) }),
+      });
+      const data = await res.json() as { ok?: boolean; effectiveBytes?: number; error?: string };
+      if (!res.ok) {
+        setCapError(data.error ?? "Failed to save cap.");
+        return;
+      }
+      toast({ title: "Cache cap updated", description: `New cap: ${gb} GB` });
+      setCapEditGb("");
+      refresh();
+    } catch (e) {
+      setCapError(String(e));
+    } finally {
+      setCapSaving(false);
+    }
+  };
 
   const handleSetPlan = async () => {
     if (!targetEmail.trim()) return;
@@ -477,6 +511,39 @@ export default function Admin() {
                   {skipped === 0 && analytics && (
                     <div className="text-xs text-muted-foreground">No scripts skipped — cache cap not reached</div>
                   )}
+
+                  {/* Cap editor */}
+                  <div className="pt-1 border-t border-border/30 space-y-2">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Adjust Cap
+                    </p>
+                    <div className="flex gap-2 items-center">
+                      <div className="relative flex-1">
+                        <Input
+                          type="number"
+                          min="1"
+                          step="any"
+                          placeholder={`${(cap / (1024 ** 3)).toFixed(0)} GB (current)`}
+                          value={capEditGb}
+                          onChange={(e) => { setCapEditGb(e.target.value); setCapError(null); }}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleSaveCap(); }}
+                          className="h-8 text-sm pr-8"
+                        />
+                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">GB</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveCap}
+                        disabled={capSaving || !capEditGb.trim()}
+                        className="h-8 shrink-0"
+                      >
+                        {capSaving ? "Saving…" : "Save"}
+                      </Button>
+                    </div>
+                    {capError && (
+                      <p className="text-xs text-red-400">{capError}</p>
+                    )}
+                  </div>
                 </div>
               );
             })()}
