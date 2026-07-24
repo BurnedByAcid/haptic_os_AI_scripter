@@ -360,6 +360,179 @@ describe("cacheVideoInBackground", () => {
     expect(skippedCall).toBeDefined();
     expect(fakeFile.createWriteStream).not.toHaveBeenCalled();
   });
+
+  it("two simultaneous calls near cap boundary: exactly one proceeds, the other is skipped, cap is never exceeded", async () => {
+    // Set cap to just below 2 × VIDEO_MAX_BYTES: headroom for exactly one upload.
+    //
+    // This test uses a SHARED STATEFUL mock so that the reserved-bytes value seen
+    // by each caller is derived from what the other caller has actually committed —
+    // not from a hardcoded constant.  This makes the test sensitive to the advisory
+    // lock: if pg_advisory_xact_lock is removed, caller B runs its SUM query before
+    // caller A commits, sees 0 bytes, and also marks itself 'uploading', causing the
+    // `callerBFinalStatus === 'skipped'` assertion to fail.
+    const cap = 2 * VIDEO_MAX_BYTES - 1;
+    process.env.COMMUNITY_CACHE_MAX_TOTAL_BYTES = String(cap);
+
+    const SCRIPT_ID_A = 201;
+    const SCRIPT_ID_B = 202;
+
+    // ── Shared DB state ───────────────────────────────────────────────────────
+    // Tracks how many bytes have been committed (i.e. post-COMMIT) across all
+    // concurrent callers.  This mirrors what Postgres sees after the lock holder
+    // commits its UPDATE and before the next waiter sees the SUM result.
+    let committedReservedBytes = 0;
+
+    // ── Advisory-lock simulation ──────────────────────────────────────────────
+    // The lock serialises callers: B's lock call returns only after A's COMMIT.
+    // This is exactly what pg_advisory_xact_lock achieves in production.
+    let lockHeld = false;
+    const lockWaiters: Array<() => void> = [];
+
+    function acquireLock(): Promise<void> {
+      if (!lockHeld) {
+        lockHeld = true;
+        return Promise.resolve();
+      }
+      return new Promise<void>((resolve) => lockWaiters.push(resolve));
+    }
+
+    function releaseLock(): void {
+      const next = lockWaiters.shift();
+      if (next) {
+        // next caller inherits the lock
+        next();
+      } else {
+        lockHeld = false;
+      }
+    }
+
+    // ── Per-caller status tracking ────────────────────────────────────────────
+    let callerAFinalStatus: string | null = null;
+    let callerBFinalStatus: string | null = null;
+
+    function makeStatefulClient(
+      callerLabel: "A" | "B",
+      setFinalStatus: (s: string) => void,
+    ) {
+      let pendingUploading = false;
+
+      return {
+        query: vi.fn(async (sql: string) => {
+          if (sql === "BEGIN") return { rows: [] };
+
+          if (sql.includes("pg_advisory_xact_lock")) {
+            // Block until the previous lock holder commits.
+            await acquireLock();
+            return { rows: [] };
+          }
+
+          if (sql.includes("COALESCE(SUM")) {
+            // Return the bytes that have been committed by prior callers.
+            return { rows: [{ reserved: String(committedReservedBytes) }] };
+          }
+
+          if (sql.includes("SET cache_status = 'uploading'")) {
+            pendingUploading = true;
+            setFinalStatus("uploading");
+            return { rows: [] };
+          }
+
+          if (sql.includes("SET cache_status = 'skipped'")) {
+            setFinalStatus("skipped");
+            return { rows: [] };
+          }
+
+          if (sql === "COMMIT") {
+            // Commit the reserved slot so subsequent callers see it in their SUM.
+            if (pendingUploading) {
+              committedReservedBytes += VIDEO_MAX_BYTES;
+              pendingUploading = false;
+            }
+            releaseLock();
+            return { rows: [] };
+          }
+
+          if (sql === "ROLLBACK") {
+            releaseLock();
+            return { rows: [] };
+          }
+
+          return { rows: [] };
+        }),
+        release: vi.fn(),
+      };
+    }
+
+    const clientA = makeStatefulClient("A", (s) => { callerAFinalStatus = s; });
+    const clientB = makeStatefulClient("B", (s) => { callerBFinalStatus = s; });
+
+    mockPoolConnect
+      .mockResolvedValueOnce(clientA as any)
+      .mockResolvedValueOnce(clientB as any);
+
+    // GCS – only caller A should reach this.
+    const writeStreamA = makeFakeWriteStream();
+    const fakeFileA = makeFakeFile(writeStreamA);
+    const fakeBucket = { file: vi.fn().mockReturnValue(fakeFileA) };
+    mockGcsClient.bucket.mockReturnValue(fakeBucket as any);
+
+    // pool.query for caller A's post-transaction steps: SELECT id + UPDATE to 'cached'.
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [{ id: SCRIPT_ID_A }] } as any)
+      .mockResolvedValueOnce({ rows: [] } as any);
+
+    const fakeResA = makeFakeResponse(200, { "content-type": "video/mp4" });
+    setupHttpsRequest(fakeResA);
+
+    // Launch both calls simultaneously.
+    const promiseA = cacheVideoInBackground(SCRIPT_ID_A, "https://example.com/video-a.mp4");
+    const promiseB = cacheVideoInBackground(SCRIPT_ID_B, "https://example.com/video-b.mp4");
+
+    // Drain the microtask queue so both callers complete their advisory-lock
+    // transactions before we drive caller A's upload stream to completion.
+    await new Promise((r) => setImmediate(r));
+    fakeResA.emit("data", Buffer.alloc(512));
+    fakeResA.emit("end");
+
+    await Promise.all([promiseA, promiseB]);
+
+    delete process.env.COMMUNITY_CACHE_MAX_TOTAL_BYTES;
+
+    // ── Verify caller A proceeded ─────────────────────────────────────────────
+
+    expect(callerAFinalStatus, "caller A should reserve an uploading slot").toBe("uploading");
+
+    const cachedCall = mockPoolQuery.mock.calls.find(
+      (c) => typeof c[0] === "string" && (c[0] as string).includes("cache_status = 'cached'"),
+    );
+    expect(cachedCall, "caller A should complete and be marked cached").toBeDefined();
+
+    // ── Verify caller B was skipped ───────────────────────────────────────────
+    // With the advisory lock in place, caller B's SUM query runs after caller A
+    // commits, so B sees committedReservedBytes = VIDEO_MAX_BYTES and is skipped.
+    // Without the lock, B's SUM could run before A commits (seeing 0 bytes) and
+    // B would also mark itself 'uploading', failing this assertion.
+    expect(callerBFinalStatus, "caller B should be skipped — advisory lock must serialise callers").toBe("skipped");
+
+    // ── Verify GCS was written exactly once ───────────────────────────────────
+
+    expect(fakeBucket.file).toHaveBeenCalledTimes(1);
+    expect(fakeBucket.file).toHaveBeenCalledWith(storageKeyForScript(SCRIPT_ID_A));
+
+    // ── Verify neither call errored ───────────────────────────────────────────
+
+    const failedCalls = mockPoolQuery.mock.calls.filter(
+      (c) => typeof c[0] === "string" && (c[0] as string).includes("cache_status = 'failed'"),
+    );
+    expect(failedCalls, "neither call should be marked failed").toHaveLength(0);
+
+    // ── Verify total reserved + cached bytes never exceeded cap ───────────────
+
+    // committedReservedBytes is VIDEO_MAX_BYTES (A's slot); B contributed 0.
+    // Actual upload was 512 bytes, well under the per-file cap.
+    expect(committedReservedBytes, "only one upload slot should be committed").toBe(VIDEO_MAX_BYTES);
+    expect(committedReservedBytes).toBeLessThanOrEqual(cap);
+  });
 });
 
 // ── deleteCachedVideo ─────────────────────────────────────────────────────────
