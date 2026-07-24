@@ -140,7 +140,7 @@ function ProtectedRoute({
 
   const onboarded = (user?.publicMetadata as Record<string, unknown>)?.onboarded === true;
   if (!onboarded) return <Redirect to="/onboarding" />;
-  if (subscriberOnly && !isPro) return <Redirect to="/upgrade" />;
+  if (subscriberOnly && !isPro && !isAdmin) return <Redirect to="/upgrade" />;
   if (adminOnly && !isAdmin) return <Redirect to={adminFallback} />;
 
   return <Component />;
