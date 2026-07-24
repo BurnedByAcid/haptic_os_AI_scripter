@@ -186,6 +186,12 @@ function importUrl() {
       return;
     }
     const jobId = res.job_id;
+    // Inactivity tracker: reset whenever progress percentage advances.
+    // This allows legitimately slow downloads to run >2 min as long as they
+    // are still making progress, while catching truly frozen/crashed jobs.
+    const _URL_INACTIVITY_MS = 120_000; // 2 minutes without progress change
+    let _lastSeenPct = -1;
+    let _lastProgressAt = Date.now();
     _urlPollInterval = setInterval(async () => {
       try {
         const pr = await fetch('/api/job/' + jobId);
@@ -197,6 +203,20 @@ function importUrl() {
 
         if (job.status === 'downloading') {
           document.getElementById('url-progress-hint').textContent = 'Downloading… ' + pct + '%';
+          // Reset the inactivity clock whenever progress advances.
+          if (pct !== _lastSeenPct) {
+            _lastSeenPct = pct;
+            _lastProgressAt = Date.now();
+          }
+          // Client-side safety net: if no progress has been recorded for the
+          // inactivity window, treat the job as failed and unlock the button.
+          if (Date.now() - _lastProgressAt > _URL_INACTIVITY_MS) {
+            stopUrlPolling();
+            hint.style.color = '#ef4444';
+            hint.textContent = '✗ Download failed — please try again';
+            document.getElementById('url-progress').style.display = 'none';
+            document.getElementById('btn-url-load').disabled = false;
+          }
         } else if (job.status === 'uploaded') {
           stopUrlPolling();
           document.getElementById('url-fill').style.width = '100%';

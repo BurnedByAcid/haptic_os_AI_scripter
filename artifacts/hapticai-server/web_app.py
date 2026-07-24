@@ -161,6 +161,26 @@ def _require_trusted_request():
     return None, None
 
 
+_DOWNLOAD_STALE_SECONDS = 120  # downloading jobs with no progress for >2 min are failed
+
+def _expire_stale_downloading_jobs():
+    """
+    Mark any job stuck in 'downloading' with no progress activity for
+    _DOWNLOAD_STALE_SECONDS as 'error'.  Uses last_progress_at (updated
+    whenever the download thread records a new progress value) rather than
+    _created_at so that legitimately slow-but-active downloads are not killed.
+    """
+    now = time.time()
+    for jid, j in list(jobs.items()):
+        if j.get("status") != "downloading":
+            continue
+        idle_since = j.get("last_progress_at", j.get("_created_at", now))
+        if now - idle_since > _DOWNLOAD_STALE_SECONDS:
+            j["status"] = "error"
+            j["error"] = "Download timed out — please try again"
+            j["log"].append("Error: download timed out after no progress")
+            logger.warning("Marked stale downloading job as error: %s", jid)
+
 def _cleanup_stale_uploads():
     """Remove upload and output files older than _UPLOAD_MAX_AGE_SECONDS."""
     cutoff = time.time() - _UPLOAD_MAX_AGE_SECONDS
@@ -172,11 +192,14 @@ def _cleanup_stale_uploads():
                     logger.info("Removed stale file: %s", path)
             except OSError:
                 pass
+    now = time.time()
     stale_jobs = [jid for jid, j in list(jobs.items())
                   if j.get("status") in ("done", "error", "uploaded", "funscript_loaded")
-                  and time.time() - j.get("_created_at", time.time()) > _UPLOAD_MAX_AGE_SECONDS]
+                  and now - j.get("_created_at", now) > _UPLOAD_MAX_AGE_SECONDS]
     for jid in stale_jobs:
         jobs.pop(jid, None)
+
+    _expire_stale_downloading_jobs()
 
 def _get_data_dir() -> Path:
     """Return a writable per-user data directory (never inside Program Files)."""
@@ -1281,6 +1304,7 @@ def import_url():
                 dl_match = _re2.search(r'\[download\]\s+(\d+(?:\.\d+)?)%', line)
                 if dl_match:
                     job["progress"] = float(dl_match.group(1)) * 0.9  # reserve 10% for final steps
+                    job["last_progress_at"] = time.time()
             proc.wait()
             if proc.returncode != 0:
                 job["status"] = "error"
@@ -1644,6 +1668,9 @@ def apply_filter():
 def get_job(job_id):
     if job_id not in jobs:
         return jsonify({"error": "Job not found"}), 404
+    # Inline stale-download check so every poll reflects current state, even
+    # when no new import/upload has triggered _cleanup_stale_uploads().
+    _expire_stale_downloading_jobs()
     job = dict(jobs[job_id])
     job.pop("funscript_actions", None)
     return jsonify(job)
