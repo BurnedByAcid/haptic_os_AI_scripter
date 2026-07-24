@@ -97,7 +97,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/",          label: "Dashboard",      icon: Home,      requiresPro: false },
   { href: "/player",    label: "Player",          icon: PlaySquare, requiresPro: false },
   { href: "/scripter",  label: "Scripter",        icon: Mic,       requiresPro: false },
-  { href: "/haptic-ai",   label: "HapticAI",    icon: Sparkles, requiresPro: false, badge: "Beta", preNavWarning: true },
+  { href: "/haptic-ai",   label: "HapticAI",    icon: Sparkles, requiresPro: true,  badge: "Beta", preNavWarning: true },
   { href: "/aiscripter", label: "AIScripter",   icon: Wand2,    requiresPro: false, badge: "Beta", preNavWarning: true },
   { href: "/community", label: "Community",       icon: Users,     requiresPro: false },
   { href: "/control",   label: "Manual Controls", icon: Settings2, requiresPro: false },
