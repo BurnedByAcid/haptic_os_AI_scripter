@@ -95,6 +95,55 @@ function resolveVideoUrl(req: Request, userId: string, row: RawRow): string {
 // ─── Routes ─────────────────────────────────────────────────────────────────
 
 /**
+ * GET /api/community/cache-statuses?ids=1,2,3
+ *
+ * Lightweight batch endpoint that returns only { id, cache_status, cached }
+ * for a list of script IDs. Used by the community page to poll pending scripts
+ * without incrementing view counts.
+ */
+router.get("/community/cache-statuses", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const rawIds = String(req.query.ids ?? "");
+  const ids = rawIds
+    .split(",")
+    .map((s) => parseInt(s.trim(), 10))
+    .filter((n) => !isNaN(n) && n > 0)
+    .slice(0, 50);
+
+  if (ids.length === 0) {
+    res.json({ statuses: [] });
+    return;
+  }
+
+  try {
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(",");
+    const { rows } = await pool.query(
+      `SELECT id, cache_status, cached_video_url FROM community_scripts WHERE id IN (${placeholders})`,
+      ids,
+    );
+
+    const statuses = rows.map((row) => {
+      const r = row as RawRow & { id: number };
+      return {
+        id: r.id,
+        cache_status: r.cache_status,
+        cached: r.cache_status === "cached",
+        video_url: r.cache_status === "cached" && r.cached_video_url
+          ? buildCachedVideoUrl(req, auth.userId!, r.id, r.cached_video_url)
+          : null,
+      };
+    });
+
+    res.json({ statuses });
+  } catch (err) {
+    logger.error({ err }, "Failed to fetch cache statuses");
+    res.status(500).json({ error: "Failed to fetch cache statuses" });
+  }
+});
+
+/**
  * GET /api/community/cached-video/:token
  *
  * Token-authenticated streaming endpoint for cached community videos.

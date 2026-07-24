@@ -288,6 +288,42 @@ export default function Community() {
     }
   }
 
+  useEffect(() => {
+    const pendingIds = allScripts
+      .filter((s) => s.cache_status === "pending")
+      .map((s) => s.id);
+
+    if (pendingIds.length === 0) return;
+
+    const poll = async () => {
+      try {
+        const headers = await authHeaders();
+        const res = await fetch(
+          `${API}/api/community/cache-statuses?ids=${pendingIds.join(",")}`,
+          { headers },
+        );
+        if (!res.ok) return;
+        const data = await res.json() as {
+          statuses: { id: number; cache_status: "pending" | "cached" | "failed"; cached: boolean; video_url: string | null }[];
+        };
+        for (const st of data.statuses) {
+          if (st.cache_status !== "pending") {
+            updateScript(st.id, (sc) => ({
+              ...sc,
+              cache_status: st.cache_status,
+              cached: st.cached,
+              ...(st.video_url ? { video_url: st.video_url } : {}),
+            }));
+          }
+        }
+      } catch {
+      }
+    };
+
+    const timer = setInterval(poll, 15_000);
+    return () => clearInterval(timer);
+  }, [allScripts]);
+
   const hasMore = nextOffset < total;
 
   async function loadMore() {
