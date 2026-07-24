@@ -469,8 +469,21 @@ router.delete("/admin/community/:id/cache", async (req: Request, res: Response) 
       [id],
     );
 
+    // Freeing one cached entry may create enough room for previously-skipped
+    // scripts. Reset all skipped rows to pending so they are retried on next
+    // request rather than staying permanently uncached.
+    const { rowCount: resetCount } = await pool.query(
+      `UPDATE community_scripts SET cache_status = 'pending' WHERE cache_status = 'skipped'`,
+    );
+    if (resetCount && resetCount > 0) {
+      logger.info(
+        { adminUserId: auth.userId, scriptId: id, resetCount },
+        "Reset skipped community scripts to pending after cache eviction",
+      );
+    }
+
     logger.info({ adminUserId: auth.userId, scriptId: id }, "Admin evicted community script cache");
-    res.json({ ok: true, scriptId: id });
+    res.json({ ok: true, scriptId: id, skippedReset: resetCount ?? 0 });
   } catch (err) {
     logger.error({ err, scriptId: id }, "Failed to evict community script cache");
     res.status(500).json({ error: "Failed to evict cache" });

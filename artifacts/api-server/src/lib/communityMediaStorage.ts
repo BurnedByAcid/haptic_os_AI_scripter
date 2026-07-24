@@ -44,6 +44,38 @@ setInterval(() => {
   for (const [t, e] of tokenStore) if (e.expiresAt <= now) tokenStore.delete(t);
 }, 30 * 60 * 1000).unref();
 
+// ─── Background sweep: re-queue skipped scripts when space is available ───────
+// Scripts marked 'skipped' are permanently uncached unless something actively
+// resets them. This sweep runs every 10 minutes and resets any 'skipped' rows
+// to 'pending' whenever the total cached bytes are below the platform cap,
+// allowing them to be picked up on the next incoming request.
+setInterval(async () => {
+  try {
+    const capBytes = getCacheMaxTotalBytes();
+    const { rows: sumRows } = await pool.query<{ total: string }>(
+      `SELECT COALESCE(SUM(cached_video_size_bytes), 0) AS total
+       FROM community_scripts
+       WHERE cache_status = 'cached' AND cached_video_size_bytes IS NOT NULL`,
+    );
+    const currentTotalBytes = Number(sumRows[0]?.total ?? 0);
+
+    // Only re-queue if there is at least one max-size video's worth of headroom.
+    if (currentTotalBytes + VIDEO_MAX_BYTES <= capBytes) {
+      const { rowCount } = await pool.query(
+        `UPDATE community_scripts SET cache_status = 'pending' WHERE cache_status = 'skipped'`,
+      );
+      if (rowCount && rowCount > 0) {
+        logger.info(
+          { resetCount: rowCount, currentTotalBytes, capBytes },
+          "Background sweep reset skipped community scripts to pending",
+        );
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, "Background skipped-scripts sweep failed");
+  }
+}, 10 * 60 * 1000).unref();
+
 /**
  * Mint a short-lived streaming token for a cached community video.
  * The token is tied to the requesting userId and expires in 6 hours.
