@@ -1,5 +1,7 @@
-const socket = io();
+const socket = io({ transports: ['polling'] });
 let currentJobId = null;
+let _pollInterval = null;
+let _seenLogCount = 0;
 let selectedMode = null;
 let selectedPlugin = null;
 let pluginsData = [];
@@ -21,6 +23,7 @@ socket.on('progress', (data) => {
 });
 socket.on('complete', (data) => {
   if (data.job_id !== currentJobId) return;
+  stopJobPolling();
   onProcessingComplete(data);
 });
 
@@ -29,6 +32,53 @@ function setConnStatus(connected) {
   const label = document.getElementById('conn-label');
   dot.className = 'status-dot ' + (connected ? 'connected' : 'error');
   label.textContent = connected ? 'Connected' : 'Disconnected';
+}
+
+function stopJobPolling() {
+  if (_pollInterval !== null) {
+    clearInterval(_pollInterval);
+    _pollInterval = null;
+  }
+}
+
+function startJobPolling(jobId) {
+  stopJobPolling();
+  _seenLogCount = 0;
+  _pollInterval = setInterval(async () => {
+    if (!jobId) return;
+    try {
+      const res = await fetch(`/api/job/${jobId}`);
+      if (!res.ok) return;
+      const job = await res.json();
+
+      // Feed any new log lines into the UI (deduplicate with SocketIO)
+      const log = job.log || [];
+      for (let i = _seenLogCount; i < log.length; i++) {
+        const statusForLine = (i === log.length - 1) ? job.status : 'processing';
+        updateProgress(job.stage || 1, job.progress || 0, log[i], statusForLine);
+      }
+      _seenLogCount = log.length;
+
+      if (job.status === 'done') {
+        stopJobPolling();
+        // Fetch funscript actions separately (stripped from job endpoint for size)
+        let actions = [];
+        try {
+          const fsRes = await fetch(`/api/funscript_data/${jobId}`);
+          if (fsRes.ok) actions = (await fsRes.json()).actions || [];
+        } catch (_e) {}
+        onProcessingComplete({
+          job_id: jobId,
+          files: (job.output_files || []).map(p => p.split(/[\\/]/).pop()),
+          saved_to: job.saved_to || [],
+          actions,
+        });
+      } else if (job.status === 'error') {
+        stopJobPolling();
+        updateProgress(job.stage || 0, 0, 'Error: ' + (job.error || 'Processing failed'), 'error');
+      }
+    } catch (_e) { /* network blip — try again next tick */ }
+  }, 1500);
 }
 
 // ---- Tab navigation ----
@@ -408,13 +458,17 @@ document.getElementById('btn-generate').addEventListener('click', () => {
   document.getElementById('prog-badge').textContent = 'Running';
 
   socket.emit('subscribe', { job_id: currentJobId });
+  startJobPolling(currentJobId);
 
   fetch('/api/process', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ job_id: currentJobId, mode: selectedMode, settings }),
   }).then(r => r.json()).then(res => {
-    if (res.error) alert('Error: ' + res.error);
+    if (res.error) {
+      stopJobPolling();
+      alert('Error: ' + res.error);
+    }
   });
 
   document.getElementById('progress-panel').scrollIntoView({ behavior: 'smooth' });
@@ -466,6 +520,7 @@ function updateProgress(stage, progress, message, status) {
 }
 
 function onProcessingComplete(data) {
+  stopJobPolling();
   document.getElementById('main-progress-fill').style.width = '100%';
   document.getElementById('main-progress-pct').textContent = '100%';
   document.getElementById('prog-badge').className = 'badge done';
