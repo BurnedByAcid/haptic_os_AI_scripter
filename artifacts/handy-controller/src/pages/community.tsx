@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
   Download, Play, Upload, Plus, X, Clock, User, Eye,
-  Crown, Loader2, Globe, Trash2, ChevronDown
+  Crown, Loader2, Globe, Trash2, ChevronDown, AlertCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { validateVideoUrl, validateAndParseFunscriptFile } from "@/lib/validation";
@@ -701,6 +701,11 @@ export default function Community() {
                               Caching…
                             </span>
                           )}
+                          {s.cache_status === "failed" && (
+                            <span className="shrink-0 flex items-center gap-0.5 text-[10px] font-medium bg-destructive/10 text-destructive border border-destructive/30 px-1.5 py-0.5 rounded" title="Video caching failed — playback is unavailable">
+                              <AlertCircle className="h-2.5 w-2.5" /> Cache failed
+                            </span>
+                          )}
                         </div>
                         {s.description && (
                           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{s.description}</p>
@@ -757,6 +762,12 @@ export default function Community() {
                       )}
                     </div>
 
+                    {isOwner && s.cache_status === "failed" && (
+                      <div className="flex items-start gap-1.5 text-[11px] text-destructive bg-destructive/8 border border-destructive/20 rounded px-2 py-1.5">
+                        <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                        <span>Caching failed. Delete this entry and re-share to try again.</span>
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <Button
                         size="sm"
@@ -770,8 +781,14 @@ export default function Community() {
                         size="sm"
                         className="flex-1 text-xs h-8 gap-1.5"
                         onClick={() => handleUseInPlayer(s)}
-                        disabled={s.cache_status === "pending"}
-                        title={s.cache_status === "pending" ? "Video is being cached — try again in a moment" : undefined}
+                        disabled={s.cache_status === "pending" || s.cache_status === "failed"}
+                        title={
+                          s.cache_status === "pending"
+                            ? "Video is being cached — try again in a moment"
+                            : s.cache_status === "failed"
+                            ? "Video caching failed — the owner needs to delete and re-share this script"
+                            : undefined
+                        }
                       >
                         <Play className="h-3.5 w-3.5" /> Use in Player
                       </Button>
