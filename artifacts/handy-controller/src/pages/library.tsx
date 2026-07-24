@@ -3,7 +3,7 @@ import { getAllEntries, addEntry, deleteEntry, updateEntry, LibraryEntry, Playli
 import { Card, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check, Pencil, ListVideo, Plus, Crown, Lock } from "lucide-react";
+import { Film, FileJson, Trash2, Play, Upload, FolderOpen, Link, X, Check, Pencil, ListVideo, Plus, Crown, Lock, Globe } from "lucide-react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { validateVideoUrl, validateAndParseFunscriptFile, sanitizeName } from "@/lib/validation";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/tooltip";
 import { getHostLabel } from "@/lib/url-utils";
 import { PlaylistEditorDialog } from "@/components/playlist-editor-dialog";
+import { ShareToCommunityDialog } from "@/components/share-to-community-dialog";
 
 // File System Access API types (Chrome/Edge, not yet in standard TS lib)
 interface FSAFileHandle extends FileSystemFileHandle {
@@ -159,6 +160,10 @@ export default function Library() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPlaylist, setEditingPlaylist] = useState<Playlist | null>(null);
+
+  // Share to Community state
+  const [shareEntry, setShareEntry] = useState<LibraryEntry | null>(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   const loadEntries = async () => {
     const data = await getAllEntries();
@@ -495,6 +500,17 @@ export default function Library() {
     setLocation("/player");
   };
 
+  const openShare = (entry: LibraryEntry) => {
+    setShareEntry(entry);
+    setShareDialogOpen(true);
+  };
+
+  const handleShared = async (entry: LibraryEntry, communityId: number) => {
+    const updated: LibraryEntry = { ...entry, sharedCommunityId: communityId };
+    await updateEntry(updated);
+    await loadEntries();
+  };
+
   const filtered = entries.filter(e => e.name.toLowerCase().includes(search.toLowerCase()));
 
   const sharedEditProps = {
@@ -507,6 +523,8 @@ export default function Library() {
     openEdit,
     cancelEdit,
     handleSaveEdit,
+    onShare: openShare,
+    isPro,
   };
 
   return (
@@ -782,6 +800,13 @@ export default function Library() {
         playlist={editingPlaylist}
         allEntries={entries}
       />
+
+      <ShareToCommunityDialog
+        entry={shareEntry}
+        open={shareDialogOpen}
+        onClose={() => { setShareDialogOpen(false); setShareEntry(null); }}
+        onShared={handleShared}
+      />
     </TooltipProvider>
   );
 }
@@ -801,6 +826,8 @@ interface EntryCardProps {
   openEdit: (e: LibraryEntry) => void;
   cancelEdit: () => void;
   handleSaveEdit: (e: LibraryEntry) => void;
+  onShare: (e: LibraryEntry) => void;
+  isPro: boolean;
 }
 
 function UrlEntryCard({
@@ -815,7 +842,9 @@ function UrlEntryCard({
   editSaving,
   openEdit,
   cancelEdit,
-  handleSaveEdit
+  handleSaveEdit,
+  onShare,
+  isPro,
 }: EntryCardProps) {
   const url = entry.url!;
   const hostLabel = getHostLabel(url);
@@ -846,6 +875,11 @@ function UrlEntryCard({
             <div className="absolute top-2 right-2 bg-background/80 backdrop-blur px-2 py-1 rounded text-xs font-mono">
               URL
             </div>
+            {entry.sharedCommunityId && (
+              <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-primary/90 backdrop-blur text-primary-foreground px-2 py-0.5 rounded text-[10px] font-semibold">
+                <Globe className="h-2.5 w-2.5" /> Community
+              </div>
+            )}
           </div>
 
           {editingId === entry.id ? (
@@ -918,6 +952,44 @@ function UrlEntryCard({
                 >
                   <Play className="h-4 w-4 mr-2" /> Open
                 </Button>
+                {isPro ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={entry.sharedCommunityId ? "outline" : "ghost"}
+                        size="icon"
+                        className={`h-9 w-9 ${entry.sharedCommunityId ? "text-primary border-primary/40" : "text-muted-foreground hover:text-foreground"}`}
+                        onClick={() => onShare(entry)}
+                        data-testid={`button-share-${entry.id}`}
+                      >
+                        <Globe className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      {entry.sharedCommunityId ? "Already shared — share again" : "Share to Community"}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 text-muted-foreground/40 cursor-default"
+                          disabled
+                        >
+                          <Globe className="h-4 w-4" />
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <div className="flex items-center gap-1.5">
+                        <Crown className="h-3 w-3 text-yellow-400" /> Subscribers only
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -951,7 +1023,7 @@ function UrlEntryCard({
   );
 }
 
-// ── File entry card (unchanged layout) ───────────────────────────────────────
+// ── File entry card ───────────────────────────────────────────────────────────
 
 function FileEntryCard({
   entry,
@@ -964,8 +1036,13 @@ function FileEntryCard({
   editSaving,
   openEdit,
   cancelEdit,
-  handleSaveEdit
+  handleSaveEdit,
+  onShare,
+  isPro,
 }: EntryCardProps) {
+  const isLocalVideo = entry.type === "video" && !entry.url;
+  const canShare = !isLocalVideo;
+
   return (
     <Card className="bg-card/50 backdrop-blur overflow-hidden group">
       <div className="aspect-video bg-black flex items-center justify-center relative border-b border-border/50 overflow-hidden">
@@ -982,6 +1059,11 @@ function FileEntryCard({
         {entry.fileHandle && (
           <div className="absolute top-2 left-2 bg-primary/80 backdrop-blur px-2 py-1 rounded text-xs font-mono text-black font-semibold">
             LINKED
+          </div>
+        )}
+        {entry.sharedCommunityId && (
+          <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-primary/90 backdrop-blur text-primary-foreground px-2 py-0.5 rounded text-[10px] font-semibold">
+            <Globe className="h-2.5 w-2.5" /> Community
           </div>
         )}
       </div>
@@ -1036,6 +1118,46 @@ function FileEntryCard({
             >
               <Play className="h-4 w-4 mr-2" /> Open
             </Button>
+            {canShare && (
+              isPro ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={entry.sharedCommunityId ? "outline" : "ghost"}
+                      size="icon"
+                      className={`h-9 w-9 ${entry.sharedCommunityId ? "text-primary border-primary/40" : "text-muted-foreground hover:text-foreground"}`}
+                      onClick={() => onShare(entry)}
+                      data-testid={`button-share-${entry.id}`}
+                    >
+                      <Globe className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {entry.sharedCommunityId ? "Already shared — share again" : "Share to Community"}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 text-muted-foreground/40 cursor-default"
+                        disabled
+                      >
+                        <Globe className="h-4 w-4" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <div className="flex items-center gap-1.5">
+                      <Crown className="h-3 w-3 text-yellow-400" /> Subscribers only
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              )
+            )}
             <Button
               variant="ghost"
               size="icon"

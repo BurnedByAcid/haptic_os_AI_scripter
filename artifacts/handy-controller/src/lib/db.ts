@@ -10,6 +10,7 @@ export interface LibraryEntry {
   addedAt: number;
   thumbnail?: string;
   linkedTo?: string;
+  sharedCommunityId?: number;
 }
 
 export interface Playlist {
