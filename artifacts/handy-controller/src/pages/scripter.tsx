@@ -238,6 +238,7 @@ export default function Scripter() {
   const [bdUrlInput, setBdUrlInput] = useState("");
   const [bdUrlError, setBdUrlError] = useState<string | null>(null);
   const [bdUrlResolving, setBdUrlResolving] = useState(false);
+  const [bdUrlLoadedLabel, setBdUrlLoadedLabel] = useState<string | null>(null);
   const { openBlockedReport } = useBlockedReport();
   const [currentTime, setCurrentTime] = useState(0);
   // Tracks how many times each base filename has been exported this session
@@ -1102,7 +1103,10 @@ export default function Scripter() {
       bdLoop();
       sessionStorage.removeItem(AUDIO_CLEANER_SESSION_KEY);
       setBdFromCleaner(null);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      throw err;
+    }
   }, [checkAndRecordGeneration, bdLoop, bdBuildFilters]);
 
   /** Resolve a video URL / embed code via the API, then load the audio track. */
@@ -1139,22 +1143,34 @@ export default function Scripter() {
         setBdUrlError(data.error ?? fallback);
         return;
       }
-      setBdUrlOpen(false);
-      setBdUrlInput("");
-      setBdUrlError(null);
+      const label = data.title ?? (() => { try { return new URL(trimmed).hostname; } catch { return trimmed; } })();
 
       if (data.isHls) {
         // HLS: route through the manifest proxy (same as Video tab).
         // decodeAudioData() cannot process m3u8 text, so we load the source
         // into the shared <video> element and tap it via MediaElementAudioSourceNode.
+        // We confirm success at the resolve step — HLS load completion is async/event-driven.
         const hlsUrl = `${API_BASE}/api/video/hls/${data.token}/manifest.m3u8`;
         bdStartVideoOnLoadRef.current = true;
         setVideoUrl(hlsUrl);
         setVideoFileName(data.title ?? "video");
+        setBdUrlOpen(false);
+        setBdUrlInput("");
+        setBdUrlError(null);
+        setBdUrlLoadedLabel(label);
       } else {
         // Non-HLS: fetch raw bytes through the stream proxy → decodeAudioData.
+        // Only show success after the stream actually loads and decodes successfully.
         const streamUrl = `${API_BASE}/api/video/stream/${data.token}`;
-        await bdLoadFromUrl(streamUrl);
+        try {
+          await bdLoadFromUrl(streamUrl);
+          setBdUrlOpen(false);
+          setBdUrlInput("");
+          setBdUrlError(null);
+          setBdUrlLoadedLabel(label);
+        } catch {
+          setBdUrlError("URL resolved but audio stream failed to load. Try a different source or download the file and upload it directly.");
+        }
       }
     } catch {
       setBdUrlError("Network error resolving URL. Please try again.");
@@ -3176,10 +3192,16 @@ export default function Scripter() {
                       size="sm"
                       variant="outline"
                       className="w-full"
-                      onClick={() => { setBdUrlOpen(o => !o); setBdUrlError(null); }}
+                      onClick={() => { setBdUrlOpen(o => !o); setBdUrlError(null); setBdUrlLoadedLabel(null); }}
                     >
                       <Link2 className="mr-2 h-3.5 w-3.5" />Load from URL
                     </Button>
+                    {bdUrlLoadedLabel && !bdUrlOpen && (
+                      <p className="text-[10px] text-primary flex items-center gap-1">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                        Loaded: {bdUrlLoadedLabel}
+                      </p>
+                    )}
                     {bdUrlOpen && (
                       <div className="space-y-1.5 pt-1">
                         <Input
