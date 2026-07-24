@@ -4,7 +4,7 @@ import {
   Users, TrendingUp, FileText, Star, Heart, Eye,
   Gamepad2, Music, Play, Sliders, PenLine,
   Ticket, RefreshCw, BarChart3, UserPlus, MessageSquare, Bug, Lightbulb, MessageCircle,
-  Upload, Monitor, Apple, CheckCircle2,
+  Upload, Monitor, Apple, CheckCircle2, HardDrive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +61,9 @@ interface AnalyticsData {
     communityViews: number;
     communityRatings: number;
     communityFavorites: number;
+    cachedVideoTotalBytes: number;
+    cachedVideoCapBytes: number;
+    cachedVideoSkipped: number;
   };
   features: Record<string, { total: number; last30: number }>;
   earlyBird: {
@@ -432,6 +435,51 @@ export default function Admin() {
               <StatCard label="Ratings" value={analytics?.content.communityRatings ?? "—"} icon={Star} color="text-yellow-400" />
               <StatCard label="Favorites" value={analytics?.content.communityFavorites ?? "—"} icon={Heart} color="text-pink-400" />
             </div>
+
+            {/* Video storage bar */}
+            {(() => {
+              const used = analytics?.content.cachedVideoTotalBytes ?? 0;
+              const cap  = analytics?.content.cachedVideoCapBytes  ?? 1;
+              const skipped = analytics?.content.cachedVideoSkipped ?? 0;
+              const pct = Math.min((used / cap) * 100, 100);
+              const barColor =
+                pct >= 90 ? "bg-red-500" :
+                pct >= 70 ? "bg-yellow-500" :
+                "bg-primary";
+              return (
+                <div className="mt-2 rounded-lg border border-border/50 bg-card/40 p-4 space-y-2.5">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <HardDrive className="h-3.5 w-3.5" /> Video Cache Storage
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium tabular-nums">
+                      {formatBytes(used)}
+                      <span className="text-muted-foreground font-normal"> / {formatBytes(cap)} used</span>
+                    </span>
+                    <span className={`tabular-nums font-medium ${
+                      pct >= 90 ? "text-red-400" : pct >= 70 ? "text-yellow-400" : "text-muted-foreground"
+                    }`}>
+                      {pct.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 rounded-full bg-muted/40 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  {skipped > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs text-yellow-400">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      {skipped.toLocaleString()} script{skipped !== 1 ? "s" : ""} skipped — cap is actively blocking new caches
+                    </div>
+                  )}
+                  {skipped === 0 && analytics && (
+                    <div className="text-xs text-muted-foreground">No scripts skipped — cache cap not reached</div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Feature usage */}

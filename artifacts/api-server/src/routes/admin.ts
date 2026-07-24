@@ -231,7 +231,9 @@ router.get("/admin/analytics", async (req: Request, res: Response) => {
           (SELECT COALESCE(SUM(cached_video_size_bytes), 0)
            FROM community_scripts
            WHERE cache_status = 'cached' AND cached_video_size_bytes IS NOT NULL
-          )                                           AS cached_video_total_bytes
+          )                                           AS cached_video_total_bytes,
+          (SELECT COUNT(*) FROM community_scripts WHERE cache_status = 'skipped')
+                                                      AS cached_video_skipped
       `),
       // Feature usage (all time and last 30 days)
       pool.query<{ feature: string; total: string; last_30: string }>(`
@@ -309,6 +311,7 @@ router.get("/admin/analytics", async (req: Request, res: Response) => {
         libraryEntries:         parseInt(c.library_entries, 10),
         cachedVideoTotalBytes:  Number(c.cached_video_total_bytes ?? 0),
         cachedVideoCapBytes,
+        cachedVideoSkipped:     parseInt(c.cached_video_skipped ?? "0", 10),
       },
       features,
       earlyBird,
