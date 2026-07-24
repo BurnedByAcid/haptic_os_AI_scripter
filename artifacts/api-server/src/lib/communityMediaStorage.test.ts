@@ -8,7 +8,7 @@ vi.mock("../lib/hapticaiStorage", () => ({
 }));
 
 vi.mock("../lib/db", () => ({
-  pool: { query: vi.fn() },
+  pool: { query: vi.fn(), connect: vi.fn() },
 }));
 
 vi.mock("../lib/logger", () => ({
@@ -45,6 +45,7 @@ import {
 
 const mockGcsClient = vi.mocked(gcsClient);
 const mockPoolQuery = vi.mocked(pool.query);
+const mockPoolConnect = vi.mocked(pool.connect);
 const mockDnsLookup = vi.mocked(dns.promises.lookup);
 const mockHttpsRequest = vi.mocked(https.request);
 
@@ -132,6 +133,23 @@ function setupHttpsRequest(fakeRes: ReturnType<typeof makeFakeResponse>) {
   );
 }
 
+/**
+ * Create a mock Postgres client that handles the advisory-lock transaction:
+ *   BEGIN → pg_advisory_xact_lock → SUM cap check → UPDATE status → COMMIT
+ *
+ * `reservedBytes` controls the value returned by the SUM cap check query.
+ * Default 0 means "plenty of headroom → proceed with upload".
+ */
+function makeClientMock(reservedBytes = 0) {
+  const clientQuery = vi.fn()
+    .mockResolvedValueOnce({ rows: [] })                                        // BEGIN
+    .mockResolvedValueOnce({ rows: [] })                                        // pg_advisory_xact_lock
+    .mockResolvedValueOnce({ rows: [{ reserved: String(reservedBytes) }] })     // SUM cap check
+    .mockResolvedValueOnce({ rows: [] })                                        // UPDATE status
+    .mockResolvedValueOnce({ rows: [] });                                       // COMMIT
+  return { query: clientQuery, release: vi.fn() };
+}
+
 // ── Shared setup ─────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -149,6 +167,9 @@ describe("cacheVideoInBackground", () => {
   const STORAGE_KEY = storageKeyForScript(SCRIPT_ID);
 
   it("caches successfully: streams data to GCS and marks cache_status = cached", async () => {
+    const client = makeClientMock(0);
+    mockPoolConnect.mockResolvedValue(client as any);
+
     const writeStream = makeFakeWriteStream();
     const fakeFile = makeFakeFile(writeStream);
     const fakeBucket = { file: vi.fn().mockReturnValue(fakeFile) };
@@ -159,8 +180,8 @@ describe("cacheVideoInBackground", () => {
 
     // Script exists in DB → UPDATE to 'cached' succeeds.
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [{ id: SCRIPT_ID }] } as any) // SELECT
-      .mockResolvedValueOnce({ rows: [] } as any); // UPDATE
+      .mockResolvedValueOnce({ rows: [{ id: SCRIPT_ID }] } as any) // SELECT id
+      .mockResolvedValueOnce({ rows: [] } as any);                  // UPDATE to 'cached'
 
     const promise = cacheVideoInBackground(SCRIPT_ID, VIDEO_URL);
 
@@ -177,15 +198,24 @@ describe("cacheVideoInBackground", () => {
       expect.objectContaining({ metadata: { contentType: "video/mp4" } }),
     );
 
-    // DB updated to 'cached' with the storage key.
+    // Transaction reserved slot as 'uploading'.
+    const uploadingCall = (client.query.mock.calls as any[][]).find(
+      (c) => typeof c[0] === "string" && (c[0] as string).includes("cache_status = 'uploading'"),
+    );
+    expect(uploadingCall).toBeDefined();
+
+    // DB updated to 'cached' with storage key and byte count via pool.query.
     const updateCall = mockPoolQuery.mock.calls.find(
       (c) => typeof c[0] === "string" && (c[0] as string).includes("cache_status = 'cached'"),
     );
     expect(updateCall).toBeDefined();
-    expect(updateCall![1]).toEqual([STORAGE_KEY, SCRIPT_ID]);
+    expect(updateCall![1]).toEqual([STORAGE_KEY, 256, SCRIPT_ID]);
   });
 
   it("upstream HTTP error: marks cache_status = failed without touching GCS", async () => {
+    const client = makeClientMock(0);
+    mockPoolConnect.mockResolvedValue(client as any);
+
     const writeStream = makeFakeWriteStream();
     const fakeFile = makeFakeFile(writeStream);
     const fakeBucket = { file: vi.fn().mockReturnValue(fakeFile) };
@@ -210,6 +240,9 @@ describe("cacheVideoInBackground", () => {
   });
 
   it("file exceeds 2 GB: aborts upload and marks cache_status = failed", async () => {
+    const client = makeClientMock(0);
+    mockPoolConnect.mockResolvedValue(client as any);
+
     const writeStream = makeFakeWriteStream();
     const fakeFile = makeFakeFile(writeStream);
     const fakeBucket = { file: vi.fn().mockReturnValue(fakeFile) };
@@ -241,6 +274,9 @@ describe("cacheVideoInBackground", () => {
   });
 
   it("GCS write failure: marks cache_status = failed", async () => {
+    const client = makeClientMock(0);
+    mockPoolConnect.mockResolvedValue(client as any);
+
     const writeStream = makeFakeWriteStream();
     // Override end() to emit an error instead of finish.
     writeStream.end.mockImplementation(() => {
@@ -269,6 +305,60 @@ describe("cacheVideoInBackground", () => {
     );
     expect(updateCall).toBeDefined();
     expect(updateCall![1]).toEqual([SCRIPT_ID]);
+  });
+
+  it("cap check exceeded: marks cache_status = skipped and skips upload", async () => {
+    // Report reserved bytes at the cap so adding VIDEO_MAX_BYTES more would exceed it.
+    const capBytes = 100 * 1024 * 1024 * 1024; // 100 GB default
+    const client = makeClientMock(capBytes); // reserved = full cap → any new upload would exceed
+    mockPoolConnect.mockResolvedValue(client as any);
+
+    const fakeFile = { createWriteStream: vi.fn() };
+    const fakeBucket = { file: vi.fn().mockReturnValue(fakeFile) };
+    mockGcsClient.bucket.mockReturnValue(fakeBucket as any);
+
+    mockPoolQuery.mockResolvedValue({ rows: [] } as any);
+
+    await cacheVideoInBackground(SCRIPT_ID, VIDEO_URL);
+
+    // The transaction should have committed a 'skipped' update, not 'uploading'.
+    const skippedCall = (client.query.mock.calls as any[][]).find(
+      (c) => typeof c[0] === "string" && (c[0] as string).includes("cache_status = 'skipped'"),
+    );
+    expect(skippedCall).toBeDefined();
+
+    // No GCS interaction.
+    expect(fakeFile.createWriteStream).not.toHaveBeenCalled();
+
+    // No pool.query UPDATE to 'failed' — early return path.
+    const failedCall = mockPoolQuery.mock.calls.find(
+      (c) => typeof c[0] === "string" && (c[0] as string).includes("cache_status = 'failed'"),
+    );
+    expect(failedCall).toBeUndefined();
+  });
+
+  it("concurrent cap reservation: second upload sees in-progress slot and is skipped", async () => {
+    // Simulate: one upload already in progress (counted as VIDEO_MAX_BYTES).
+    // If the cap is just above VIDEO_MAX_BYTES, the second caller's check
+    // (currentReserved + VIDEO_MAX_BYTES > cap) should fail.
+    const capBytes = 100 * 1024 * 1024 * 1024; // 100 GB default
+    // Reserved = cap - 1 byte → adding VIDEO_MAX_BYTES pushes it over.
+    const client = makeClientMock(capBytes - 1);
+    mockPoolConnect.mockResolvedValue(client as any);
+
+    const fakeFile = { createWriteStream: vi.fn() };
+    const fakeBucket = { file: vi.fn().mockReturnValue(fakeFile) };
+    mockGcsClient.bucket.mockReturnValue(fakeBucket as any);
+
+    mockPoolQuery.mockResolvedValue({ rows: [] } as any);
+
+    await cacheVideoInBackground(SCRIPT_ID, VIDEO_URL);
+
+    const skippedCall = (client.query.mock.calls as any[][]).find(
+      (c) => typeof c[0] === "string" && (c[0] as string).includes("cache_status = 'skipped'"),
+    );
+    expect(skippedCall).toBeDefined();
+    expect(fakeFile.createWriteStream).not.toHaveBeenCalled();
   });
 });
 

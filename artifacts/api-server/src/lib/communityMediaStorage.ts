@@ -213,28 +213,70 @@ function fetchStream(
  */
 export async function cacheVideoInBackground(scriptId: number, videoUrl: string): Promise<void> {
   try {
-    // ── Platform-wide storage cap check ─────────────────────────────────────
-    // Query the sum of all successfully cached video sizes. If adding a new
-    // video (up to VIDEO_MAX_BYTES worst-case) would exceed the ceiling, skip
-    // caching rather than risk runaway storage costs.
+    // ── Atomic cap check + slot reservation ─────────────────────────────────
+    // We hold a transaction-scoped Postgres advisory lock for the duration of
+    // the check-and-mark step only (not the whole upload). This serialises all
+    // concurrent callers through a single critical section so neither can see
+    // a stale total while the other is still reserving its slot.
+    //
+    // In-progress uploads (cache_status = 'uploading') are counted as
+    // VIDEO_MAX_BYTES each — the worst-case size — so the headroom calculation
+    // is always pessimistic.  The lock is released automatically when the
+    // transaction commits or rolls back.
     const capBytes = getCacheMaxTotalBytes();
-    const { rows: sumRows } = await pool.query<{ total: string }>(
-      `SELECT COALESCE(SUM(cached_video_size_bytes), 0) AS total
-       FROM community_scripts
-       WHERE cache_status = 'cached' AND cached_video_size_bytes IS NOT NULL`,
-    );
-    const currentTotalBytes = Number(sumRows[0]?.total ?? 0);
-    if (currentTotalBytes + VIDEO_MAX_BYTES > capBytes) {
-      logger.warn(
-        { scriptId, currentTotalBytes, capBytes },
-        "Platform cache cap would be exceeded; skipping video cache",
+
+    // Fixed advisory-lock key: crc32-like integer scoped to this cap check.
+    // Any stable non-zero bigint works; pick something unlikely to collide.
+    const CAP_LOCK_KEY = 5_672_341_234; // fits in JS safe-integer range; Postgres casts to bigint
+
+    const client = await pool.connect();
+    let slotReserved = false;
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock($1)", [CAP_LOCK_KEY]);
+
+      const { rows: sumRows } = await client.query<{ reserved: string }>(
+        `SELECT COALESCE(SUM(
+           CASE
+             WHEN cache_status = 'cached'   THEN COALESCE(cached_video_size_bytes, 0)
+             WHEN cache_status = 'uploading' THEN $1
+             ELSE 0
+           END
+         ), 0) AS reserved
+         FROM community_scripts
+         WHERE cache_status IN ('cached', 'uploading')`,
+        [VIDEO_MAX_BYTES],
       );
-      await pool.query(
-        `UPDATE community_scripts SET cache_status = 'skipped' WHERE id = $1`,
+      const currentReservedBytes = Number(sumRows[0]?.reserved ?? 0);
+
+      if (currentReservedBytes + VIDEO_MAX_BYTES > capBytes) {
+        await client.query(
+          `UPDATE community_scripts SET cache_status = 'skipped' WHERE id = $1`,
+          [scriptId],
+        );
+        await client.query("COMMIT");
+        logger.warn(
+          { scriptId, currentReservedBytes, capBytes },
+          "Platform cache cap would be exceeded; skipping video cache",
+        );
+        return;
+      }
+
+      // Reserve the slot — counted in subsequent cap checks while uploading.
+      await client.query(
+        `UPDATE community_scripts SET cache_status = 'uploading' WHERE id = $1`,
         [scriptId],
-      ).catch(() => undefined);
-      return;
+      );
+      await client.query("COMMIT");
+      slotReserved = true;
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
     }
+
+    if (!slotReserved) return;
 
     const parsed = new URL(videoUrl);
     await assertHostIsPublic(parsed.hostname);
