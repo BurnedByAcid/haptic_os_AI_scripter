@@ -10,6 +10,14 @@ const VIDEO_MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
 const MAX_REDIRECTS = 5;
 const DEFAULT_CACHE_MAX_TOTAL_BYTES = 100 * 1024 * 1024 * 1024; // 100 GB
 
+// ─── Upload concurrency gate ──────────────────────────────────────────────────
+// Prevents a flood of simultaneous GCS uploads when many 'skipped' scripts
+// unblock at once (e.g. after a sweep or cache eviction). At most
+// MAX_CONCURRENT_UPLOADS uploads run in parallel; additional callers exit
+// immediately (the DB row stays 'pending' for the next request burst).
+const MAX_CONCURRENT_UPLOADS = 3;
+let activeUploads = 0;
+
 function getCacheMaxTotalBytes(): number {
   const raw = process.env.COMMUNITY_CACHE_MAX_TOTAL_BYTES?.trim();
   if (!raw) return DEFAULT_CACHE_MAX_TOTAL_BYTES;
@@ -60,9 +68,17 @@ setInterval(async () => {
     const currentTotalBytes = Number(sumRows[0]?.total ?? 0);
 
     // Only re-queue if there is at least one max-size video's worth of headroom.
+    // Reset in small batches (LIMIT 5) so that even if many scripts are waiting,
+    // only a handful become 'pending' at once — preventing a simultaneous upload spike.
     if (currentTotalBytes + VIDEO_MAX_BYTES <= capBytes) {
       const { rowCount } = await pool.query(
-        `UPDATE community_scripts SET cache_status = 'pending' WHERE cache_status = 'skipped'`,
+        `UPDATE community_scripts
+         SET cache_status = 'pending'
+         WHERE id IN (
+           SELECT id FROM community_scripts
+           WHERE cache_status = 'skipped'
+           LIMIT 5
+         )`,
       );
       if (rowCount && rowCount > 0) {
         logger.info(
@@ -212,6 +228,17 @@ function fetchStream(
  * Fire-and-forget after INSERT.
  */
 export async function cacheVideoInBackground(scriptId: number, videoUrl: string): Promise<void> {
+  // ── Concurrency gate ──────────────────────────────────────────────────────
+  // If the maximum number of uploads are already running, skip this call.
+  // The DB row remains 'pending' so it will be picked up on the next request.
+  if (activeUploads >= MAX_CONCURRENT_UPLOADS) {
+    logger.info(
+      { scriptId, activeUploads, MAX_CONCURRENT_UPLOADS },
+      "Upload concurrency cap reached; deferring community video cache",
+    );
+    return;
+  }
+  activeUploads++;
   try {
     // ── Atomic cap check + slot reservation ─────────────────────────────────
     // We hold a transaction-scoped Postgres advisory lock for the duration of
@@ -330,6 +357,8 @@ export async function cacheVideoInBackground(scriptId: number, videoUrl: string)
       `UPDATE community_scripts SET cache_status = 'failed' WHERE id = $1`,
       [scriptId],
     ).catch(() => undefined);
+  } finally {
+    activeUploads--;
   }
 }
 
