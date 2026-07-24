@@ -3,7 +3,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { useHandy } from "@/hooks/use-handy";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useRetryQueue } from "@/hooks/use-retry-queue";
-import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Settings, Check, WifiOff, Sparkles, Wand2, type LucideIcon } from "lucide-react";
+import { Activity, BookMarked, ChevronLeft, ChevronRight, Crown, ExternalLink, Gamepad2, Home, Library, MessageSquare, Mic, PlaySquare, Settings2, Shield, LogIn, LogOut, User, Users, Settings, Check, WifiOff, Sparkles, Wand2, type LucideIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -97,6 +97,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/",          label: "Dashboard",      icon: Home,      requiresPro: false },
   { href: "/player",    label: "Player",          icon: PlaySquare, requiresPro: false },
   { href: "/scripter",  label: "Scripter",        icon: Mic,       requiresPro: false },
+  { href: "/local-library", label: "Private Library", icon: Library,   requiresPro: false },
   { href: "/haptic-ai",   label: "HapticAI",    icon: Sparkles, requiresPro: true,  badge: "Beta", preNavWarning: true },
   { href: "/aiscripter", label: "AIScripter",   icon: Wand2,    requiresPro: false, badge: "Beta", preNavWarning: true },
   { href: "/community", label: "Community",       icon: Users,     requiresPro: false },
