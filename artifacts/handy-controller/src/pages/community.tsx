@@ -36,6 +36,7 @@ interface CommunityScript {
   title: string;
   description: string;
   video_url: string;
+  cached: boolean;
   view_count: number;
   created_at: string;
   favorite_count: number;
@@ -685,9 +686,16 @@ export default function Community() {
                     <div className="flex items-start gap-2">
                       <VideoIcon url={s.video_url} />
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground leading-tight truncate" title={s.title}>
-                          {s.title}
-                        </h3>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-semibold text-foreground leading-tight truncate" title={s.title}>
+                            {s.title}
+                          </h3>
+                          {s.cached && (
+                            <span className="shrink-0 text-[10px] font-medium bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 px-1.5 py-0.5 rounded" title="Video is permanently cached on our servers">
+                              Cached ✓
+                            </span>
+                          )}
+                        </div>
                         {s.description && (
                           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{s.description}</p>
                         )}

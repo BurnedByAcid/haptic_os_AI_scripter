@@ -3,6 +3,7 @@ import { getAuth, clerkClient } from "@clerk/express";
 import { pool } from "../lib/db";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { logger } from "../lib/logger";
+import { deleteCachedVideo } from "../lib/communityMediaStorage";
 
 const router: IRouter = Router();
 
@@ -378,6 +379,85 @@ router.get("/admin/hapticai/releases", async (req: Request, res: Response) => {
   } catch (err) {
     logger.error({ err }, "Failed to load hapticai releases");
     res.status(500).json({ error: "Failed to load releases." });
+  }
+});
+
+/**
+ * DELETE /api/admin/community/:id
+ *
+ * Hard-deletes a community script (any user's) including its cached GCS
+ * object. Requires admin plan. Use for policy violations / DMCA.
+ */
+router.delete("/admin/community/:id", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const caller = await clerkClient.users.getUser(auth.userId);
+  if ((caller.publicMetadata as Record<string, unknown>)?.plan !== "admin") {
+    res.status(403).json({ error: "Admin access required" }); return;
+  }
+
+  const id = parseInt(String(req.params.id), 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id FROM community_scripts WHERE id = $1`,
+      [id],
+    );
+    if (!rows.length) { res.status(404).json({ error: "Community script not found" }); return; }
+
+    await deleteCachedVideo(id);
+
+    await pool.query(`DELETE FROM community_scripts WHERE id = $1`, [id]);
+
+    logger.info({ adminUserId: auth.userId, scriptId: id }, "Admin deleted community script");
+    res.json({ ok: true, scriptId: id });
+  } catch (err) {
+    logger.error({ err, scriptId: id }, "Failed to admin-delete community script");
+    res.status(500).json({ error: "Failed to delete community script" });
+  }
+});
+
+/**
+ * DELETE /api/admin/community/:id/cache
+ *
+ * Evicts the cached GCS object for a community script and resets
+ * cache_status to 'failed' so the original video_url is served again.
+ * Use for DMCA takedowns or manual cache cleanup.
+ * Requires admin plan.
+ */
+router.delete("/admin/community/:id/cache", async (req: Request, res: Response) => {
+  const auth = getAuth(req);
+  if (!auth.userId) { res.status(401).json({ error: "Not authenticated" }); return; }
+
+  const caller = await clerkClient.users.getUser(auth.userId);
+  if ((caller.publicMetadata as Record<string, unknown>)?.plan !== "admin") {
+    res.status(403).json({ error: "Admin access required" }); return;
+  }
+
+  const id = parseInt(String(req.params.id), 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, cached_video_url, cache_status FROM community_scripts WHERE id = $1`,
+      [id],
+    );
+    if (!rows.length) { res.status(404).json({ error: "Community script not found" }); return; }
+
+    await deleteCachedVideo(id);
+
+    await pool.query(
+      `UPDATE community_scripts SET cached_video_url = NULL, cache_status = 'failed' WHERE id = $1`,
+      [id],
+    );
+
+    logger.info({ adminUserId: auth.userId, scriptId: id }, "Admin evicted community script cache");
+    res.json({ ok: true, scriptId: id });
+  } catch (err) {
+    logger.error({ err, scriptId: id }, "Failed to evict community script cache");
+    res.status(500).json({ error: "Failed to evict cache" });
   }
 });
 

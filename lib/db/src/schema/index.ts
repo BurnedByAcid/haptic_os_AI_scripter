@@ -50,16 +50,18 @@ export const scripterSessionsTable = pgTable("scripter_sessions", {
 
 
 export const communityScriptsTable = pgTable("community_scripts", {
-  id:          integer("id").generatedAlwaysAsIdentity().primaryKey(),
-  userId:      text("user_id").notNull().references(() => usersTable.clerkId, { onDelete: "cascade" }),
-  username:    text("username").notNull(),
-  title:       text("title").notNull(),
-  description: text("description").notNull().default(""),
-  videoUrl:    text("video_url").notNull(),
-  funscript:   text("funscript").notNull(),
-  viewCount:   integer("view_count").notNull().default(0),
-  tags:        text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
-  createdAt:   timestamp("created_at").notNull().defaultNow(),
+  id:              integer("id").generatedAlwaysAsIdentity().primaryKey(),
+  userId:          text("user_id").notNull().references(() => usersTable.clerkId, { onDelete: "cascade" }),
+  username:        text("username").notNull(),
+  title:           text("title").notNull(),
+  description:     text("description").notNull().default(""),
+  videoUrl:        text("video_url").notNull(),
+  funscript:       text("funscript").notNull(),
+  viewCount:       integer("view_count").notNull().default(0),
+  tags:            text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
+  createdAt:       timestamp("created_at").notNull().defaultNow(),
+  cachedVideoUrl:  text("cached_video_url"),
+  cacheStatus:     text("cache_status").notNull().default("pending"),
 }, (t) => [
   index("community_scripts_tags_gin_idx").using("gin", t.tags),
   unique("community_scripts_user_video_unique").on(t.userId, t.videoUrl),

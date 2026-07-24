@@ -6,6 +6,13 @@ import sanitizeHtml from "sanitize-html";
 import { scriptUploadLimiter, writeLimiter } from "../middlewares/rateLimiters";
 import { logger } from "../lib/logger";
 import { validateTagsForWrite, parseTagsFilter } from "@workspace/validation";
+import {
+  cacheVideoInBackground,
+  deleteCachedVideo,
+  streamCachedVideo,
+  mintCachedVideoToken,
+  lookupCachedVideoToken,
+} from "../lib/communityMediaStorage";
 
 const router = Router();
 const COMMUNITY_VIDEO_MAX_BYTES = 200 * 1024 * 1024;
@@ -58,13 +65,77 @@ async function getSubscriberVideoBytes(userId: string): Promise<number> {
   return Number(rows[0]?.total ?? 0);
 }
 
+/**
+ * Build the token-based streaming URL for a cached community video.
+ * The token is short-lived and tied to the requesting user; it can be used
+ * by a <video> element without sending auth headers.
+ */
+function buildCachedVideoUrl(req: Request, userId: string, scriptId: number, storageKey: string): string {
+  const token = mintCachedVideoToken(userId, scriptId, storageKey);
+  const proto = req.headers["x-forwarded-proto"] ?? "https";
+  const host = req.headers["x-forwarded-host"] ?? req.headers.host ?? "localhost";
+  return `${String(proto)}://${String(host)}/api/community/cached-video/${token}`;
+}
+
+type RawRow = { id: number; video_url: string; cached_video_url: string | null; cache_status: string };
+
+/**
+ * Return the best video URL for a script row.
+ * When cache_status is 'cached', mint a streaming token and return the
+ * token-based proxy URL (works with <video> elements — no auth headers needed).
+ * Otherwise returns the original video_url.
+ */
+function resolveVideoUrl(req: Request, userId: string, row: RawRow): string {
+  if (row.cache_status === "cached" && row.cached_video_url) {
+    return buildCachedVideoUrl(req, userId, row.id, row.cached_video_url);
+  }
+  return row.video_url;
+}
+
 // ─── Routes ─────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/community/cached-video/:token
+ *
+ * Token-authenticated streaming endpoint for cached community videos.
+ * No Clerk auth required — the short-lived opaque token is sufficient, making
+ * this URL safe to pass to a browser <video> element.
+ * Supports Range requests for video seeking.
+ *
+ * MUST be registered before GET /community/:id to avoid Express treating
+ * "cached-video" as the :id segment.
+ */
+router.get("/community/cached-video/:token", async (req: Request, res: Response) => {
+  const entry = lookupCachedVideoToken(String(req.params.token));
+  if (!entry) {
+    res.status(404).json({ error: "Stream token not found or expired — reload the community page." });
+    return;
+  }
+
+  try {
+    const origin = req.headers["origin"];
+    if (origin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+    }
+    res.setHeader("Access-Control-Allow-Headers", "Range");
+    res.setHeader("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges");
+
+    const served = await streamCachedVideo(entry.storageKey, req.headers["range"], res);
+    if (!served) {
+      if (!res.headersSent) {
+        res.status(404).json({ error: "Cached video object not found in storage" });
+      }
+    }
+  } catch (err) {
+    logger.error({ err, scriptId: entry.scriptId }, "Failed to stream cached video");
+    if (!res.headersSent) res.status(500).json({ error: "Failed to stream cached video" });
+  }
+});
 
 /**
  * GET /api/community
  * List shared scripts (paginated, newest first).
- * Includes aggregate favorite count and average rating.
- * Requires auth; returns per-user favorite/rating state when signed in.
  */
 router.get("/community", async (req: Request, res: Response) => {
   const auth = getAuth(req);
@@ -75,8 +146,6 @@ router.get("/community", async (req: Request, res: Response) => {
   const tagFilter = parseTagsFilter(req.query.tags);
 
   try {
-    // Build optional tag intersection clause. Tags column has a GIN index so
-    // `cs.tags @> $4::text[]` stays fast even on large tables.
     const params: unknown[] = [limit, offset, auth.userId];
     let tagClause = "";
     if (tagFilter.length > 0) {
@@ -86,7 +155,8 @@ router.get("/community", async (req: Request, res: Response) => {
     const { rows } = await pool.query(
       `SELECT
          cs.id, cs.user_id, cs.username, cs.title, cs.description,
-         cs.video_url, cs.view_count, cs.tags, cs.created_at,
+         cs.video_url, cs.cached_video_url, cs.cache_status,
+         cs.view_count, cs.tags, cs.created_at,
          COUNT(DISTINCT cf.user_id)::int        AS favorite_count,
          ROUND(AVG(cr.rating)::numeric, 1)::float AS avg_rating,
          COUNT(DISTINCT cr.user_id)::int         AS rating_count,
@@ -101,7 +171,7 @@ router.get("/community", async (req: Request, res: Response) => {
        LIMIT $1 OFFSET $2`,
       params,
     );
-    // Total respects the same tag filter so pagination math stays correct.
+
     const totalParams: unknown[] = [];
     let totalClause = "";
     if (tagFilter.length > 0) {
@@ -112,7 +182,18 @@ router.get("/community", async (req: Request, res: Response) => {
       `SELECT COUNT(*)::int AS total FROM community_scripts${totalClause}`,
       totalParams,
     );
-    res.json({ scripts: rows, total: (countRows[0] as { total: number }).total, limit, offset });
+
+    const scripts = rows.map((row) => {
+      const r = row as RawRow;
+      return {
+        ...row,
+        video_url: resolveVideoUrl(req, auth.userId!, r),
+        cached: r.cache_status === "cached",
+        cached_video_url: undefined,
+      };
+    });
+
+    res.json({ scripts, total: (countRows[0] as { total: number }).total, limit, offset });
   } catch (err) {
     logger.error({ err }, "Failed to fetch community scripts");
     res.status(500).json({ error: "Failed to fetch community scripts" });
@@ -122,7 +203,6 @@ router.get("/community", async (req: Request, res: Response) => {
 /**
  * GET /api/community/:id
  * Get detail for a single shared script. Increments view_count.
- * Returns funscript content + aggregate stats.
  */
 router.get("/community/:id", async (req: Request, res: Response) => {
   const auth = getAuth(req);
@@ -137,7 +217,8 @@ router.get("/community/:id", async (req: Request, res: Response) => {
     const { rows } = await pool.query(
       `SELECT
          cs.id, cs.user_id, cs.username, cs.title, cs.description,
-         cs.video_url, cs.funscript, cs.view_count, cs.tags, cs.created_at,
+         cs.video_url, cs.cached_video_url, cs.cache_status,
+         cs.funscript, cs.view_count, cs.tags, cs.created_at,
          COUNT(DISTINCT cf.user_id)::int        AS favorite_count,
          ROUND(AVG(cr.rating)::numeric, 1)::float AS avg_rating,
          COUNT(DISTINCT cr.user_id)::int         AS rating_count,
@@ -151,7 +232,14 @@ router.get("/community/:id", async (req: Request, res: Response) => {
       [id, auth.userId]
     );
     if (!rows.length) { res.status(404).json({ error: "Not found" }); return; }
-    res.json(rows[0]);
+
+    const row = rows[0] as RawRow;
+    res.json({
+      ...rows[0],
+      video_url: resolveVideoUrl(req, auth.userId, row),
+      cached: row.cache_status === "cached",
+      cached_video_url: undefined,
+    });
   } catch {
     res.status(500).json({ error: "Failed to fetch script" });
   }
@@ -190,7 +278,6 @@ router.post("/community", writeLimiter, scriptUploadLimiter, async (req: Request
   if ("error" in tagsResult) { res.status(400).json({ error: tagsResult.error.message }); return; }
   const tags = tagsResult.tags;
 
-  // Derive username from trusted DB record — never trust client-supplied username
   const { rows: userRows } = await pool.query(
     `SELECT username FROM users WHERE clerk_id = $1`,
     [auth.userId]
@@ -224,36 +311,48 @@ router.post("/community", writeLimiter, scriptUploadLimiter, async (req: Request
     );
     if (dupeRows.length > 0) {
       const dupe = dupeRows[0] as { id: number; title: string };
-      res.status(409).json({
-        error: "already_shared",
-        existing_id: dupe.id,
-        existing_title: dupe.title,
-      });
+      res.status(409).json({ error: "already_shared", existing_id: dupe.id, existing_title: dupe.title });
       return;
     }
 
     const { rows } = await pool.query(
-      `INSERT INTO community_scripts (user_id, username, title, description, video_url, funscript, tags)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, user_id, username, title, description, video_url, view_count, tags, created_at`,
+      `INSERT INTO community_scripts (user_id, username, title, description, video_url, funscript, tags, cache_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
+       RETURNING id, user_id, username, title, description, video_url, view_count, tags, created_at, cache_status`,
       [auth.userId, username, title, description, video_url, funscriptStr, tags],
     );
-    res.status(201).json(rows[0]);
+
+    const newRow = rows[0] as {
+      id: number;
+      user_id: string;
+      username: string;
+      title: string;
+      description: string;
+      video_url: string;
+      view_count: number;
+      tags: string[];
+      created_at: string;
+      cache_status: string;
+    };
+
+    // cache_status is 'pending' so cached=false; video_url is the original.
+    res.status(201).json({ ...newRow, cached: false });
+
+    setImmediate(() => {
+      cacheVideoInBackground(newRow.id, newRow.video_url).catch((err) => {
+        logger.error({ err, scriptId: newRow.id }, "Unexpected error in cacheVideoInBackground");
+      });
+    });
   } catch (err: unknown) {
     const pg = err as { code?: string };
     if (pg.code === "23505") {
-      // Unique constraint violation — race condition duplicate; look up the existing entry
       try {
         const { rows: existing } = await pool.query(
           `SELECT id, title FROM community_scripts WHERE user_id = $1 AND video_url = $2 LIMIT 1`,
           [auth.userId, video_url],
         );
         const dupe = existing[0] as { id: number; title: string } | undefined;
-        res.status(409).json({
-          error: "already_shared",
-          existing_id: dupe?.id,
-          existing_title: dupe?.title,
-        });
+        res.status(409).json({ error: "already_shared", existing_id: dupe?.id, existing_title: dupe?.title });
       } catch {
         res.status(409).json({ error: "already_shared" });
       }
@@ -265,7 +364,7 @@ router.post("/community", writeLimiter, scriptUploadLimiter, async (req: Request
 
 /**
  * DELETE /api/community/:id
- * Delete own shared entry. Subscriber who owns the entry.
+ * Delete own shared entry. Removes cached GCS object first.
  */
 router.delete("/community/:id", writeLimiter, async (req: Request, res: Response) => {
   const auth = getAuth(req);
@@ -275,6 +374,14 @@ router.delete("/community/:id", writeLimiter, async (req: Request, res: Response
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   try {
+    const { rows: ownerRows } = await pool.query(
+      `SELECT id FROM community_scripts WHERE id = $1 AND user_id = $2`,
+      [id, auth.userId]
+    );
+    if (!ownerRows.length) { res.status(404).json({ error: "Not found or not your script" }); return; }
+
+    await deleteCachedVideo(id);
+
     const { rowCount } = await pool.query(
       `DELETE FROM community_scripts WHERE id = $1 AND user_id = $2`,
       [id, auth.userId]
