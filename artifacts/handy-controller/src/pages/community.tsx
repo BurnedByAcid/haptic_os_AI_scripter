@@ -37,6 +37,7 @@ interface CommunityScript {
   description: string;
   video_url: string;
   cached: boolean;
+  cache_status: "pending" | "cached" | "failed";
   view_count: number;
   created_at: string;
   favorite_count: number;
@@ -695,6 +696,11 @@ export default function Community() {
                               Cached ✓
                             </span>
                           )}
+                          {s.cache_status === "pending" && (
+                            <span className="shrink-0 text-[10px] font-medium bg-amber-500/15 text-amber-500 border border-amber-500/30 px-1.5 py-0.5 rounded" title="Video is being cached — playback will be available shortly">
+                              Caching…
+                            </span>
+                          )}
                         </div>
                         {s.description && (
                           <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{s.description}</p>
@@ -764,6 +770,8 @@ export default function Community() {
                         size="sm"
                         className="flex-1 text-xs h-8 gap-1.5"
                         onClick={() => handleUseInPlayer(s)}
+                        disabled={s.cache_status === "pending"}
+                        title={s.cache_status === "pending" ? "Video is being cached — try again in a moment" : undefined}
                       >
                         <Play className="h-3.5 w-3.5" /> Use in Player
                       </Button>
