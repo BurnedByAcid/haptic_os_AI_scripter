@@ -103,11 +103,11 @@ trap "rm -rf $TEMP_DIR" EXIT
 # RELEASE: Pin to a specific tag so installs are reproducible and won't break
 # silently when main changes. Update INSTALLER_TAG and INSTALLER_SHA256 each
 # time a new installer is published.
-INSTALLER_TAG="v1.0.0"
-# INSTALLER_URL points to the API server's /api/hapticai/install.py route.
-# The fallback is the Replit dev-domain URL (always reachable during development).
+INSTALLER_TAG="v1.04.0"
+# INSTALLER_URL points to the install.py file pinned to INSTALLER_TAG in the
+# GitHub repository (served via raw.githubusercontent.com).
 # Set HAPTICAI_BASE_URL to your production / custom domain to override it.
-INSTALLER_URL="https://1496e5f1-f302-402a-b2dd-cd25d95f85b5-00-3k43daw6ksczj-pzce384d.riker.replit.dev/api/hapticai/install.py"
+INSTALLER_URL="https://raw.githubusercontent.com/BurnedByAcid/haptic_os_AI_scripter/${INSTALLER_TAG}/artifacts/hapticai-server/install.py"
 # Allow override via HAPTICAI_BASE_URL for production / custom-domain deployments.
 # Unquoted RHS keeps check_installer_urls.sh from treating the unexpanded
 # variable reference as a URL to validate (its regex requires "..." around the value).
